@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}مسح رمز الحضور QR - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}ماسح كود الحضور الذكي{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4" x-data="{ 
+    gpsCaptured: false, 
+    latitude: null, 
+    longitude: null, 
+    statusMsg: 'بانتظار السماح بصلاحيات الموقع الجغرافي (GPS)...', 
+    scanActive: false,
+    alertMsg: '',
+    alertClass: '',
+    
+    requestGPS() {
+        if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    this.latitude = position.coords.latitude;
+                    this.longitude = position.coords.longitude;
+                    this.gpsCaptured = true;
+                    this.statusMsg = 'تم التقاط الموقع الجغرافي بنجاح. يمكنك الآن مسح كود الـ QR المعروض بالقاعة.';
+                    this.startScanner();
+                },
+                (error) => {
+                    this.statusMsg = 'فشل تحديد الموقع. يرجى تفعيل الـ GPS وإعطاء الصلاحية للمتصفح.';
+                },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            this.statusMsg = 'المتصفح لا يدعم تحديد الموقع الجغرافي.';
+        }
+    },
+    
+    startScanner() {
+        this.scanActive = true;
+        const html5QrcodeScanner = new Html5QrcodeScanner(
+            'reader', { fps: 10, qrbox: 250 }
+        );
+        
+        html5QrcodeScanner.render((decodedText, decodedResult) => {
+            // Stop scanning once code is detected
+            html5QrcodeScanner.clear();
+            this.scanActive = false;
+            this.sendAttendance(decodedText);
+        });
+    },
+    
+    sendAttendance(tokenStr) {
+        this.statusMsg = 'جاري تسجيل حضورك وإرسال البيانات للخادم...';
+        
+        fetch('{% url "portal:mark_attendance_post" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: json = JSON.stringify({
+                token: tokenStr,
+                latitude: this.latitude,
+                longitude: this.longitude
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.alertMsg = data.message;
+                this.alertClass = 'alert-success';
+                this.statusMsg = 'اكتملت العملية.';
+            } else {
+                this.alertMsg = data.message;
+                this.alertClass = 'alert-danger';
+                this.statusMsg = 'فشلت عملية التحضير.';
+            }
+        })
+        .catch(err => {
+            this.alertMsg = 'حدث خطأ في الاتصال بالشبكة.';
+            this.alertClass = 'alert-danger';
+            this.statusMsg = 'فشل الاتصال.';
+        });
+    }
+}" x-init="requestGPS()">
+
+    <div class="col-md-8 col-lg-6">
+        <div class="glass-card p-4 border-0 text-center shadow-lg">
+            <h5 class="fw-bold mb-3"><i class="fas fa-camera me-2 text-success"></i>ماسح كاميرا الويب / الجوال</h5>
+            <p class="text-muted small mb-4">يجب التواجد الفعلي داخل القاعة المحددة وتفعيل صلاحية تحديد الموقع (GPS) لتثبيت حضورك بنجاح.</p>
+            
+            <!-- GPS Status -->
+            <div class="alert alert-info py-2" style="font-size: 0.9rem;">
+                <i class="fas fa-map-marker-alt me-1"></i> <span x-text="statusMsg"></span>
+            </div>
+
+            <!-- Result Alert -->
+            <div class="alert dismissible fade show" :class="alertClass" x-show="alertMsg" style="display:none;" role="alert">
+                <strong x-text="alertMsg"></strong>
+                <div class="mt-2" x-show="alertClass === 'alert-success'">
+                    <a href="{% url 'portal:trainee_dashboard' %}" class="btn btn-sm btn-success px-3">العودة للوحة التحكم</a>
+                </div>
+            </div>
+
+            <!-- Scanner Camera Box -->
+            <div id="reader" class="border rounded bg-light p-2 mb-3" style="width: 100%; min-height: 250px;"></div>
+            
+            <div class="mt-3">
+                <a href="{% url 'portal:trainee_dashboard' %}" class="btn btn-outline-secondary"><i class="fas fa-chevron-right me-1"></i>الرجوع</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Load Html5-Qrcode Library -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}مبادرة 1000 مبرمج بالبصرة - العتبة الحسينية المقدسة{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="row align-items-center py-5">
+    <div class="col-lg-6 mb-4 mb-lg-0 text-center text-lg-start">
+        <span class="badge bg-success-subtle text-success px-3 py-2 rounded-pill mb-3 fs-6">برعاية العتبة الحسينية المقدسة</span>
+        <h1 class="display-4 fw-extrabold mb-3 text-slate-900" style="font-weight: 900; line-height: 1.2;">
+            بناء جيل برمجـي واعد في <span class="text-success">محافظة البصرة</span>
+        </h1>
+        <p class="lead text-muted mb-4">
+            مبادرة تنموية رائدة تهدف إلى تدريب وتأهيل 1000 شاب وشابة من البصرة في أرقى تخصصات البرمجيات العالمية، لتمكينهم من قيادة التحول الرقمي وتلبية متطلبات سوق العمل البرمجي المعاصر.
+        </p>
+        <div class="d-flex gap-3 justify-content-center justify-content-lg-start">
+            <a href="{% url 'portal:login' %}" class="btn btn-primary-custom btn-lg shadow-sm">دخول المنصة التعليمية <i class="fas fa-arrow-left ms-2"></i></a>
+            <a href="#about" class="btn btn-outline-secondary btn-lg">تعرف على المبادرة</a>
+        </div>
+    </div>
+    <div class="col-lg-6 text-center">
+        <!-- A beautiful abstract vector or placeholder-free modern programming representation -->
+        <div class="glass-card p-4 shadow-lg border-0 d-inline-block position-relative">
+            <div class="position-absolute top-0 start-50 translate-middle-y bg-warning text-dark px-3 py-1 rounded-pill fw-bold" style="font-size: 0.85rem;">
+                <i class="fas fa-trophy me-1"></i>التميز المعرفي
+            </div>
+            <i class="fas fa-laptop-code text-success" style="font-size: 15rem; opacity: 0.95;"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Section -->
+<div class="row my-5 text-center g-4">
+    <div class="col-6 col-md-3">
+        <div class="glass-card p-4 border-0">
+            <div class="icon-box icon-box-primary mx-auto mb-3">
+                <i class="fas fa-user-graduate"></i>
+            </div>
+            <h3 class="fw-bold text-slate-800">{{ stats.trainees }}</h3>
+            <p class="text-muted m-0">متدرب نشط</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="glass-card p-4 border-0">
+            <div class="icon-box icon-box-secondary mx-auto mb-3">
+                <i class="fas fa-chalkboard-teacher"></i>
+            </div>
+            <h3 class="fw-bold text-slate-800">{{ stats.lecturers }}</h3>
+            <p class="text-muted m-0">مدرب ومحاضر</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="glass-card p-4 border-0">
+            <div class="icon-box icon-box-accent mx-auto mb-3">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <h3 class="fw-bold text-slate-800">{{ stats.supervisors }}</h3>
+            <p class="text-muted m-0">مشرف متابعة</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="glass-card p-4 border-0">
+            <div class="icon-box icon-box-primary mx-auto mb-3" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <h3 class="fw-bold text-slate-800">{{ stats.attendance_rate }}%</h3>
+            <p class="text-muted m-0">نسبة الحضور</p>
+        </div>
+    </div>
+</div>
+
+<!-- About Section -->
+<div id="about" class="row py-5 border-top align-items-center">
+    <div class="col-md-6 mb-4 mb-md-0">
+        <h2 class="fw-bold mb-3">حول المبادرة المباركة</h2>
+        <p class="text-muted">
+            تسعى الأمانة العامة للعتبة الحسينية المقدسة من خلال إطلاق هذه المبادرة في محافظة البصرة إلى الاستثمار الفعلي في العقول الشابة، وتوفير بيئة تعليمية احترافية تحاكي كبرى المؤسسات الأكاديمية والمهنية العالمية.
+        </p>
+        <p class="text-muted">
+            يشتمل البرنامج التدريبي على محاضرات حضورية مكثفة، تطبيقات عملية مستمرة، تقييمات دورية تفصيلية، ومشاريع تخرج تلامس احتياجات السوق الواقعية، تنتهي بمنح شهادات معتمدة وموثقة عبر رموز تحقق إلكترونية.
+        </p>
+    </div>
+    <div class="col-md-6">
+        <div class="glass-card p-4 border-0">
+            <h5 class="fw-bold mb-3 text-success"><i class="fas fa-check-circle me-2"></i>مزايا المنصة والتدريب:</h5>
+            <ul class="list-group list-group-flush bg-transparent">
+                <li class="list-group-item bg-transparent border-0 px-0 text-muted"><i class="fas fa-chevron-left me-2 text-warning"></i> تسجيل ذكي للحضور عبر كود الـ QR الديناميكي والموقع الجغرافي.</li>
+                <li class="list-group-item bg-transparent border-0 px-0 text-muted"><i class="fas fa-chevron-left me-2 text-warning"></i> نظام تحفيز وتفاعل (Gamification) بالنقاط والشارات التنافسية.</li>
+                <li class="list-group-item bg-transparent border-0 px-0 text-muted"><i class="fas fa-chevron-left me-2 text-warning"></i> تقييمات أدائية مهنية متكاملة تتضمن 9 مهارات سلوكية وتقنية.</li>
+                <li class="list-group-item bg-transparent border-0 px-0 text-muted"><i class="fas fa-chevron-left me-2 text-warning"></i> توليد شهادات PDF ذكية تدعم رموز الاستجابة السريعة للتثبت العام.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

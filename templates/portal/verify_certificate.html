@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}التحقق من الشهادة الرقمية - مبادرة 1000 مبرمج{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-8 col-lg-6 text-center">
+        <!-- Verification Shield Header -->
+        <div class="glass-card p-5 border-0 shadow-lg" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(30, 58, 138, 0.03) 100%); border-top: 5px solid #10b981 !important;">
+            <div class="text-success mb-3">
+                <i class="fas fa-shield-check" style="font-size: 5rem; color: #10b981;"></i>
+            </div>
+            
+            <h3 class="fw-bold mb-1 text-success">شهادة معتمدة وموثقة</h3>
+            <p class="text-muted mb-4">تم التحقق من صحة هذه الشهادة إلكترونياً من قاعدة بيانات مبادرة 1000 مبرمج</p>
+            
+            <hr>
+            
+            <!-- Details Grid -->
+            <div class="text-start my-4 px-3">
+                <div class="row mb-3">
+                    <div class="col-5 text-muted">اسم المتدرب:</div>
+                    <div class="col-7 fw-bold text-dark fs-5">{{ certificate.trainee.get_full_name|default:certificate.trainee.username }}</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-5 text-muted">الدورة التدريبية:</div>
+                    <div class="col-7 fw-bold text-dark">{{ certificate.course.title }}</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-5 text-muted">ساعات التدريب:</div>
+                    <div class="col-7 fw-bold text-dark">{{ certificate.course.hours }} ساعة تدريبية معتمدة</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-5 text-muted">رقم الشهادة:</div>
+                    <div class="col-7"><span class="badge bg-secondary px-3 py-2">{{ certificate.certificate_number }}</span></div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-5 text-muted">تاريخ الإصدار:</div>
+                    <div class="col-7 text-dark">{{ certificate.issued_at|date:"Y-m-d" }}</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-5 text-muted">الجهة المصدرة:</div>
+                    <div class="col-7 text-dark fw-bold">الأمانة العامة للعتبة الحسينية المقدسة</div>
+                </div>
+            </div>
+            
+            <hr class="mb-4">
+            
+            <a href="{{ certificate.pdf_file.url }}" target="_blank" class="btn btn-primary-custom w-100 py-3 mb-2 shadow"><i class="fas fa-file-download me-2"></i>تحميل نسخة الشهادة الرسمية PDF</a>
+            <a href="{% url 'portal:landing' %}" class="btn btn-link text-decoration-none text-muted small"><i class="fas fa-home me-1"></i>الرجوع للصفحة الرئيسية</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

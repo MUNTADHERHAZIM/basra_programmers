@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}نشر واجب جديد - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}نشر واجب دراسي{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="glass-card p-5 border-0 shadow-lg">
+            <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-plus-circle me-2 text-success"></i>نشر واجب للمجموعة: {{ group.name }}</h5>
+            <hr class="mb-4">
+            
+            <form action="{% url 'portal:create_assignment' group.id %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="title" class="form-label fw-bold">عنوان الواجب الدراسي</label>
+                    <input type="text" class="form-control py-2" id="title" name="title" required placeholder="مثال: واجب الدرس الرابع - هياكل البيانات">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="description" class="form-label fw-bold">وصف وتعليمات الواجب</label>
+                    <textarea class="form-control" id="description" name="description" rows="5" required placeholder="اشرح تفاصيل المطلوب والملفات والتقنيات المطلوبة لتسليم الحل..."></textarea>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="due_date" class="form-label fw-bold">تاريخ ووقت التسليم النهائي</label>
+                    <input type="datetime-local" class="form-control py-2" id="due_date" name="due_date" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="file" class="form-label fw-bold">ملف توضيحي مرفق (اختياري)</label>
+                    <input type="file" class="form-control" id="file" name="file">
+                </div>
+                
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn btn-primary-custom w-50 py-3 shadow"><i class="fas fa-paper-plane me-2"></i>نشر الواجب</button>
+                    <a href="{% url 'portal:lecturer_dashboard' %}" class="btn btn-outline-secondary w-50 py-3 d-flex align-items-center justify-content-center">إلغاء الرجوع</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

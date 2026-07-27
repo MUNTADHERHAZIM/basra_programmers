@@ -1,0 +1,311 @@
+{% extends 'base.html' %}
+
+{% block title %}مركز بث الإعلانات والتبليغات - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}مركز بث الإعلانات الاحترافي{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <!-- Form Side -->
+    <div class="col-lg-7">
+        <div class="glass-card p-4 border-0 shadow">
+            <div class="d-flex align-items-center gap-2 mb-4">
+                <i class="fas fa-bullhorn text-success fs-4"></i>
+                <h5 class="fw-bold text-slate-800 m-0">إنشاء وبث إعلان جديد</h5>
+            </div>
+            
+            <form method="POST" action="{% url 'portal:add_announcement_post' %}" id="announcementForm">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <!-- Title -->
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">عنوان الإعلان</label>
+                        <input type="text" name="title" id="announcementTitle" class="form-control py-2" placeholder="مثال: موعد المحاضرة القادمة" oninput="updatePreview()" required>
+                    </div>
+
+                    <!-- Target Audience -->
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">الجهة المستهدفة بالتبليغ</label>
+                        <select name="target_audience" id="targetAudience" class="form-select py-2" onchange="toggleGroupSelect(); updatePreview();" required>
+                            <option value="all">الجميع (المدربين والمتدربين)</option>
+                            <option value="trainees">المتدربين فقط (جميع الطلاب)</option>
+                            <option value="lecturers">المدربين فقط (جميع المحاضرين)</option>
+                            <option value="group">شعبة/مجموعة معينة</option>
+                        </select>
+                    </div>
+
+                    <!-- Group Selector (Conditional) -->
+                    <div class="col-12" id="groupSelectContainer" style="display: none;">
+                        <label class="form-label text-dark fw-bold">اختر الشعبة المستهدفة</label>
+                        <select name="group_id" id="groupIdSelect" class="form-select py-2" onchange="updatePreview()">
+                            <option value="">-- اختر شعبة دراسية من القائمة --</option>
+                            {% for g in groups %}
+                            <option value="{{ g.id }}" data-name="{{ g.name }}">{{ g.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Quick Templates selector -->
+                    <div class="col-12">
+                        <label class="form-label text-dark fw-bold mb-2">استخدام قالب إعلانات جاهز (سريع)</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-info rounded-3 px-3" onclick="applyTemplate('info')">
+                                <i class="fas fa-info-circle me-1"></i>إعلان عام
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-3 px-3" onclick="applyTemplate('danger')">
+                                <i class="fas fa-exclamation-triangle me-1"></i>تنبيه عاجل
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success rounded-3 px-3" onclick="applyTemplate('success')">
+                                <i class="fas fa-trophy me-1"></i>تهنئة وتفوق
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-3 px-3" onclick="applyTemplate('warning')">
+                                <i class="fas fa-calendar-alt me-1"></i>تعديل جدول
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Content & HTML helper tools -->
+                    <div class="col-12">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                            <label class="form-label text-dark fw-bold m-0">نص الإعلان (يدعم كود HTML)</label>
+                            <div class="d-flex gap-2">
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-secondary py-0" onclick="insertHtmlTag('strong')"><strong>عريض</strong></button>
+                                    <button type="button" class="btn btn-outline-secondary py-0" onclick="insertHtmlTag('a')">رابط</button>
+                                    <button type="button" class="btn btn-outline-secondary py-0" onclick="insertHtmlTag('h5')">عنوان فرعي</button>
+                                    <button type="button" class="btn btn-outline-secondary py-0" onclick="insertHtmlTag('ul')">قائمة</button>
+                                    <button type="button" class="btn btn-outline-secondary py-0 text-danger" onclick="insertHtmlTag('span-red')">تنبيه أحمر</button>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-success py-0 active" id="dirRtlBtn" onclick="setTextareaDir('rtl')">عربي ➡</button>
+                                    <button type="button" class="btn btn-outline-primary py-0" id="dirLtrBtn" onclick="setTextareaDir('ltr')">⬅ LTR (كود)</button>
+                                </div>
+                            </div>
+                        </div>
+                        <textarea name="body" id="announcementBody" class="form-control" rows="6" placeholder="اكتب نص التبليغ أو استخدم أحد القوالب الجاهزة أعلاه..." style="direction: rtl;" oninput="updatePreview()" required></textarea>
+                        <small class="text-muted">نظام التنبيهات يدعم كود HTML بالكامل لتنسيق الروابط والتنبيهات الملونة للطلاب.</small>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-end">
+                    <button type="submit" class="btn btn-primary-custom px-5 py-2 fw-bold shadow-sm">
+                        <i class="fas fa-paper-plane me-2"></i>نشر وبث التبليغ فورياً
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Live Preview Side -->
+    <div class="col-lg-5">
+        <div class="glass-card p-4 border-0 shadow position-sticky" style="top: 90px;">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="fas fa-eye text-primary fs-4"></i>
+                <h5 class="fw-bold text-slate-800 m-0">معاينة حية وتفاعلية (Live Preview)</h5>
+            </div>
+            <p class="text-muted small">هكذا سيظهر الإعلان للمتدربين والمدربين المستهدفين في لوحات تحكمهم:</p>
+            
+            <hr class="text-muted my-3">
+            
+            <!-- Live Preview Announcement Card -->
+            <div class="p-3 border-0 shadow-sm rounded-4" style="background: linear-gradient(135deg, rgba(220, 38, 38, 0.04) 0%, rgba(30, 58, 138, 0.02) 100%); border-right: 4px solid #dc2626 !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <span class="badge bg-danger-subtle text-danger" id="previewBadge"><i class="fas fa-exclamation-circle me-1"></i>تبليغ إداري رسمي</span>
+                    <span class="text-muted small font-monospace">17:00 اليوم</span>
+                </div>
+                <h6 class="fw-bold text-slate-900 mb-2" id="previewTitle">عنوان الإعلان التجريبي</h6>
+                <div class="text-dark small m-0 text-wrap" id="previewBody">نص الإعلان سيظهر هنا بشكل تفاعلي أثناء كتابتك...</div>
+            </div>
+            
+            <div class="mt-4 bg-light p-3 rounded-3 text-center border border-light">
+                <i class="fas fa-bell text-warning fs-3 mb-2 animate-bounce"></i>
+                <h6 class="fw-bold m-0 text-slate-800">تنبيهات جرس الويب والهاتف</h6>
+                <p class="text-muted small m-0 mt-1">سيتم إرسال إشعار فوري وتنبيه أحمر في جرس المتصفح لكافة أفراد الفئة المستهدفة فور النشر.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- History Log Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-sm">
+            <div class="d-flex align-items-center gap-2 mb-4">
+                <i class="fas fa-history text-primary fs-4"></i>
+                <h5 class="fw-bold text-slate-800 m-0">سجل الإعلانات والتبليغات العامة والخاصة المرسلة</h5>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 15%">تاريخ النشر</th>
+                            <th style="width: 20%">الجهة المستهدفة</th>
+                            <th style="width: 55%">نص ومحتوى الإعلان</th>
+                            <th style="width: 10%" class="text-center">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for msg in announcements %}
+                        <tr>
+                            <td class="font-monospace text-muted small">{{ msg.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if msg.group %}
+                                <span class="badge bg-secondary-subtle text-dark border border-secondary py-1 px-2">
+                                    <i class="fas fa-users me-1 text-secondary"></i>شعبة: {{ msg.group.name }}
+                                </span>
+                                {% else %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary py-1 px-2">
+                                    <i class="fas fa-globe-asia me-1 text-primary"></i>عام للجميع
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="p-2 bg-light rounded-3 text-dark small m-0 border border-light" style="max-height: 100px; overflow-y: auto;">
+                                    {{ msg.content|safe }}
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <form method="POST" action="{% url 'portal:delete_announcement_post' msg.id %}" onsubmit="return confirm('هل أنت متأكد من حذف هذا الإعلان والتنبيه نهائياً من قاعدة البيانات ولوحات تحكم المستلمين؟');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger px-2 rounded-2" title="حذف التبليغ">
+                                        <i class="fas fa-trash-alt me-1"></i>حذف
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">لا يوجد أي إعلانات مرسلة مسبقاً.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Live update toggle for group selector
+    function toggleGroupSelect() {
+        const audience = document.getElementById('targetAudience').value;
+        const container = document.getElementById('groupSelectContainer');
+        const groupInput = document.getElementById('groupIdSelect');
+        
+        if (audience === 'group') {
+            container.style.display = 'block';
+            groupInput.required = true;
+        } else {
+            container.style.display = 'none';
+            groupInput.required = false;
+            groupInput.value = '';
+        }
+    }
+
+    // Load templates in textarea
+    function applyTemplate(type) {
+        const textarea = document.getElementById('announcementBody');
+        let template = "";
+        
+        if (type === 'danger') {
+            template = `<div class="alert alert-danger border-0 p-3 m-0 shadow-sm"><h6 class="fw-bold mb-1"><i class="fas fa-exclamation-triangle me-1"></i> تنبيه عاجل وهام</h6>يرجى الانتباه إلى أن الامتحان العملي النهائي قد تقرر إجراؤه في موعده المحدد دون أي تأجيل. التزامكم بالحضور ضروري جداً.</div>`;
+        } else if (type === 'success') {
+            template = `<div class="alert alert-success border-0 p-3 m-0 shadow-sm"><h6 class="fw-bold mb-1"><i class="fas fa-trophy me-1"></i> تهنئة وتبريكات متميزة</h6>نبارك لطلبتنا الأعزاء تفوقهم في حل الاختبارات البرمجية، ويسرنا الإعلان عن تقديم جوائز شرفية وشهادات تقدير لأفضل المشاريع الأسبوع القادم!</div>`;
+        } else if (type === 'warning') {
+            template = `<div class="alert alert-warning border-0 p-3 m-0 shadow-sm"><h6 class="fw-bold mb-1"><i class="fas fa-calendar-alt me-1"></i> تعديل في جدول المحاضرات الأسبوعي</h6>نود إعلامكم بتغيير موعد محاضرة البرمجة القادمة لتصبح عند الساعة <strong>5:00 مساءً</strong> بدلاً من 4:00. يرجى التنسيق والحضور بالموعد الجديد.</div>`;
+        } else if (type === 'info') {
+            template = `<div class="alert alert-info border-0 p-3 m-0 shadow-sm"><h6 class="fw-bold mb-1"><i class="fas fa-info-circle me-1"></i> إعلان إداري هام</h6>نرجو من جميع المتدربين تحديث ملفاتهم الشخصية وإدخال البيانات الجامعية والتخصص بدقة متناهية لتجنب تجميد أو إيقاف حساباتهم الأكاديمية.</div>`;
+        }
+        
+        textarea.value = template;
+        updatePreview();
+    }
+
+    // Insert HTML tag at cursor
+    function insertHtmlTag(tag) {
+        const textarea = document.getElementById('announcementBody');
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const selectedText = text.substring(start, end);
+        
+        let replacement = "";
+        if (tag === 'strong') {
+            replacement = `<strong>${selectedText || 'نص عريض'}</strong>`;
+        } else if (tag === 'a') {
+            replacement = `<a href="https://example.com" class="text-decoration-none text-success fw-bold" target="_blank">${selectedText || 'اسم الرابط'}</a>`;
+        } else if (tag === 'h5') {
+            replacement = `<h5 class="fw-bold text-success mt-2 mb-1">${selectedText || 'عنوان فرعي'}</h5>`;
+        } else if (tag === 'ul') {
+            replacement = `\n<ul>\n  <li>${selectedText || 'عنصر أول'}</li>\n  <li>عنصر ثانٍ</li>\n</ul>\n`;
+        } else if (tag === 'span-red') {
+            replacement = `<span class="text-danger fw-bold">${selectedText || 'تنبيه ملون'}</span>`;
+        }
+        
+        textarea.value = text.substring(0, start) + replacement + text.substring(end);
+        textarea.focus();
+        textarea.setSelectionRange(start + replacement.length, start + replacement.length);
+        updatePreview();
+    }
+
+    // Set Textarea Direction
+    function setTextareaDir(dir) {
+        const textarea = document.getElementById('announcementBody');
+        const rtlBtn = document.getElementById('dirRtlBtn');
+        const ltrBtn = document.getElementById('dirLtrBtn');
+        
+        textarea.style.direction = dir;
+        if (dir === 'ltr') {
+            textarea.style.textAlign = 'left';
+            textarea.style.fontFamily = 'monospace';
+            
+            ltrBtn.className = "btn btn-primary py-0 active";
+            rtlBtn.className = "btn btn-outline-success py-0";
+        } else {
+            textarea.style.textAlign = 'right';
+            textarea.style.fontFamily = 'inherit';
+            
+            rtlBtn.className = "btn btn-success py-0 active";
+            ltrBtn.className = "btn btn-outline-primary py-0";
+        }
+    }
+
+    // Update Live Preview Container
+    function updatePreview() {
+        const titleInput = document.getElementById('announcementTitle').value.trim();
+        const bodyInput = document.getElementById('announcementBody').value.trim();
+        const audienceSelect = document.getElementById('targetAudience');
+        const audienceVal = audienceSelect.value;
+        
+        // Update Title and Body in Preview
+        document.getElementById('previewTitle').innerText = titleInput || 'عنوان الإعلان التجريبي';
+        document.getElementById('previewBody').innerHTML = bodyInput || 'نص الإعلان سيظهر هنا بشكل تفاعلي أثناء كتابتك...';
+        
+        // Update Badge text in Preview based on Audience
+        const badge = document.getElementById('previewBadge');
+        if (audienceVal === 'group') {
+            const groupSelect = document.getElementById('groupIdSelect');
+            const selectedOpt = groupSelect.options[groupSelect.selectedIndex];
+            const groupName = (selectedOpt && selectedOpt.value) ? selectedOpt.getAttribute('data-name') : 'شعبة محددة';
+            badge.innerHTML = `<i class="fas fa-users me-1"></i>خاص بطلاب شعبة: ${groupName}`;
+            badge.className = "badge bg-secondary-subtle text-dark border border-secondary";
+        } else if (audienceVal === 'trainees') {
+            badge.innerHTML = '<i class="fas fa-user-graduate me-1"></i>خاص بجميع الطلاب';
+            badge.className = "badge bg-info-subtle text-info border border-info";
+        } else if (audienceVal === 'lecturers') {
+            badge.innerHTML = '<i class="fas fa-chalkboard-teacher me-1"></i>خاص بالمدربين فقط';
+            badge.className = "badge bg-warning-subtle text-warning border border-warning text-dark";
+        } else {
+            badge.innerHTML = '<i class="fas fa-globe-asia me-1"></i>إعلان عام لجميع المنتسبين';
+            badge.className = "badge bg-danger-subtle text-danger border border-danger";
+        }
+    }
+
+    // Initialize Preview on page load
+    window.addEventListener('DOMContentLoaded', () => {
+        updatePreview();
+    });
+</script>
+{% endblock %}

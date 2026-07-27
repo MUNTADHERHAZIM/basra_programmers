@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}جدول محاضرات المبادرة - 1000 مبرمج{% endblock %}
+{% block header_title %}جدول المبادرة واللقاءات التدريبية{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-lg">
+            <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-calendar-alt me-2 text-success"></i>تقويم محاضرات ومواعيد تسليم المجموعات</h5>
+            <p class="text-muted small mb-4">يعرض هذا التقويم جميع المحاضرات المجدولة والواجبات المستحقة لمجموعتك الدراسية. يمكنك تصفحها باليوم، الأسبوع، أو الشهر.</p>
+            
+            <!-- Safe JSON script block outside of JavaScript literal -->
+            {{ events|json_script:"calendar-events" }}
+
+            <!-- Calendar Container -->
+            <div id="calendar" style="min-height: 600px;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const calendarEl = document.getElementById('calendar');
+        
+        // Extract events from embedded JSON script block safely
+        const eventsData = JSON.parse(document.getElementById('calendar-events').textContent);
+        
+        // Format events list for fullCalendar layout mapping
+        const formattedEvents = eventsData.map(e => ({
+            title: e.title,
+            start: `${e.date}T${e.start_time}`,
+            end: `${e.date}T${e.end_time}`,
+            extendedProps: {
+                classroom: e.classroom
+            },
+            backgroundColor: '#10b981', // Holy Shrine green color
+            borderColor: '#0f764e'
+        }));
+
+        // Setup FullCalendar
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'ar',
+            direction: 'rtl',
+            headerToolbar: {
+                right: 'prev,next today',
+                center: 'title',
+                left: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            buttonText: {
+                today: 'اليوم',
+                month: 'شهر',
+                week: 'أسبوع',
+                day: 'يوم'
+            },
+            events: formattedEvents,
+            eventDidMount: function(info) {
+                // Add tooltip or display extra details on hover
+                info.el.title = `${info.event.title}\nالقاعة: ${info.event.extendedProps.classroom || 'غير محددة'}`;
+            }
+        });
+        
+        calendar.render();
+    });
+</script>
+{% endblock %}

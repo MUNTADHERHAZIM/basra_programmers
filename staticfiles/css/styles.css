@@ -1,0 +1,168 @@
+:root {
+  --primary-hsl: 154, 76%, 33%;      /* Holy Shrine Green */
+  --secondary-hsl: 224, 76%, 18%;    /* Deep Slate/Navy */
+  --accent-hsl: 38, 92%, 50%;        /* Gold */
+  
+  --bg-light: #f1f5f9;
+  --card-light: rgba(255, 255, 255, 0.9);
+  --text-light: #0f172a;
+  
+  /* Dark mode removed */
+  
+  --transition-speed: 0.3s;
+}
+
+body {
+  font-family: 'Tajawal', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-light);
+  color: var(--text-light);
+  transition: background-color var(--transition-speed), color var(--transition-speed);
+}
+
+/* Dark mode base styles removed */
+
+/* Glassmorphic Cards */
+.glass-card {
+  background: var(--card-light);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px 0 rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Dark mode glass-card removed */
+
+.glass-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 35px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Custom Buttons */
+.btn-primary-custom {
+  background-color: hsl(var(--primary-hsl));
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-primary-custom:hover {
+  background-color: #0f764e;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+  color: #fff;
+}
+
+.btn-secondary-custom {
+  background-color: hsl(var(--secondary-hsl));
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary-custom:hover {
+  background-color: #111827;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.2);
+  color: #fff;
+}
+
+/* Sidebar Nav Layout */
+.sidebar {
+  min-height: 100vh;
+  background-color: hsl(var(--secondary-hsl));
+  color: #fff;
+  padding: 24px;
+  box-shadow: 4px 0 15px rgba(0,0,0,0.1);
+}
+
+.sidebar a {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+  display: block;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.sidebar a:hover, .sidebar a.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: hsl(var(--accent-hsl));
+  padding-right: 22px;
+}
+
+/* Top Navbar */
+.top-navbar {
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+/* Dark mode top-navbar removed */
+
+/* Stat Card Icon Wrappers */
+.icon-box {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.icon-box-primary {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: hsl(var(--primary-hsl));
+}
+
+.icon-box-secondary {
+  background-color: rgba(30, 58, 138, 0.15);
+  color: #1e3a8a;
+}
+
+.icon-box-accent {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: hsl(var(--accent-hsl));
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+/* Dark mode scrollbar thumb removed */
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Progress Circular Indicator */
+.progress-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.progress-ring__circle {
+  transition: stroke-dashoffset 0.35s;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}

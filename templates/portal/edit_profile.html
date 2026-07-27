@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}تعديل الملف الشخصي - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}تعديل بيانات الملف الشخصي وتغيير كلمة المرور{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Right Column: Personal Information & Profile Details -->
+    <div class="col-lg-8">
+        <div class="glass-card p-4 border-0 shadow-lg mb-4">
+            <h5 class="fw-bold mb-4 text-success"><i class="fas fa-user-edit me-2"></i>البيانات الشخصية والمهنية</h5>
+            <form method="POST" action="{% url 'portal:edit_profile' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_info">
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">الاسم الأول</label>
+                        <input type="text" name="first_name" class="form-control" value="{{ user.first_name }}" placeholder="الاسم الأول">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">اسم العائلة</label>
+                        <input type="text" name="last_name" class="form-control" value="{{ user.last_name }}" placeholder="اسم العائلة">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">اسم المستخدم (Username)</label>
+                        <input type="text" class="form-control bg-light" value="{{ user.username }}" readonly disabled>
+                        <small class="text-muted">اسم المستخدم ثابت لحسابك الأكاديمي.</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">البريد الإلكتروني</label>
+                        <input type="email" name="email" class="form-control" value="{{ user.email }}" placeholder="email@domain.com">
+                    </div>
+
+                    <!-- Role-specific fields for LECTURER -->
+                    {% if user.role == 'lecturer' %}
+                    <div class="col-12 mt-4 border-top pt-3">
+                        <h6 class="fw-bold text-success mb-3"><i class="fas fa-graduation-cap me-1"></i>تفاصيل الخبرة والمدرب</h6>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-dark fw-bold">التخصص التقني</label>
+                        <input type="text" name="specialty" class="form-control" value="{{ lecturer_profile.specialty|default:'' }}" placeholder="مثال: Python & AI Engineering">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-dark fw-bold">نبذة تعريفية (Bio)</label>
+                        <textarea name="bio" class="form-control" rows="3" placeholder="اكتب نبذة مختصرة عن مؤهلاتك وخبرتك المهنية...">{{ lecturer_profile.bio|default:'' }}</textarea>
+                    </div>
+                    {% endif %}
+
+                    <!-- Role-specific fields for TRAINEE -->
+                    {% if user.role == 'trainee' %}
+                    <div class="col-12 mt-4 border-top pt-3">
+                        <h6 class="fw-bold text-success mb-3"><i class="fas fa-graduation-cap me-1"></i>التفاصيل الدراسية للمتدرب</h6>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">الجامعة</label>
+                        <input type="text" name="university" class="form-control" value="{{ trainee_profile.university|default:'' }}" placeholder="جامعة البصرة">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">الكلية</label>
+                        <input type="text" name="college" class="form-control" value="{{ trainee_profile.college|default:'' }}" placeholder="علوم الحاسوب وتكنولوجيا المعلومات">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">القسم</label>
+                        <input type="text" name="department" class="form-control" value="{{ trainee_profile.department|default:'' }}" placeholder="قسم نظم المعلومات البرمجية">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">المرحلة الدراسية</label>
+                        <input type="text" name="academic_stage" class="form-control" value="{{ trainee_profile.academic_stage|default:'' }}" placeholder="المرحلة الثالثة">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">التخصص التقني / الاهتمام</label>
+                        <input type="text" name="specialty" class="form-control" value="{{ trainee_profile.specialty|default:'' }}" placeholder="مثال: Backend Web Development">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">المحافظة</label>
+                        <input type="text" name="governorate" class="form-control" value="{{ trainee_profile.governorate|default:'البصرة' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">القضاء/المنطقة السكنية</label>
+                        <input type="text" name="district" class="form-control" value="{{ trainee_profile.district|default:'' }}" placeholder="الجبيلة">
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mt-4 text-end">
+                    <button type="submit" class="btn btn-primary-custom px-5 py-2">
+                        <i class="fas fa-save me-1"></i>حفظ تفاصيل الملف الشخصي
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Left Column: Change Password -->
+    <div class="col-lg-4">
+        <div class="glass-card p-4 border-0 shadow-lg mb-4">
+            <h5 class="fw-bold mb-4 text-danger"><i class="fas fa-key me-2"></i>تغيير كلمة المرور</h5>
+            <form method="POST" action="{% url 'portal:edit_profile' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="change_password">
+                
+                <div class="mb-3">
+                    <label class="form-label text-dark fw-bold">كلمة المرور الحالية</label>
+                    <input type="password" name="old_password" class="form-control" placeholder="كلمة المرور الحالية" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label text-dark fw-bold">كلمة المرور الجديدة</label>
+                    <input type="password" name="new_password" class="form-control" placeholder="أدخل كلمة مرور قوية" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label text-dark fw-bold">تأكيد كلمة المرور الجديدة</label>
+                    <input type="password" name="confirm_password" class="form-control" placeholder="أعد كتابة كلمة المرور" required>
+                </div>
+                
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-danger w-100 py-2 fw-bold">
+                        <i class="fas fa-shield-alt me-1"></i>تغيير كلمة المرور الآن
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

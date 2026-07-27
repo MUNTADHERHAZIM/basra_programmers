@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block title %}تسجيل الدخول - بوابة مبادرة 1000 مبرمج{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center py-5" style="min-height: 70vh;">
+    <div class="col-md-6 col-lg-4">
+        <div class="glass-card p-5 border-0 shadow-lg text-center">
+            <i class="fas fa-user-lock text-success fs-1 mb-3"></i>
+            <h3 class="fw-bold mb-1 text-slate-800">تسجيل الدخول</h3>
+            <p class="text-muted mb-4" style="font-size: 0.9rem;">أدخل حساب المبادرة المعتمد للوصول إلى لوحتك</p>
+            
+            <form method="POST" action="{% url 'portal:login' %}">
+                {% csrf_token %}
+                <div class="form-floating mb-3 text-start">
+                    <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
+                    <label for="username" class="text-secondary"><i class="fas fa-user me-1"></i>اسم المستخدم</label>
+                </div>
+                
+                <div class="form-floating mb-4 text-start position-relative" x-data="{ showPass: false }">
+                    <input :type="showPass ? 'text' : 'password'" class="form-control" id="password" name="password" placeholder="Password" required>
+                    <label for="password" class="text-secondary"><i class="fas fa-lock me-1"></i>كلمة المرور</label>
+                    <button type="button" class="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2 text-muted border-0" @click="showPass = !showPass">
+                        <i class="fas" :class="showPass ? 'fa-eye-slash' : 'fa-eye'"></i>
+                    </button>
+                </div>
+                
+                <button type="submit" class="btn btn-primary-custom w-100 py-3 mb-3 shadow">دخول المنصة</button>
+            </form>
+            
+            <div class="mt-3">
+                <a href="{% url 'portal:landing' %}" class="text-muted small text-decoration-none"><i class="fas fa-chevron-right me-1"></i>العودة للرئيسية</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

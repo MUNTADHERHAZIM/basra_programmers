@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load portal_tags %}
+
+{% block title %}تقييم المحاضرة - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}استمارة التقييم الأدائي للطلاب{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-lg">
+            <h5 class="fw-bold mb-1 text-slate-800"><i class="fas fa-star me-2 text-warning"></i>تقييم أداء المتدربين للمحاضرة: {{ lecture.title }}</h5>
+            <p class="text-muted small mb-4">قم بتقييم كل متدرب في المهارات التقنية والسلوكية التسعة (من 1 إلى 10). القيمة الافتراضية هي 10.</p>
+            
+            <form action="{% url 'portal:evaluate_students' lecture.id %}" method="POST">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-bordered align-middle text-center" style="font-size: 0.85rem; min-width: 1000px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>اسم المتدرب</th>
+                                <th>الالتزام</th>
+                                <th>الحضور</th>
+                                <th>الواجبات</th>
+                                <th>المشاركة</th>
+                                <th>البرمجة</th>
+                                <th>المشاريع</th>
+                                <th>العمل الجماعي</th>
+                                <th>السلوك</th>
+                                <th>التواصل</th>
+                                <th>ملاحظات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trainee in trainees %}
+                            {% with eval=evaluations|dict_get:trainee.user.id %}
+                            <tr>
+                                <td class="fw-bold text-start text-dark">{{ trainee.user.get_full_name|default:trainee.user.username }}</td>
+                                <!-- Inputs for 9 criteria -->
+                                <td><input type="number" class="form-control form-control-sm text-center" name="commitment_{{ trainee.user.id }}" min="1" max="10" value="10" required style="width: 55px; margin: auto;"></td>
+                                <td><input type="number" class="form-control form-control-sm text-center" name="attendance_{{ trainee.user.id }}" min="1" max="10" value="10" required style="width: 55px; margin: auto;"></td>
+                                <td><input type="number" class="form-control form-control-sm text-center" name="assignments_{{ trainee.user.id }}" min="1" max="10" value="10" required style="width: 55px; margin: auto;"></td>
+                                <td><input type="number" class="form-control form-control-sm text-center" name="participation_{{ trainee.user.id }}" min="1" max="10" value="10" required style="width: 55px; margin: auto;"></td>
+                                <td><input type="number" class="form-control form-control-sm text-center" name="coding_{{ trainee.user.id }}" min="1" max="10" value="10" required style="width: 55px; margin: auto;"></td>
+                                <td><input type="number" class="form-control form-control-sm text-center" name="projects_{{ trainee.user.id }}" min="1" max="10" value="10" required style="width: 55px; margin: auto;"></td>
+                                <td><input type="number" class="form-control form-control-sm text-center" name="teamwork_{{ trainee.user.id }}" min="1" max="10" value="10" required style="width: 55px; margin: auto;"></td>
+                                <td><input type="number" class="form-control form-control-sm text-center" name="behavior_{{ trainee.user.id }}" min="1" max="10" value="10" required style="width: 55px; margin: auto;"></td>
+                                <td><input type="number" class="form-control form-control-sm text-center" name="communication_{{ trainee.user.id }}" min="1" max="10" value="10" required style="width: 55px; margin: auto;"></td>
+                                <td><input type="text" class="form-control form-control-sm" name="notes_{{ trainee.user.id }}" placeholder="ملاحظة قصيرة..." value="" style="min-width: 120px;"></td>
+                            </tr>
+                            {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="d-flex gap-3 mt-4 justify-content-end">
+                    <a href="{% url 'portal:lecturer_dashboard' %}" class="btn btn-outline-secondary px-5 py-3">رجوع إلغاء</a>
+                    <button type="submit" class="btn btn-primary-custom px-5 py-3 shadow"><i class="fas fa-save me-2"></i>حفظ جميع التقييمات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

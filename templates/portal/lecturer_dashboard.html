@@ -1,0 +1,384 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة تحكم المحاضر - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}بوابة المدرب الأكاديمية{% endblock %}
+
+{% block content %}
+<div x-data="{ activeTab: 'schedule' }" class="row g-4">
+    <!-- Sidebar Navigation for Dashboard -->
+    <div class="col-lg-3">
+        <div class="glass-card p-4 border-0">
+            <h5 class="fw-bold mb-4 text-success"><i class="fas fa-chalkboard-teacher me-2"></i>إدارة المحاضرات</h5>
+            <ul class="nav flex-column gap-2">
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0" 
+                            :class="activeTab === 'schedule' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'schedule'">
+                        <i class="fas fa-calendar-day me-2"></i>جدول المحاضرات والـ QR
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0" 
+                            :class="activeTab === 'students' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'students'">
+                        <i class="fas fa-user-graduate me-2"></i>قائمة طلابي وتقييمهم
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0" 
+                            :class="activeTab === 'assignments' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'assignments'">
+                        <i class="fas fa-file-signature me-2"></i>الواجبات والتصحيح
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0" 
+                            :class="activeTab === 'daily_reports' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'daily_reports'">
+                        <i class="fas fa-clipboard-check me-2"></i>التقرير اليومي للمدرب
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Main Tab Content -->
+    <div class="col-lg-9">
+        
+        <!-- Administrative Announcements for Lecturers -->
+        {% if announcements %}
+        <div class="glass-card p-4 border-0 mb-4 shadow-sm" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.04) 0%, rgba(16, 185, 129, 0.02) 100%); border-right: 4px solid #1e3a8a !important;">
+            <h6 class="fw-bold text-primary mb-3"><i class="fas fa-bullhorn me-2 text-warning"></i>تبليغات وإعلانات الإدارة العامة</h6>
+            <div class="d-flex flex-column gap-2">
+                {% for msg in announcements|slice:":2" %}
+                <div class="bg-white p-3 rounded-3 shadow-sm border border-light">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="badge bg-primary-subtle text-primary"><i class="fas fa-info-circle me-1"></i>تبليغ إداري</span>
+                        <span class="text-muted small font-monospace" style="font-size: 0.75rem;">{{ msg.created_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <div class="text-dark small m-0">{{ msg.content|safe }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Tab 1: Schedule -->
+        <div x-show="activeTab === 'schedule'" x-transition>
+            <div class="glass-card p-4 border-0 mb-4">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-hourglass-start me-2 text-warning"></i>المحاضرات القادمة</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>المحاضرة</th>
+                                <th>المجموعة</th>
+                                <th>التاريخ</th>
+                                <th>الوقت</th>
+                                <th class="text-center">إجراءات الحضور</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lec in upcoming_lectures %}
+                            <tr>
+                                <td class="fw-bold">{{ lec.title }}</td>
+                                <td><span class="badge bg-secondary">{{ lec.group.name }}</span></td>
+                                <td>{{ lec.date }}</td>
+                                <td>{{ lec.start_time|time:"H:i" }} - {{ lec.end_time|time:"H:i" }}</td>
+                                <td class="text-center">
+                                    <a href="{% url 'portal:mark_attendance_manual' lec.id %}" class="btn btn-sm btn-primary-custom">
+                                        <i class="fas fa-user-check me-1"></i>تسجيل حضور وغياب الطلاب
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">لا توجد محاضرات قادمة مجدولة</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-card p-4 border-0">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-history me-2 text-primary"></i>المحاضرات المنجزة (التقييم وسجل الحضور)</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>المحاضرة</th>
+                                <th>المجموعة</th>
+                                <th>التاريخ</th>
+                                <th>تقييم الطلاب</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lec in past_lectures %}
+                            <tr>
+                                <td class="fw-bold">{{ lec.title }}</td>
+                                <td><span class="badge bg-secondary">{{ lec.group.name }}</span></td>
+                                <td>{{ lec.date }}</td>
+                                <td>
+                                    <a href="{% url 'portal:evaluate_students' lec.id %}" class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-star me-1"></i>تقييم أداء المحاضرة
+                                    </a>
+                                    <a href="{% url 'portal:mark_attendance_manual' lec.id %}" class="btn btn-sm btn-outline-primary ms-1">
+                                        <i class="fas fa-user-check me-1"></i>تسجيل الحضور اليدوي
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">لا توجد محاضرات منجزة مسبقاً</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Students List & Evaluations -->
+        <div x-show="activeTab === 'students'" x-transition style="display: none;">
+            <div class="glass-card p-4 border-0">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-users me-2 text-success"></i>قائمة المتدربين المسجلين في شعبك</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>الرقم التدريبي</th>
+                                <th>الاسم الكامل</th>
+                                <th>البريد الإلكتروني</th>
+                                <th>المجموعة</th>
+                                <th>النقاط</th>
+                                <th>حالة الحساب</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in trainees %}
+                            <tr>
+                                <td><span class="badge bg-light text-dark border">{{ student.training_number }}</span></td>
+                                <td class="fw-bold">
+                                    <a href="{% url 'portal:view_trainee_profile_detail' student.user.id %}" class="text-decoration-none text-success fw-bold">
+                                        <i class="fas fa-external-link-alt me-1 small" style="font-size: 0.75rem;"></i>
+                                        {{ student.user.get_full_name|default:student.user.username }}
+                                    </a>
+                                </td>
+                                <td>{{ student.user.email }}</td>
+                                <td>{{ student.group.name }}</td>
+                                <td><span class="text-success fw-bold">{{ student.points }} نقطة</span></td>
+                                <td>
+                                    {% if student.status == 'active' %}
+                                        <span class="badge bg-success">نشط</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">موقف</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">لا يوجد متدربين مسجلين في مجموعاتك حالياً</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Assignments -->
+        <div x-show="activeTab === 'assignments'" x-transition style="display: none;">
+            <!-- Create Assignment Widget -->
+            <div class="glass-card p-4 border-0 mb-4">
+                <h5 class="fw-bold mb-3"><i class="fas fa-plus me-2 text-success"></i>نشر واجب دراسي جديد</h5>
+                {% if groups %}
+                <div class="d-flex gap-3 align-items-center">
+                    <p class="text-muted m-0 small">اختر مجموعة لإنشاء ونشر واجب خاص بها:</p>
+                    {% for group in groups %}
+                    <a href="{% url 'portal:create_assignment' group.id %}" class="btn btn-sm btn-primary-custom"><i class="fas fa-paper-plane me-1"></i>نشر لـ {{ group.name }}</a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-danger m-0 small">يجب أن تكون مدرباً لمجموعة واحدة على الأقل لنشر الواجبات.</p>
+                {% endif %}
+            </div>
+
+            <!-- List Active Assignments -->
+            <div class="glass-card p-4 border-0">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-tasks me-2 text-primary"></i>الواجبات المنشورة وتصحيح حلول الطلاب</h5>
+                <div class="accordion" id="assignmentsAccordion">
+                    {% for assign in assignments %}
+                    <div class="accordion-item border-0 glass-card mb-3 overflow-hidden shadow-sm">
+                        <h2 class="accordion-header" id="heading_{{ assign.id }}">
+                            <button class="accordion-button collapsed fw-bold bg-transparent text-dark shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_{{ assign.id }}">
+                                {{ assign.title }} - <span class="text-muted ms-2">{{ assign.group.name }}</span> (مستحق: {{ assign.due_date|date:"Y-m-d H:i" }})
+                            </button>
+                        </h2>
+                        <div id="collapse_{{ assign.id }}" class="accordion-collapse collapse" data-bs-parent="#assignmentsAccordion">
+                            <div class="accordion-body bg-light-subtle">
+                                <p class="text-muted mb-3">{{ assign.description }}</p>
+                                
+                                <h6 class="fw-bold text-success border-bottom pb-2">التسليمات وحلول الطلاب</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>المتدرب</th>
+                                                <th>تاريخ التسليم</th>
+                                                <th>الملف</th>
+                                                <th>الدرجة</th>
+                                                <th>الإجراء</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for sub in assign.submissions.all %}
+                                            <tr>
+                                                <td class="fw-bold">{{ sub.trainee.get_full_name|default:sub.trainee.username }}</td>
+                                                <td>{{ sub.submitted_at|date:"Y-m-d H:i" }}</td>
+                                                <td><a href="{{ sub.file.url }}" target="_blank" class="text-decoration-none text-success"><i class="fas fa-file-download me-1"></i>تحميل الحل</a></td>
+                                                <td>
+                                                    {% if sub.grade is not None %}
+                                                        <span class="badge bg-success">{{ sub.grade }}/10</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning">بانتظار التصحيح</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <a href="{% url 'portal:grade_submission' sub.id %}" class="btn btn-xs btn-outline-primary px-2 py-1" style="font-size: 0.8rem;"><i class="fas fa-edit"></i> تصحيح</a>
+                                                </td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="5" class="text-center py-2 text-muted small">لم يقم أي طالب برفع حل لهذا الواجب بعد.</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted text-center py-4">لم تقم بنشر أي واجب دراسي مسبقاً</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Daily Reports -->
+        <div x-show="activeTab === 'daily_reports'" x-transition style="display: none;">
+            <!-- Submit Daily Report Widget -->
+            <div class="glass-card p-4 border-0 mb-4 shadow-sm" style="background: linear-gradient(135deg, rgba(25, 135, 84, 0.02) 0%, rgba(30, 58, 138, 0.02) 100%);">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-paper-plane me-2 text-success"></i>رفع التقرير اليومي للإدارة والمشرفين</h5>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2"><i class="fas fa-clock me-1"></i>توثيق اليوم الدراسي</span>
+                </div>
+                <p class="text-muted small mb-4">قم بتعبئة التقرير اليومي الخاص بمجمل فعاليات اليوم الدراسي للشعبة، وسوف يتم إرساله وتوثيقه تلقائياً للإدارة والمشرفين.</p>
+                
+                <form method="POST" action="{% url 'portal:submit_daily_report' %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">اختر الشعبة / المجموعة الدراسية <span class="text-danger">*</span></label>
+                            <select name="group_id" class="form-select" required>
+                                <option value="" disabled selected>اختر الشعبة...</option>
+                                {% for g in groups %}
+                                <option value="{{ g.id }}">{{ g.name }} - {{ g.course.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">المحاضرة المنجزة (اختياري)</label>
+                            <select name="lecture_id" class="form-select">
+                                <option value="">بدون محاضرة محددة</option>
+                                {% for lec in past_lectures %}
+                                <option value="{{ lec.id }}">{{ lec.title }} ({{ lec.date }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label text-dark fw-bold">المواضيع المشروحة والمهارات المغطاة اليوم <span class="text-danger">*</span></label>
+                            <textarea name="topics_covered" class="form-control" rows="3" placeholder="مثال: تم شرح مفهوم OOP والفرق بين Class و Object مع كتابة تطبيق عملي 30 دقيقة..." required></textarea>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">ملخص الحضور والالتزام</label>
+                            <input type="text" name="attendance_summary" class="form-control" placeholder="مثال: حضر 24 متدرباً من أصل 26، وتأخر متدرب واحد 10 دقائق">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">الطلاب المتميزون خلال اليوم</label>
+                            <input type="text" name="outstanding_students" class="form-control" placeholder="مثال: ابراهيم علي، زهراء محمد (تفاعل واستجابة سريعة)">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">الطلاب الذين يحتاجون متابعة ودعم</label>
+                            <input type="text" name="struggling_students" class="form-control" placeholder="مثال: علي احمد (يحتاج مراجعة أسس الحلقات التكرارية)">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">التحديات أو الملاحظات العامة للورشة</label>
+                            <input type="text" name="challenges_and_notes" class="form-control" placeholder="مثال: انقطاع الكهرباء لمدة 10 دقائق / تم حل جميع التدريبات">
+                        </div>
+                    </div>
+                    <div class="mt-4 text-end">
+                        <button type="submit" class="btn btn-success px-4 fw-bold shadow-sm">
+                            <i class="fas fa-paper-plane me-1"></i>رفع وإرسال التقرير اليومي
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- List Previously Submitted Daily Reports -->
+            <div class="glass-card p-4 border-0 shadow-sm">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-history me-2 text-primary"></i>أرشيف تقاريرك اليومية وحالة الاطلاع عليها</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>الشعبة</th>
+                                <th>التاريخ</th>
+                                <th>المواضيع المشروحة</th>
+                                <th>حالة التقرير</th>
+                                <th>ملاحظات الإدارة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in daily_reports %}
+                            <tr>
+                                <td><span class="badge bg-secondary">{{ r.group.name }}</span></td>
+                                <td class="font-monospace small">{{ r.report_date|date:"Y-m-d" }}</td>
+                                <td class="small" style="max-width: 250px;">
+                                    <span class="d-inline-block text-truncate w-100" title="{{ r.topics_covered }}">{{ r.topics_covered }}</span>
+                                </td>
+                                <td>
+                                    {% if r.status == 'pending' %}
+                                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i class="fas fa-clock me-1"></i>قيد المراجعة</span>
+                                    {% elif r.status == 'reviewed' %}
+                                        <span class="badge bg-info-subtle text-info border border-info-subtle"><i class="fas fa-check-circle me-1"></i>تم الاطلاع</span>
+                                    {% else %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fas fa-check-double me-1"></i>تم اتخاذ إجراء</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small text-muted">
+                                    {% if r.admin_feedback %}
+                                        <span class="text-success fw-semibold"><i class="fas fa-comment-dots me-1"></i>{{ r.admin_feedback }}</span>
+                                    {% else %}
+                                        <span class="text-muted small">- لا توجد ردود إدارية -</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">لم تقم برفع أي تقرير يومي بعد.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

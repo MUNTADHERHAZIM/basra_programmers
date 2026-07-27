@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+{% load portal_tags %}
+
+{% block title %}تسجيل الحضور اليدوي - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}تسجيل الحضور والغياب اليدوي{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-lg mb-4">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div>
+                    <h5 class="fw-bold m-0 text-slate-800">
+                        <i class="fas fa-user-check text-success me-2"></i>محاضرة: {{ lecture.title }}
+                    </h5>
+                    <p class="text-muted small m-0 mt-1">الدورة والمجموعة: {{ lecture.group.course.title }} - {{ lecture.group.name }} | التاريخ: {{ lecture.date }}</p>
+                </div>
+                <a href="{% url 'portal:lecturer_dashboard' %}" class="btn btn-secondary-custom px-4 btn-sm">
+                    <i class="fas fa-arrow-right me-1"></i>العودة للوحة التحكم
+                </a>
+            </div>
+            
+            <hr class="my-3 text-muted">
+
+            <!-- Live Attendance Stats counters -->
+            <div class="row g-3 mb-4 text-center">
+                <div class="col-6 col-md-3">
+                    <div class="bg-success-subtle text-success p-2 rounded-3 fw-bold">
+                        حاضر: <span id="count-present">0</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="bg-warning-subtle text-warning p-2 rounded-3 fw-bold">
+                        متأخر: <span id="count-late">0</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="bg-info-subtle text-info p-2 rounded-3 fw-bold">
+                        مجاز: <span id="count-excused">0</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="bg-danger-subtle text-danger p-2 rounded-3 fw-bold">
+                        غائب: <span id="count-absent">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trainee Search and Quick Actions -->
+            <div class="bg-light p-3 rounded-3 mb-4">
+                <div class="row g-3 align-items-center justify-content-between">
+                    <div class="col-md-4">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                            <input type="text" id="traineeSearch" class="form-control border-start-0 ps-0" placeholder="ابحث عن اسم المتدنب..." onkeyup="filterTrainees()">
+                        </div>
+                    </div>
+                    <div class="col-md-8 text-md-end gap-2 d-flex flex-wrap justify-content-md-end justify-content-start">
+                        <button class="btn btn-success btn-sm px-3 fw-bold" onclick="selectAllStatus('present')">
+                            <i class="fas fa-check-circle me-1"></i>حاضر للكل
+                        </button>
+                        <button class="btn btn-warning btn-sm px-3 fw-bold text-dark" onclick="selectAllStatus('late')">
+                            <i class="fas fa-clock me-1"></i>متأخر للكل
+                        </button>
+                        <button class="btn btn-info text-white btn-sm px-3 fw-bold" onclick="selectAllStatus('excused')">
+                            <i class="fas fa-user-shield me-1"></i>مجاز للكل
+                        </button>
+                        <button class="btn btn-danger btn-sm px-3 fw-bold" onclick="selectAllStatus('absent')">
+                            <i class="fas fa-times-circle me-1"></i>غائب للكل
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Form -->
+            <form method="POST">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" id="attendanceTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>اسم المتدرب</th>
+                                <th class="text-center">حالة الحضور</th>
+                                <th>دقائق التأخير</th>
+                                <th>ملاحظات وتبريرات الحضور</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trainee in trainees %}
+                            <tr class="trainee-row">
+                                <td class="fw-bold text-dark trainee-name">
+                                    {{ trainee.user.get_full_name|default:trainee.user.username }}
+                                    <span class="d-block small text-muted font-monospace">{{ trainee.user.username }}</span>
+                                </td>
+                                <td>
+                                    <!-- Dynamic Radio Options (Present, Late, Excused, Absent) -->
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <!-- Present -->
+                                        <input type="radio" class="btn-check status-radio" name="status_{{ trainee.user.id }}" 
+                                               id="pres_{{ trainee.user.id }}" value="present" onchange="updateLiveStats()"
+                                               {% if existing_attendance|dict_get:trainee.user.id == 'present' or not existing_attendance|dict_get:trainee.user.id %}checked{% endif %}>
+                                        <label class="btn btn-outline-success btn-sm px-2 fw-bold" for="pres_{{ trainee.user.id }}">حاضر</label>
+
+                                        <!-- Late -->
+                                        <input type="radio" class="btn-check status-radio" name="status_{{ trainee.user.id }}" 
+                                               id="late_{{ trainee.user.id }}" value="late" onchange="updateLiveStats()"
+                                               {% if existing_attendance|dict_get:trainee.user.id == 'late' %}checked{% endif %}>
+                                        <label class="btn btn-outline-warning btn-sm px-2 fw-bold" for="late_{{ trainee.user.id }}">متأخر</label>
+
+                                        <!-- Excused -->
+                                        <input type="radio" class="btn-check status-radio" name="status_{{ trainee.user.id }}" 
+                                               id="excu_{{ trainee.user.id }}" value="excused" onchange="updateLiveStats()"
+                                               {% if existing_attendance|dict_get:trainee.user.id == 'excused' %}checked{% endif %}>
+                                        <label class="btn btn-outline-info btn-sm px-2 fw-bold" for="excu_{{ trainee.user.id }}">مجاز</label>
+
+                                        <!-- Absent -->
+                                        <input type="radio" class="btn-check status-radio" name="status_{{ trainee.user.id }}" 
+                                               id="abse_{{ trainee.user.id }}" value="absent" onchange="updateLiveStats()"
+                                               {% if existing_attendance|dict_get:trainee.user.id == 'absent' %}checked{% endif %}>
+                                        <label class="btn btn-outline-danger btn-sm px-2 fw-bold" for="abse_{{ trainee.user.id }}">غائب</label>
+                                    </div>
+                                </td>
+                                <td>
+                                    <!-- Delay minutes (enabled only if status is late) -->
+                                    <input type="number" name="delay_{{ trainee.user.id }}" class="form-control form-control-sm" 
+                                           style="max-width: 90px;" min="0" placeholder="0 دقيقة" 
+                                           value="{{ existing_delays|dict_get:trainee.user.id|default:0 }}">
+                                </td>
+                                <td>
+                                    <!-- Custom Notes -->
+                                    <input type="text" name="notes_{{ trainee.user.id }}" class="form-control form-control-sm" 
+                                           placeholder="مثال: بعذر طبي / تأخر الباص..." 
+                                           value="{{ existing_notes|dict_get:trainee.user.id|default:'' }}">
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">لا يوجد متدربين مسجلين في هذه المجموعة.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 text-end">
+                    <button type="submit" class="btn btn-primary-custom px-5 py-2">
+                        <i class="fas fa-save me-1"></i>حفظ وتحديث كشف الحضور والغياب
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Live Search Functionality
+    function filterTrainees() {
+        const query = document.getElementById('traineeSearch').value.toLowerCase();
+        const rows = document.querySelectorAll('.trainee-row');
+        rows.forEach(row => {
+            const name = row.querySelector('.trainee-name').textContent.toLowerCase();
+            if (name.includes(query)) {
+                row.style.display = "";
+            } else {
+                row.style.display = "none";
+            }
+        });
+    }
+
+    // Set Status for all rows
+    function selectAllStatus(status) {
+        const radios = document.querySelectorAll(`input[type="radio"][value="${status}"]`);
+        radios.forEach(radio => {
+            radio.checked = true;
+        });
+        updateLiveStats();
+    }
+
+    // Calculate and update real-time attendance statistics
+    function updateLiveStats() {
+        let present = 0;
+        let late = 0;
+        let excused = 0;
+        let absent = 0;
+
+        const rows = document.querySelectorAll('.trainee-row');
+        rows.forEach(row => {
+            const checkedRadio = row.querySelector('input[type="radio"]:checked');
+            if (checkedRadio) {
+                const val = checkedRadio.value;
+                if (val === 'present') present++;
+                else if (val === 'late') late++;
+                else if (val === 'excused') excused++;
+                else if (val === 'absent') absent++;
+            }
+        });
+
+        document.getElementById('count-present').innerText = present;
+        document.getElementById('count-late').innerText = late;
+        document.getElementById('count-excused').innerText = excused;
+        document.getElementById('count-absent').innerText = absent;
+    }
+
+    // Initial run on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateLiveStats();
+    });
+</script>
+{% endblock %}

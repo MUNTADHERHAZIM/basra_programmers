@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}تقارير المدربين اليومية - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}بوابة المتابعة والإشراف على تقارير المدربين اليومية{% endblock %}
+
+{% block content %}
+<div class="row g-4" @keydown.escape.window="showReviewModal = false" x-data="{
+    showReviewModal: false,
+    reviewReportId: '',
+    reviewInstructorName: '',
+    reviewGroupName: '',
+    reviewDate: '',
+    reviewTopics: '',
+    reviewAttendance: '',
+    reviewOutstanding: '',
+    reviewStruggling: '',
+    reviewChallenges: '',
+    reviewFeedback: '',
+    reviewStatus: 'reviewed'
+}">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow">
+            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                <div>
+                    <h4 class="fw-bold text-slate-800 m-0"><i class="fas fa-clipboard-list text-success me-2"></i>تقارير المدربين اليومية والأكاديمية</h4>
+                    <p class="text-muted small m-0 mt-1">عرض ومتابعة التقارير المرفوعة من المدربين يومياً ومراجعة الملاحظات وتوثيق إجراءات الإدارة.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'portal:lecturer_dashboard' %}" class="btn btn-outline-success btn-sm">
+                        <i class="fas fa-plus-circle me-1"></i>رفع تقرير يومي جديد
+                    </a>
+                </div>
+            </div>
+
+            <!-- Reports Table -->
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>المدرب</th>
+                            <th>الشعبة / المجموعة</th>
+                            <th>التاريخ</th>
+                            <th>المواضيع والمهارات المشروحة</th>
+                            <th>حالة التقرير</th>
+                            <th>خيارات والمراجعة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in reports %}
+                        <tr>
+                            <td class="fw-bold">
+                                <i class="fas fa-user-tie me-1 text-success"></i>
+                                {{ report.instructor.get_full_name|default:report.instructor.username }}
+                            </td>
+                            <td><span class="badge bg-secondary-subtle text-secondary border">{{ report.group.name }}</span></td>
+                            <td class="font-monospace small">{{ report.report_date|date:"Y-m-d" }}</td>
+                            <td style="max-width: 300px;">
+                                <p class="text-dark small m-0 text-truncate" title="{{ report.topics_covered }}">{{ report.topics_covered }}</p>
+                            </td>
+                            <td>
+                                {% if report.status == 'pending' %}
+                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i class="fas fa-hourglass-half me-1"></i>قيد المراجعة</span>
+                                {% elif report.status == 'reviewed' %}
+                                    <span class="badge bg-info-subtle text-info border border-info-subtle"><i class="fas fa-check-circle me-1"></i>تم الاطلاع عليه</span>
+                                {% else %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fas fa-check-double me-1"></i>تم اتخاذ إجراء</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary-custom" @click="
+                                    reviewReportId = '{{ report.id }}';
+                                    reviewInstructorName = '{{ report.instructor.get_full_name|default:report.instructor.username|escapejs }}';
+                                    reviewGroupName = '{{ report.group.name|escapejs }}';
+                                    reviewDate = '{{ report.report_date|date:'Y-m-d' }}';
+                                    reviewTopics = '{{ report.topics_covered|escapejs }}';
+                                    reviewAttendance = '{{ report.attendance_summary|default:''|escapejs }}';
+                                    reviewOutstanding = '{{ report.outstanding_students|default:''|escapejs }}';
+                                    reviewStruggling = '{{ report.struggling_students|default:''|escapejs }}';
+                                    reviewChallenges = '{{ report.challenges_and_notes|default:''|escapejs }}';
+                                    reviewFeedback = '{{ report.admin_feedback|default:''|escapejs }}';
+                                    reviewStatus = '{{ report.status }}';
+                                    showReviewModal = true;
+                                ">
+                                    <i class="fas fa-eye me-1"></i>عرض التقرير وتوثيق المراجعة
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="fas fa-folder-open fs-2 d-block mb-2 opacity-50"></i>
+                                لا توجد تقارير يومية مرفوعة حالياً.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div class="modal fade" :class="{ 'show d-block': showReviewModal }" x-show="showReviewModal" x-transition @click.self="showReviewModal = false" :style="showReviewModal ? 'background: rgba(0,0,0,0.6); display: block;' : 'display: none;'">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content glass-card border-0 shadow">
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold text-slate-800">
+                        <i class="fas fa-file-invoice text-success me-2"></i>تفاصيل التقرير اليومي للمدرب
+                    </h5>
+                    <button type="button" class="btn-close" @click="showReviewModal = false"></button>
+                </div>
+                <form method="POST" action="{% url 'portal:review_daily_report_post_general' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="report_id" :value="reviewReportId">
+                    <div class="modal-body p-4">
+                        <!-- Header Details -->
+                        <div class="row g-3 mb-4 bg-light p-3 rounded-3 border">
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">اسم المدرب:</small>
+                                <span class="fw-bold text-dark" x-text="reviewInstructorName"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">الشعبة / المجموعة:</small>
+                                <span class="fw-bold text-success" x-text="reviewGroupName"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">تاريخ التقرير:</small>
+                                <span class="fw-bold text-primary font-monospace" x-text="reviewDate"></span>
+                            </div>
+                        </div>
+
+                        <!-- Report Sections -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-book-open text-primary me-1"></i>المواضيع والمهارات المشروحة:</label>
+                            <div class="p-3 bg-white border rounded-3 text-dark" style="white-space: pre-wrap;" x-text="reviewTopics"></div>
+                        </div>
+
+                        <div class="mb-3" x-show="reviewAttendance">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-users-check text-success me-1"></i>ملخص الحضور والالتزام:</label>
+                            <div class="p-3 bg-white border rounded-3 text-dark" x-text="reviewAttendance"></div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6" x-show="reviewOutstanding">
+                                <label class="form-label fw-bold text-success"><i class="fas fa-star me-1"></i>الطلاب المتميزون خلال اليوم:</label>
+                                <div class="p-3 bg-success bg-opacity-10 border border-success border-opacity-25 rounded-3 text-dark" style="white-space: pre-wrap;" x-text="reviewOutstanding"></div>
+                            </div>
+                            <div class="col-md-6" x-show="reviewStruggling">
+                                <label class="form-label fw-bold text-warning"><i class="fas fa-exclamation-triangle me-1"></i>الطلاب الذين يحتاجون دعم وتوجيه:</label>
+                                <div class="p-3 bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded-3 text-dark" style="white-space: pre-wrap;" x-text="reviewStruggling"></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4" x-show="reviewChallenges">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-sticky-note text-info me-1"></i>التحديات والملاحظات العامة:</label>
+                            <div class="p-3 bg-white border rounded-3 text-dark" style="white-space: pre-wrap;" x-text="reviewChallenges"></div>
+                        </div>
+
+                        <!-- Admin Review Form Fields -->
+                        {% if request.user.role == 'super_admin' or request.user.role == 'director' or request.user.role == 'supervisor' %}
+                        <div class="border-top pt-3">
+                            <h6 class="fw-bold text-primary mb-3"><i class="fas fa-user-shield me-1"></i>توثيق المراجعة الإدارية والإجراءات</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-dark">حالة المراجعة والتقرير</label>
+                                    <select name="status" class="form-select" x-model="reviewStatus">
+                                        <option value="pending">قيد المراجعة</option>
+                                        <option value="reviewed">تم الاطلاع والاعتماد</option>
+                                        <option value="action_taken">تم اتخاذ إجراء مع المدرب/الشعبة</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-bold text-dark">رد الملاحظات والتوجيهات للمدرب (اختياري)</label>
+                                    <textarea name="admin_feedback" class="form-control" rows="3" placeholder="اكتب ملاحظاتك الإدارية أو التوجيهات للمدرب هنا ليراها في حسابه..." x-model="reviewFeedback"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer border-top bg-light">
+                        <button type="button" class="btn btn-secondary" @click="showReviewModal = false">إغلاق</button>
+                        {% if request.user.role == 'super_admin' or request.user.role == 'director' or request.user.role == 'supervisor' %}
+                        <button type="submit" class="btn btn-primary-custom px-4">حفظ الاعتماد والرد</button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

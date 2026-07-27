@@ -1,0 +1,500 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة تحكم الطالب - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}لوحتي التعليمية والتنافسية{% endblock %}
+
+{% block content %}
+{% if is_viewing_as_staff %}
+<div class="alert alert-info border-0 shadow-sm d-flex justify-content-between align-items-center mb-4 p-3 glass-card bg-info-subtle">
+    <div class="d-flex align-items-center gap-2">
+        <i class="fas fa-info-circle text-info fs-5"></i>
+        <div class="text-dark">
+            أنت تستعرض حالياً الملف الأكاديمي والتفاعلي للمتدرب: <strong class="text-primary">{{ profile.user.get_full_name|default:profile.user.username }}</strong>.
+        </div>
+    </div>
+    <button onclick="window.history.back();" class="btn btn-sm btn-primary-custom px-3">
+        <i class="fas fa-arrow-right me-1"></i>رجوع
+    </button>
+</div>
+{% endif %}
+
+<!-- Official Announcements Alert Section -->
+{% if announcements %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-lg" style="background: linear-gradient(135deg, rgba(220, 38, 38, 0.05) 0%, rgba(30, 58, 138, 0.02) 100%); border-right: 4px solid #dc2626 !important;">
+            <h5 class="fw-bold text-danger mb-3"><i class="fas fa-bullhorn me-2"></i>لوحة التبليغات والإعلانات الرسمية الهامة</h5>
+            <div class="d-flex flex-column gap-3">
+                {% for msg in announcements|slice:":3" %}
+                <div class="bg-white p-3 rounded-3 shadow-sm border border-light">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                        <span class="badge bg-danger-subtle text-danger"><i class="fas fa-exclamation-circle me-1"></i>تبليغ إداري رسمي</span>
+                        <span class="text-muted small font-monospace">{{ msg.created_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <div class="text-dark small m-0">{{ msg.content|safe }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Top Row: Welcome & Gamified Scoreboard -->
+<div class="row g-4 mb-4">
+    <!-- Welcome Card -->
+    <div class="col-lg-6">
+        <div class="glass-card p-4 border-0 d-flex align-items-center justify-content-between h-100" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(30, 58, 138, 0.05) 100%);">
+            <div>
+                <h3 class="fw-bold mb-2 text-slate-800">الملف الشخصي: {{ profile.user.get_full_name|default:profile.user.username }} 👋</h3>
+                <p class="text-muted m-0 small">الرقم التدريبي: <strong class="text-dark">{{ profile.training_number }}</strong></p>
+                <p class="text-muted m-0 small">الشعبة الدراسية: <strong class="text-dark">{{ group.name|default:"غير مسكن بشعبة" }}</strong></p>
+                <p class="text-muted m-0 small">المدرب المسؤول: <strong class="text-dark">{{ group.instructor.get_full_name|default:"غير محدد" }}</strong></p>
+                {% if profile.university %}
+                <p class="text-muted m-0 small">المدرسة: <strong class="text-dark">{{ profile.university }}</strong></p>
+                {% endif %}
+                {% if profile.college %}
+                <p class="text-muted m-0 small">الصف الدراسي: <strong class="text-dark">{{ profile.college }}</strong></p>
+                {% endif %}
+            </div>
+            <div>
+                <i class="fas fa-user-graduate text-success" style="font-size: 5rem; opacity: 0.15;"></i>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scoreboard Metrics -->
+    <div class="col-lg-6">
+        <div class="row g-3 h-100">
+            <!-- Points -->
+            <div class="col-6 col-md-4">
+                <div class="glass-card p-3 border-0 text-center h-100 d-flex flex-column justify-content-center shadow-sm">
+                    <span class="text-muted d-block small mb-1">نقاط التفاعل</span>
+                    <h3 class="fw-bold text-success m-0"><i class="fas fa-star text-warning me-1"></i>{{ profile.points }}</h3>
+                </div>
+            </div>
+            <!-- Group Rank -->
+            <div class="col-6 col-md-4">
+                <div class="glass-card p-3 border-0 text-center h-100 d-flex flex-column justify-content-center shadow-sm">
+                    <span class="text-muted d-block small mb-1">ترتيبي بالشعبة</span>
+                    <h3 class="fw-bold text-primary m-0"><i class="fas fa-trophy text-primary me-1"></i>#{{ group_rank }}</h3>
+                </div>
+            </div>
+            <!-- Global Rank -->
+            <div class="col-12 col-md-4">
+                <div class="glass-card p-3 border-0 text-center h-100 d-flex flex-column justify-content-center shadow-sm">
+                    <span class="text-muted d-block small mb-1">الترتيب العام</span>
+                    <h3 class="fw-bold text-warning m-0"><i class="fas fa-globe text-warning me-1"></i>#{{ global_rank }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Rings, Leaderboard & Badges Row -->
+<div class="row g-4 mb-4">
+    <!-- SVGs and Leaderboard -->
+    <div class="col-lg-4">
+        <!-- Progress Indicators -->
+        <div class="glass-card p-4 border-0 text-center mb-4 shadow-sm">
+            <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-chart-pie me-2 text-success"></i>نسب الحضور والمشروع</h5>
+            <div class="d-flex justify-content-around align-items-center">
+                <!-- Attendance Circle -->
+                <div>
+                    <div class="progress-ring mx-auto mb-2 position-relative" style="width: 80px; height: 80px;">
+                        <svg width="80" height="80">
+                            <circle class="text-slate-200" stroke="#e2e8f0" stroke-width="6" fill="transparent" r="30" cx="40" cy="40"/>
+                            <circle class="progress-ring__circle text-success" stroke="#10b981" stroke-width="6" fill="transparent" r="30" cx="40" cy="40"
+                                    stroke-dasharray="188.4"
+                                    stroke-dashoffset="calc(188.4 - ({{ profile.attendance_percentage }} / 100) * 188.4)"/>
+                        </svg>
+                        <div class="position-absolute top-50 start-50 translate-middle fw-bold small text-slate-800">{{ profile.attendance_percentage }}%</div>
+                    </div>
+                    <span class="small text-muted">نسبة الحضور</span>
+                </div>
+                <!-- Project Progress Circle -->
+                <div>
+                    <div class="progress-ring mx-auto mb-2 position-relative" style="width: 80px; height: 80px;">
+                        <svg width="80" height="80">
+                            <circle class="text-slate-200" stroke="#e2e8f0" stroke-width="6" fill="transparent" r="30" cx="40" cy="40"/>
+                            <circle class="progress-ring__circle text-warning" stroke="#f59e0b" stroke-width="6" fill="transparent" r="30" cx="40" cy="40"
+                                    stroke-dasharray="188.4"
+                                    stroke-dashoffset="calc(188.4 - ({{ profile.completion_percentage }} / 100) * 188.4)"/>
+                        </svg>
+                        <div class="position-absolute top-50 start-50 translate-middle fw-bold small text-slate-800">{{ profile.completion_percentage }}%</div>
+                    </div>
+                    <span class="small text-muted">إنجاز المشروع</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Local Leaderboard -->
+        <div class="glass-card p-4 border-0 shadow-sm">
+            <h6 class="fw-bold mb-3 text-slate-800"><i class="fas fa-crown text-warning me-2"></i>لوحة صدارة الشعبة</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <tbody>
+                        {% for mbr in group_leaderboard %}
+                        <tr class="{% if mbr.user == user %}table-success-subtle fw-bold{% endif %}">
+                            <td class="text-center" style="width: 30px;">
+                                {% if forloop.counter == 1 %}
+                                    👑
+                                {% else %}
+                                    <span class="badge bg-secondary-subtle text-dark">{{ forloop.counter }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-dark small">{{ mbr.user.get_full_name|default:mbr.user.username|truncatechars:20 }}</td>
+                            <td class="text-end small"><span class="badge bg-success-subtle text-success">{{ mbr.points }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Badges Shelf -->
+    <div class="col-lg-8">
+        <div class="glass-card p-4 border-0 h-100 shadow-sm">
+            <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-award me-2 text-warning"></i>شارات التميز وإنجازاتي البرمجية</h5>
+            <p class="text-muted small">هنا تعرض الشارات التي حصلت عليها نتيجة تفاعلك المستمر، حضورك المحاضرات وحل الواجبات.</p>
+            <div class="row g-3 mt-2">
+                {% for t_badge in badges %}
+                <div class="col-6 col-sm-4 col-md-3">
+                    <div class="text-center p-3 glass-card bg-light border-0 shadow-sm rounded-3 d-flex flex-column align-items-center h-100">
+                        <div class="icon-box bg-warning-subtle rounded-circle mb-2 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                            <i class="fas fa-{{ t_badge.badge.icon_name|default:'award' }} fs-4 text-warning"></i>
+                        </div>
+                        <strong class="small text-slate-800 d-block">{{ t_badge.badge.name }}</strong>
+                        <small class="text-muted d-block mt-1" style="font-size: 0.65rem;">{{ t_badge.unlocked_at|date:"Y-m-d" }}</small>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center text-muted py-4">
+                    <i class="fas fa-medal text-muted fs-1 mb-2"></i>
+                    <p class="m-0 small">لم تقم بفتح أي شارة تفوق بعد. تفاعل لحل الواجبات والمشروعات لتفتح شاراتك الأولى!</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dynamic Tabs: Attendance Log, Evaluations & Notes, Points Ledger -->
+<div class="row mb-4" x-data="{ subTab: 'evaluations' }">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-lg">
+            <!-- Tabs Navigation -->
+            <div class="d-flex justify-content-between align-items-center flex-wrap border-bottom pb-3 mb-4 gap-2">
+                <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-folder-open text-success me-2"></i>ملف الأداء الشامل والنشاطات</h5>
+                <div class="nav nav-pills gap-2">
+                    <button class="btn btn-sm px-3 fw-bold" 
+                            :class="subTab === 'evaluations' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="subTab = 'evaluations'">
+                        <i class="fas fa-star-half-alt me-1"></i>تقييمات المحاضرات وملاحظات المدربين
+                    </button>
+                    <button class="btn btn-sm px-3 fw-bold" 
+                            :class="subTab === 'attendance' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="subTab = 'attendance'">
+                        <i class="fas fa-user-check me-1"></i>سجل الحضور اليومي
+                    </button>
+                    <button class="btn btn-sm px-3 fw-bold" 
+                            :class="subTab === 'ledger' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="subTab = 'ledger'">
+                        <i class="fas fa-list-ol me-1"></i>دفتر حركة النقاط
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab 1: Evaluations -->
+            <div x-show="subTab === 'evaluations'" x-transition>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>المحاضرة والتاريخ</th>
+                                <th>المقيّم</th>
+                                <th>المعدل</th>
+                                <th>التقدير</th>
+                                <th>ملاحظات وتوجيهات المدرب</th>
+                                <th>تفاصيل الدرجات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for eval in evaluations %}
+                            <tr>
+                                <td>
+                                    <span class="fw-bold text-dark d-block">{{ eval.lecture.title }}</span>
+                                    <small class="text-muted">{{ eval.lecture.date }}</small>
+                                </td>
+                                <td>{{ eval.evaluator.get_full_name|default:eval.evaluator.username }}</td>
+                                <td><span class="badge bg-primary fs-6">{{ eval.average_grade }}/10</span></td>
+                                <td><span class="badge bg-success">{{ eval.grade_letter }}</span></td>
+                                <td>
+                                    {% if eval.notes %}
+                                        <p class="text-success small m-0 fw-bold"><i class="fas fa-comment-dots me-1"></i>{{ eval.notes }}</p>
+                                    {% else %}
+                                        <span class="text-muted small">- لا توجد ملاحظات -</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-secondary py-0" type="button" data-bs-toggle="collapse" data-bs-target="#evalDetail_{{ eval.id }}">
+                                        تفصيل الدرجة <i class="fas fa-chevron-down ms-1"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="collapse" id="evalDetail_{{ eval.id }}">
+                                <td colspan="6" class="bg-light p-3 border">
+                                    <div class="row g-2 text-center small">
+                                        <div class="col-4 col-md-2">الالتزام: <strong>{{ eval.commitment }}/10</strong></div>
+                                        <div class="col-4 col-md-2">الحضور: <strong>{{ eval.attendance }}/10</strong></div>
+                                        <div class="col-4 col-md-2">الواجبات: <strong>{{ eval.assignments }}/10</strong></div>
+                                        <div class="col-4 col-md-2">المشاركة: <strong>{{ eval.participation }}/10</strong></div>
+                                        <div class="col-4 col-md-2">البرمجة: <strong>{{ eval.coding }}/10</strong></div>
+                                        <div class="col-4 col-md-2">المشاريع: <strong>{{ eval.projects }}/10</strong></div>
+                                        <div class="col-4 col-md-2">العمل الجماعي: <strong>{{ eval.teamwork }}/10</strong></div>
+                                        <div class="col-4 col-md-2">السلوك: <strong>{{ eval.behavior }}/10</strong></div>
+                                        <div class="col-4 col-md-2">التواصل: <strong>{{ eval.communication }}/10</strong></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">لا توجد تقييمات مسجلة لك حالياً. التقييم يتم بعد حضور المحاضرة.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 2: Attendance Log -->
+            <div x-show="subTab === 'attendance'" x-transition style="display:none;">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>المحاضرة الأكاديمية</th>
+                                <th>التاريخ والوقت</th>
+                                <th>حالة الحضور</th>
+                                <th>وقت تسجيل الحضور</th>
+                                <th>طريقة التحضير</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for att in attendances %}
+                            <tr>
+                                <td class="fw-bold text-dark">{{ att.lecture.title }}</td>
+                                <td>{{ att.lecture.date }} ({{ att.lecture.start_time|time:"H:i" }} - {{ att.lecture.end_time|time:"H:i" }})</td>
+                                <td>
+                                    {% if att.status == 'present' %}
+                                        <span class="badge bg-success-subtle text-success fs-6"><i class="fas fa-check-circle me-1"></i>حاضر</span>
+                                    {% elif att.status == 'late' %}
+                                        <span class="badge bg-warning-subtle text-warning fs-6"><i class="fas fa-clock me-1"></i>متأخر</span>
+                                    {% elif att.status == 'excused' %}
+                                        <span class="badge bg-info-subtle text-info fs-6"><i class="fas fa-calendar-times me-1"></i>مجاز رسمياً</span>
+                                    {% else %}
+                                        <span class="badge bg-danger-subtle text-danger fs-6"><i class="fas fa-times-circle me-1"></i>غائب</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ att.check_in_time|date:"Y-m-d H:i"|default:"-" }}</td>
+                                <td>
+                                    {% if att.method == 'qr' %}
+                                        <span class="badge bg-primary-subtle text-primary"><i class="fas fa-qrcode me-1"></i>مسح QR Code</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary"><i class="fas fa-user-edit me-1"></i>تحضير يدوي من المحاضر</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">لا يوجد سجل حضور مسجل لك بعد.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Points Ledger -->
+            <div x-show="subTab === 'ledger'" x-transition style="display:none;">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>تاريخ الحركة</th>
+                                <th>سبب ربح النقاط</th>
+                                <th>النقاط المكتسبة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in points_log %}
+                            <tr>
+                                <td class="text-muted">{{ log.created_at|date:"Y-m-d H:i" }}</td>
+                                <td class="fw-bold text-dark">{{ log.reason }}</td>
+                                <td>
+                                    <span class="badge bg-success fs-6">+{{ log.points }} نقطة</span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4 text-muted">لا توجد حركات نقاط مسجلة بعد. شارك في المبادرة لتبدأ بربح النقاط!</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Notes and Guidance Section -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-sm" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.02) 0%, rgba(16, 185, 129, 0.02) 100%);">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-comment-medical text-success me-2"></i>ملاحظات وتوجيهات الكادر التدريسي</h5>
+                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2">
+                    <i class="fas fa-user-shield me-1"></i>سجل موثق بالاسم والتاريخ
+                </span>
+            </div>
+            
+            <div class="d-flex flex-column gap-3 mb-4">
+                {% for n in staff_notes %}
+                <div class="p-3 bg-white rounded-3 shadow-xs border border-light" style="border-right: 4px solid #10b981 !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="avatar-circle bg-success text-white rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-xs" style="width: 34px; height: 34px; font-size: 0.85rem;">
+                                {% if n.author %}
+                                    {{ n.author.first_name|default:n.author.username|slice:":1" }}
+                                {% else %}
+                                    <i class="fas fa-user-edit"></i>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <span class="fw-bold text-dark fs-6 me-2">
+                                    {% if n.author %}
+                                        {{ n.author.get_full_name|default:n.author.username }}
+                                    {% else %}
+                                        الكادر الأكاديمي
+                                    {% endif %}
+                                </span>
+                                {% if n.author %}
+                                    <span class="badge {% if n.author.role == 'super_admin' or n.author.role == 'director' %}bg-danger-subtle text-danger{% elif n.author.role == 'supervisor' %}bg-primary-subtle text-primary{% else %}bg-success-subtle text-success{% endif %} small">
+                                        <i class="fas fa-user-tie me-1"></i>{{ n.author.get_role_display }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="text-muted small font-monospace d-flex align-items-center gap-1" style="font-size: 0.8rem;">
+                            <i class="far fa-clock text-muted me-1"></i>
+                            <span>{{ n.created_at|date:"Y-m-d H:i" }}</span>
+                        </div>
+                    </div>
+                    <div class="text-dark fs-6 ps-2 m-0" style="white-space: pre-wrap; line-height: 1.6;">
+                        <i class="fas fa-quote-right text-success opacity-50 me-2"></i>{{ n.note }}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="p-3 bg-light bg-opacity-50 rounded-3 border text-center text-muted">
+                    <p class="m-0 small"><i class="fas fa-info-circle me-1"></i>لا توجد ملاحظات أو توجيهات مسجلة للمتدرب حالياً.</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if is_viewing_as_staff %}
+            <div class="pt-3 border-top">
+                <form method="POST" action="{% url 'portal:save_trainee_notes_post' profile.id %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-slate-700"><i class="fas fa-pen-nib me-1"></i>إضافة توجيه وملاحظة جديدة للطالب (سوف يتم توثيق اسمك وتاريخ الإضافة):</label>
+                        <textarea name="notes" class="form-control border-success border-opacity-25 shadow-xs" rows="3" placeholder="اكتب توجيهاتك أو ملاحظاتك السلوكية والتقنية هنا... وسيتم توثيقها باسمك ووقت إضافتها تلقائياً" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success px-4 fw-bold"><i class="fas fa-paper-plane me-1"></i>إضافة وحفظ الملاحظة</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Assignments Grid Row -->
+<div class="row g-4 mb-4">
+    <!-- Pending Assignments -->
+    <div class="col-lg-6">
+        <div class="glass-card p-4 border-0 h-100 shadow-sm">
+            <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-file-signature me-2 text-primary"></i>الواجبات الدراسية وبانتظار الحل</h5>
+            <div class="list-group list-group-flush gap-3">
+                {% for assign in pending_assignments %}
+                <div class="list-group-item bg-transparent border rounded-3 p-3 shadow-sm d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h6 class="fw-bold mb-1 text-slate-800">{{ assign.title }}</h6>
+                        <small class="text-danger d-block mb-2"><i class="fas fa-clock me-1"></i>تاريخ التسليم: {{ assign.due_date|date:"Y-m-d H:i" }}</small>
+                        <p class="text-muted small m-0">{{ assign.description|truncatewords:15 }}</p>
+                    </div>
+                    <a href="{% url 'portal:submit_assignment' assign.id %}" class="btn btn-sm btn-primary-custom"><i class="fas fa-upload me-1"></i>تسليم الحل</a>
+                </div>
+                {% empty %}
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-check-double text-success fs-1 mb-2"></i>
+                    <p class="m-0 small">رائع! لقد أنجزت جميع الواجبات المطلوبة بالكامل.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Completed Homework & Evaluations -->
+    <div class="col-lg-6">
+        <div class="glass-card p-4 border-0 h-100 shadow-sm">
+            <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-poll-h me-2 text-success"></i>الواجبات المسلّمة والدرجات المستحقة</h5>
+            <div class="list-group list-group-flush gap-2">
+                {% for sub in completed_submissions %}
+                <div class="list-group-item bg-transparent border-0 border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="fw-bold m-0 text-slate-800">{{ sub.assignment.title }}</h6>
+                        <small class="text-muted">تاريخ التسليم: {{ sub.submitted_at|date:"Y-m-d" }}</small>
+                        {% if sub.feedback %}
+                        <p class="text-success small mt-1 mb-0"><i class="fas fa-comment-dots me-1"></i>ملاحظة المدرب: {{ sub.feedback }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        {% if sub.grade is not None %}
+                            <span class="badge bg-success fs-6 py-2 px-3">{{ sub.grade }} / 10</span>
+                        {% else %}
+                            <span class="badge bg-warning fs-6 py-2 px-3">قيد التصحيح</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted text-center py-4 small">لم تقم بتسليم أي واجب بعد.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Certificates Section -->
+{% if certificates %}
+<div class="row">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 text-center shadow-lg" style="background: linear-gradient(135deg, rgba(217, 119, 6, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%);">
+            <h5 class="fw-bold mb-3 text-warning"><i class="fas fa-certificate me-2"></i>شهادات التخرج الرقمية الصادرة</h5>
+            <p class="text-muted small">تهانينا! لقد أكملت متطلبات التخرج للمبادرة وحصلت على الشهادات الرسمية التالية.</p>
+            <div class="d-flex flex-wrap justify-content-center gap-3 mt-3">
+                {% for cert in certificates %}
+                <div class="glass-card p-3 border-0 bg-white text-center shadow-sm" style="max-width: 300px;">
+                    <i class="fas fa-file-pdf text-danger fs-1 mb-2"></i>
+                    <h6 class="fw-bold mb-1 text-slate-800">{{ cert.course.title }}</h6>
+                    <small class="text-muted d-block mb-3">الرقم: {{ cert.certificate_number }}</small>
+                    <div class="d-flex gap-2">
+                        <a href="{{ cert.pdf_file.url }}" target="_blank" class="btn btn-sm btn-outline-danger w-50"><i class="fas fa-download me-1"></i>تحميل PDF</a>
+                        <a href="{% url 'portal:verify_certificate' cert.verification_token %}" class="btn btn-sm btn-outline-success w-50"><i class="fas fa-shield-alt me-1"></i>التحقق</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

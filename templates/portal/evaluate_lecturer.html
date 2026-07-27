@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}تقييم المحاضر - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}استبيان تقييم أداء المحاضر{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="glass-card p-5 border-0 shadow-lg">
+            <h5 class="fw-bold mb-1 text-slate-800"><i class="fas fa-chalkboard-teacher me-2 text-success"></i>تقييم المدرب للمحاضرة: {{ lecture.title }}</h5>
+            <p class="text-muted small mb-4">يرجى تقييم أداء المدرب في الجوانب الخمسة التالية بموضوعية كاملة (من 1 إلى 5 حيث 5 هي الأعلى).</p>
+            <hr class="mb-4">
+            
+            <form action="{% url 'portal:evaluate_lecturer' lecture.id %}" method="POST">
+                {% csrf_token %}
+                
+                <!-- 5 Criteria sliders or number choices -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold d-block">1. وضوح الشرح وتبسيط الأفكار</label>
+                    <div class="d-flex justify-content-between text-muted small mb-1">
+                        <span>ضعيف جداً</span>
+                        <span>ممتاز</span>
+                    </div>
+                    <input type="range" class="form-range" name="clarity" min="1" max="5" step="1" value="5">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold d-block">2. الالتزام بوقت المحاضرة والمنهج</label>
+                    <div class="d-flex justify-content-between text-muted small mb-1">
+                        <span>ضعيف جداً</span>
+                        <span>ممتاز</span>
+                    </div>
+                    <input type="range" class="form-range" name="commitment" min="1" max="5" step="1" value="5">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold d-block">3. جودة المادة العلمية والعروض التقديمية</label>
+                    <div class="d-flex justify-content-between text-muted small mb-1">
+                        <span>ضعيف جداً</span>
+                        <span>ممتاز</span>
+                    </div>
+                    <input type="range" class="form-range" name="quality" min="1" max="5" step="1" value="5">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold d-block">4. التفاعل مع أسئلة الطلاب وتشجيعهم</label>
+                    <div class="d-flex justify-content-between text-muted small mb-1">
+                        <span>ضعيف جداً</span>
+                        <span>ممتاز</span>
+                    </div>
+                    <input type="range" class="form-range" name="interaction" min="1" max="5" step="1" value="5">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold d-block">5. إدارة وقت المحاضرة والتطبيقات العملية</label>
+                    <div class="d-flex justify-content-between text-muted small mb-1">
+                        <span>ضعيف جداً</span>
+                        <span>ممتاز</span>
+                    </div>
+                    <input type="range" class="form-range" name="time" min="1" max="5" step="1" value="5">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="notes" class="form-label fw-bold">ملاحظات ومقترحات إضافية لتطوير الأداء (اختياري)</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="ملاحظاتك سرية وتستخدم فقط لتطوير جودة التعليم بالمبادرة..."></textarea>
+                </div>
+                
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn btn-primary-custom w-50 py-3 shadow"><i class="fas fa-save me-2"></i>حفظ التقييم وإرساله</button>
+                    <a href="{% url 'portal:trainee_dashboard' %}" class="btn btn-outline-secondary w-50 py-3 d-flex align-items-center justify-content-center">إلغاء الرجوع</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

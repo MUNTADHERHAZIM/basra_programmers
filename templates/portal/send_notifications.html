@@ -1,0 +1,452 @@
+{% extends 'base.html' %}
+
+{% block title %}مركز إرسال الإشعارات المخصصة - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}مركز إرسال الإشعارات المخصصة{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <!-- Form Side -->
+    <div class="col-lg-7">
+        <div class="glass-card p-4 border-0 shadow">
+            <div class="d-flex align-items-center gap-2 mb-4">
+                <i class="fas fa-bell text-primary fs-4 animate-swing"></i>
+                <h5 class="fw-bold text-slate-800 m-0">إرسال إشعار فوري جديد للجرس</h5>
+            </div>
+            
+            <form method="POST" action="{% url 'portal:send_notifications_view' %}" id="notificationForm">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <!-- Target Type Select -->
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">نوع الاستهداف</label>
+                        <select name="target_type" id="targetType" class="form-select py-2" onchange="toggleTargets(); updatePreview();" required>
+                            <option value="user">مستخدم فردي محدد (طالب أو مدرب)</option>
+                            <option value="group">طلاب شعبة/مجموعة معينة</option>
+                            <option value="all_trainees">جميع المتدربين (الطلاب)</option>
+                            <option value="all_lecturers">جميع المدربين (المحاضرين)</option>
+                        </select>
+                    </div>
+
+                    <!-- Notification Type -->
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">قناة الإرسال</label>
+                        <select name="notification_type" class="form-select py-2" required>
+                            <option value="system">داخل النظام فقط (جرس الويب)</option>
+                            <option value="email">بريد إلكتروني فقط</option>
+                            <option value="both">كلاهما (جرس الويب + البريد)</option>
+                        </select>
+                    </div>
+
+                    <!-- Single/Multi User Selector (Conditional) -->
+                    <div class="col-12" id="singleUserContainer">
+                        <label class="form-label text-dark fw-bold mb-2">تحديد واستهداف المستخدمين (متعدد)</label>
+                        
+                        <!-- Real-time Filter Bar -->
+                        <div class="row g-2 mb-3 bg-light p-3 rounded-3 border border-light">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted mb-1">بحث بالاسم أو اسم المستخدم</label>
+                                <input type="text" id="filterSearch" class="form-control form-control-sm" placeholder="اكتب اسم الطالب..." oninput="filterUserList()">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted mb-1">الشعبة الدراسية</label>
+                                <select id="filterGroup" class="form-select form-select-sm" onchange="filterUserList()">
+                                    <option value="">-- الكل --</option>
+                                    {% for g in groups %}
+                                    <option value="{{ g.name }}">{{ g.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted mb-1">الجنس</label>
+                                <select id="filterGender" class="form-select form-select-sm" onchange="filterUserList()">
+                                    <option value="">-- الكل --</option>
+                                    <option value="male">ذكور</option>
+                                    <option value="female">إناث</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-bold text-muted mb-1">الدور</label>
+                                <select id="filterRole" class="form-select form-select-sm" onchange="filterUserList()">
+                                    <option value="">-- الكل --</option>
+                                    <option value="trainee">متدرب</option>
+                                    <option value="lecturer">محاضر</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Checkbox List Table -->
+                        <div class="border rounded-3 overflow-hidden bg-white shadow-sm mb-2" style="max-height: 250px; overflow-y: auto;">
+                            <table class="table table-sm table-hover align-middle m-0" style="font-size: 0.85rem;">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th style="width: 50px;" class="text-center">
+                                            <input type="checkbox" id="selectAllUsers" class="form-check-input" onclick="toggleSelectAllUsers(this)">
+                                        </th>
+                                        <th>المستلم</th>
+                                        <th>الدور</th>
+                                        <th>الشعبة</th>
+                                        <th>الجنس</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="userListBody">
+                                    {% for u in all_users %}
+                                    <tr class="user-row" 
+                                        data-name="{{ u.get_full_name|default:u.username|lower }}" 
+                                        data-username="{{ u.username|lower }}"
+                                        data-role="{{ u.role }}"
+                                        data-group="{{ u.trainee_profile.group.name|default:'' }}"
+                                        data-gender="{{ u.gender|default:'male' }}">
+                                        <td class="text-center">
+                                            <input type="checkbox" name="user_ids" value="{{ u.id }}" class="form-check-input user-checkbox" onclick="updatePreview(); updateCheckedCount();">
+                                        </td>
+                                        <td>
+                                            <div class="fw-bold text-dark">{{ u.get_full_name|default:u.username }}</div>
+                                            <small class="text-muted font-monospace">{{ u.username }}</small>
+                                        </td>
+                                        <td>
+                                            {% if u.role == 'trainee' %}
+                                            <span class="badge bg-info-subtle text-info py-0">متدرب</span>
+                                            {% else %}
+                                            <span class="badge bg-warning-subtle text-warning text-dark py-0">محاضر</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if u.trainee_profile.group %}
+                                            <span class="badge bg-secondary-subtle text-dark py-0">{{ u.trainee_profile.group.name }}</span>
+                                            {% else %}
+                                            <span class="text-muted small">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if u.gender == 'female' %}
+                                            <span class="badge bg-danger-subtle text-danger py-0"><i class="fas fa-venus me-1"></i>أنثى</span>
+                                            {% else %}
+                                            <span class="badge bg-primary-subtle text-primary py-0"><i class="fas fa-mars me-1"></i>ذكر</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded-3 border">
+                            <span class="small text-muted" id="filteredCount">يتم عرض {{ all_users|length }} مستخدم</span>
+                            <span class="small fw-bold text-success" id="selectedCount">تم تحديد 0 مستخدم</span>
+                        </div>
+                    </div>
+
+                    <!-- Group Selector (Conditional) -->
+                    <div class="col-12" id="groupContainer" style="display: none;">
+                        <label class="form-label text-dark fw-bold">اختر الشعبة المستهدفة</label>
+                        <select name="group_id" id="groupIdSelect" class="form-select py-2" onchange="updatePreview()">
+                            <option value="">-- اختر شعبة دراسية --</option>
+                            {% for g in groups %}
+                            <option value="{{ g.id }}" data-name="{{ g.name }}">شعبة: {{ g.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Presets -->
+                    <div class="col-12">
+                        <label class="form-label text-dark fw-bold mb-2">نماذج إشعارات سريعة</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-3 px-3" onclick="applyPreset('warning_absent')">
+                                <i class="fas fa-user-times me-1"></i>إنذار غياب
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info rounded-3 px-3" onclick="applyPreset('reminder_homework')">
+                                <i class="fas fa-file-invoice me-1"></i>تذكير بالواجب
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success rounded-3 px-3" onclick="applyPreset('excellence')">
+                                <i class="fas fa-medal me-1"></i>تهنئة تفوق
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-3 px-3" onclick="applyPreset('admin_office')">
+                                <i class="fas fa-id-card me-1"></i>مراجعة الإدارة
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Title Input -->
+                    <div class="col-12">
+                        <label class="form-label text-dark fw-bold">عنوان الإشعار</label>
+                        <input type="text" name="title" id="notifTitle" class="form-control py-2" placeholder="مثال: تنبيه غياب هام جداً" oninput="updatePreview()" required>
+                    </div>
+
+                    <!-- Message Body -->
+                    <div class="col-12">
+                        <label class="form-label text-dark fw-bold">نص الإشعار التفصيلي</label>
+                        <textarea name="message" id="notifMessage" class="form-control" rows="4" placeholder="اكتب نص الإشعار الموجز الذي سيظهر للمستلم في جرس التنبيهات..." oninput="updatePreview()" required></textarea>
+                        <small class="text-muted">ملاحظة: نص إشعار الجرس يفضل أن يكون موجزاً ومباشراً لجذب انتباه المستلم فوراً.</small>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-end">
+                    <button type="submit" class="btn btn-primary-custom px-5 py-2 fw-bold shadow-sm">
+                        <i class="fas fa-paper-plane me-2"></i>إرسال التنبيه فورياً
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Live Preview Side -->
+    <div class="col-lg-5">
+        <div class="glass-card p-4 border-0 shadow position-sticky" style="top: 90px;">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="fas fa-eye text-success fs-4"></i>
+                <h5 class="fw-bold text-slate-800 m-0">معاينة الإشعار في الجرس (Preview)</h5>
+            </div>
+            <p class="text-muted small">هكذا سيظهر الإشعار للمستلم داخل قائمة منسدلة الجرس المضيئة:</p>
+            
+            <hr class="text-muted my-3">
+            
+            <!-- Bell Dropdown Replica Container -->
+            <div class="border rounded-4 bg-white shadow-sm p-1" style="max-width: 320px; margin: 0 auto;">
+                <div class="text-center fw-bold py-2 border-bottom text-muted small bg-light rounded-top-4">
+                    الإشعارات الواردة (معاينة)
+                </div>
+                
+                <!-- Single Item Replica -->
+                <div class="py-2 px-3 border-bottom d-flex flex-column text-wrap bg-light fw-bold">
+                    <span class="text-primary fw-bold" id="previewTitle" style="font-size: 0.85rem;">عنوان الإشعار التجريبي</span>
+                    <small class="text-muted mt-1 text-wrap" id="previewBody" style="font-size: 0.75rem;">نص الإشعار التفصيلي سيظهر هنا تفاعلياً...</small>
+                    <span class="text-muted font-monospace mt-1" style="font-size: 0.65rem; text-align: left;">17:00 اليوم</span>
+                </div>
+                
+                <div class="text-center py-2 text-primary small fw-bold bg-light rounded-bottom-4" style="font-size: 0.7rem;">
+                    عرض كافة الإشعارات
+                </div>
+            </div>
+            
+            <div class="mt-4 bg-primary-subtle text-primary p-3 rounded-4 border border-primary-subtle">
+                <div class="d-flex align-items-start gap-2">
+                    <i class="fas fa-info-circle fs-5 mt-1"></i>
+                    <div>
+                        <h6 class="fw-bold m-0" style="font-size: 0.9rem;">الفرق بين الإشعار والإعلان:</h6>
+                        <p class="small m-0 mt-1" style="font-size: 0.8rem; line-height: 1.4;">
+                            * <strong>الإعلان (Announcement):</strong> يظهر كلوحة وبطاقة عريضة في وسط لوحة التحكم الرئيسية لجميع المتدربين لتنسيق الاختبارات والجداول.
+                            <br>
+                            * <strong>الإشعار (Notification):</strong> تنبيه مخصص وموجه يضيء به جرس التنبيهات في شريط التصفح العلوي لتنبيه مستخدم معين بحدث يخصه مباشرة.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- History Log Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-sm">
+            <div class="d-flex align-items-center gap-2 mb-4">
+                <i class="fas fa-history text-primary fs-4"></i>
+                <h5 class="fw-bold text-slate-800 m-0">سجل أحدث الإشعارات الفردية والجماعية المرسلة</h5>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 15%">وقت الإرسال</th>
+                            <th style="width: 20%">المستلم / الفئة</th>
+                            <th style="width: 20%">عنوان الإشعار</th>
+                            <th style="width: 35%">مضمون الإشعار</th>
+                            <th style="width: 10%" class="text-center">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for notif in sent_notifications %}
+                        <tr>
+                            <td class="font-monospace text-muted small">{{ notif.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold text-dark" style="font-size: 0.85rem;">{{ notif.user.get_full_name|default:notif.user.username }}</span>
+                                    <small class="text-muted">{{ notif.user.get_role_display }}</small>
+                                </div>
+                            </td>
+                            <td class="fw-bold text-primary" style="font-size: 0.85rem;">{{ notif.title }}</td>
+                            <td>
+                                <div class="text-dark small text-wrap">{{ notif.message }}</div>
+                            </td>
+                            <td class="text-center">
+                                <form method="POST" action="{% url 'portal:delete_notification_post' notif.id %}" onsubmit="return confirm('هل أنت متأكد من حذف هذا الإشعار من جرس المستلم؟');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger px-2 rounded-2" title="سحب وحذف الإشعار">
+                                        <i class="fas fa-trash-alt me-1"></i>حذف
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">لا يوجد أي إشعارات فردية أو جماعية مرسلة مسبقاً.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Toggle conditional target inputs based on Target Type Selection
+    function toggleTargets() {
+        const type = document.getElementById('targetType').value;
+        const singleContainer = document.getElementById('singleUserContainer');
+        const groupContainer = document.getElementById('groupContainer');
+        
+        const groupInput = document.getElementById('groupIdSelect');
+        const checkboxes = document.querySelectorAll('.user-checkbox');
+        
+        if (type === 'user') {
+            singleContainer.style.display = 'block';
+            // Require at least one checkbox selected if sending to user selection
+            checkboxes.forEach(cb => cb.required = false); // browser requires at least one, we will validate on submit or simply let django handle
+            
+            groupContainer.style.display = 'none';
+            groupInput.required = false;
+            groupInput.value = '';
+        } else if (type === 'group') {
+            groupContainer.style.display = 'block';
+            groupInput.required = true;
+            
+            singleContainer.style.display = 'none';
+            checkboxes.forEach(cb => {
+                cb.required = false;
+                cb.checked = false;
+            });
+            updateCheckedCount();
+        } else {
+            singleContainer.style.display = 'none';
+            checkboxes.forEach(cb => {
+                cb.required = false;
+                cb.checked = false;
+            });
+            updateCheckedCount();
+            
+            groupContainer.style.display = 'none';
+            groupInput.required = false;
+            groupInput.value = '';
+        }
+    }
+
+    // Interactive user list filtering
+    function filterUserList() {
+        const searchVal = document.getElementById('filterSearch').value.trim().toLowerCase();
+        const groupVal = document.getElementById('filterGroup').value;
+        const genderVal = document.getElementById('filterGender').value;
+        const roleVal = document.getElementById('filterRole').value;
+        
+        const rows = document.querySelectorAll('.user-row');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const name = row.getAttribute('data-name');
+            const username = row.getAttribute('data-username');
+            const role = row.getAttribute('data-role');
+            const group = row.getAttribute('data-group');
+            const gender = row.getAttribute('data-gender');
+            
+            const matchSearch = !searchVal || name.includes(searchVal) || username.includes(searchVal);
+            const matchGroup = !groupVal || group === groupVal;
+            const matchGender = !genderVal || gender === genderVal;
+            const matchRole = !roleVal || role === roleVal;
+            
+            if (matchSearch && matchGroup && matchGender && matchRole) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+                // Uncheck if hidden to prevent accidental selection
+                const cb = row.querySelector('.user-checkbox');
+                if (cb.checked) {
+                    cb.checked = false;
+                }
+            }
+        });
+        
+        document.getElementById('filteredCount').innerText = `يتم عرض ${visibleCount} مستخدم`;
+        updateCheckedCount();
+    }
+
+    // Toggle Select All Visible Users
+    function toggleSelectAllUsers(headerCheckbox) {
+        const rows = document.querySelectorAll('.user-row');
+        rows.forEach(row => {
+            if (row.style.display !== 'none') {
+                const cb = row.querySelector('.user-checkbox');
+                cb.checked = headerCheckbox.checked;
+            }
+        });
+        updateCheckedCount();
+        updatePreview();
+    }
+
+    // Update selected checkbox count
+    function updateCheckedCount() {
+        const checkedCount = document.querySelectorAll('.user-checkbox:checked').length;
+        document.getElementById('selectedCount').innerText = `تم تحديد ${checkedCount} مستخدم`;
+        
+        // Update select all state
+        const allVisible = document.querySelectorAll('.user-row:not([style*="display: none"])');
+        const allVisibleChecked = document.querySelectorAll('.user-row:not([style*="display: none"]) .user-checkbox:checked');
+        const selectAllCb = document.getElementById('selectAllUsers');
+        
+        if (selectAllCb) {
+            selectAllCb.checked = allVisible.length > 0 && allVisible.length === allVisibleChecked.length;
+        }
+    }
+
+    // Form submit validation to ensure at least one user is selected in user selection mode
+    document.getElementById('notificationForm').addEventListener('submit', function(e) {
+        const type = document.getElementById('targetType').value;
+        if (type === 'user') {
+            const checkedCount = document.querySelectorAll('.user-checkbox:checked').length;
+            if (checkedCount === 0) {
+                e.preventDefault();
+                alert('يرجى تحديد مستخدم واحد على الأقل من الجدول لإرسال الإشعار إليهم.');
+            }
+        }
+    });
+
+    // Apply Presets to Form inputs
+    function applyPreset(presetType) {
+        const titleInput = document.getElementById('notifTitle');
+        const messageInput = document.getElementById('notifMessage');
+        
+        if (presetType === 'warning_absent') {
+            titleInput.value = "⚠️ إنذار بخصوص الغياب المتكرر";
+            messageInput.value = "عزيزي المتدرب، نود إحاطتك علماً بتجاوزك الحد المسموح به من الغياب غير المبرر. يرجى الحضور والتواجد بالورش القادمة تجنباً لخصم النقاط وحظر الحساب.";
+        } else if (presetType === 'reminder_homework') {
+            titleInput.value = "📝 تذكير هام بتسليم الواجب";
+            messageInput.value = "تذكير لكافة الطلبة بضرورة رفع حل الواجب البرمجي المطلوب قبل انتهاء المدة الزمنية المحددة للحصول على نقاط كاملة.";
+        } else if (presetType === 'excellence') {
+            titleInput.value = "🏆 تهنئة بالتميز والنشاط الصفي";
+            messageInput.value = "يسر إدارة المبادرة والمدرب تقديم شكر خاص لك على تفاعلك ونشاطك المميز في المحاضرة الأخيرة وتقديمك لحلول مبتكرة للواجب البرمجي.";
+        } else if (presetType === 'admin_office') {
+            titleInput.value = "🆔 يرجى مراجعة إدارة المبادرة";
+            messageInput.value = "يرجى مراجعة مكتب الإدارة خلال أوقات الدوام الرسمي غداً، لغرض إكمال تدقيق وتحديث بياناتك الشخصية وإكمال الهوية التعريفية الخاصة بك.";
+        }
+        
+        updatePreview();
+    }
+
+    // Live update preview card
+    function updatePreview() {
+        const title = document.getElementById('notifTitle').value.trim();
+        const message = document.getElementById('notifMessage').value.trim();
+        
+        document.getElementById('previewTitle').innerText = title || "عنوان الإشعار التجريبي";
+        document.getElementById('previewBody').innerText = message || "نص الإشعار التفصيلي سيظهر هنا تفاعلياً...";
+    }
+
+    // Initialize visibility on load
+    window.addEventListener('DOMContentLoaded', () => {
+        toggleTargets();
+        updatePreview();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}تصحيح الواجب - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}تصحيح وتقييم حل الطالب{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="glass-card p-5 border-0 shadow-lg">
+            <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-edit me-2 text-warning"></i>تصحيح واجب: {{ submission.assignment.title }}</h5>
+            <p class="text-muted small mb-2">الطالب: <strong>{{ submission.trainee.get_full_name|default:submission.trainee.username }}</strong></p>
+            <p class="text-muted small mb-4">تاريخ التسليم: {{ submission.submitted_at|date:"Y-m-d H:i" }}</p>
+            <hr class="mb-4">
+            
+            <form action="{% url 'portal:grade_submission' submission.id %}" method="POST">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="grade" class="form-label fw-bold">الدرجة المستحقة (من 10)</label>
+                    <input type="number" class="form-control py-2" id="grade" name="grade" min="0" max="10" value="{{ submission.grade|default:10 }}" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="feedback" class="form-label fw-bold">ملاحظات والتغذية الراجعة للمتدرب</label>
+                    <textarea class="form-control" id="feedback" name="feedback" rows="4" placeholder="اكتب بعض التوجيهات البرمجية أو الثناء والتشجيع للطالب...">{{ submission.feedback|default:'' }}</textarea>
+                </div>
+                
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn btn-primary-custom w-50 py-3 shadow"><i class="fas fa-save me-2"></i>حفظ التقييم والدرجة</button>
+                    <a href="{% url 'portal:lecturer_dashboard' %}" class="btn btn-outline-secondary w-50 py-3 d-flex align-items-center justify-content-center">إلغاء الرجوع</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1989 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة إدارة المبادرة - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}بوابة الإشراف وإدارة شعب المبادرة{% endblock %}
+
+{% block content %}
+<div class="row" x-data="{
+    activeTab: 'groups',
+    showAddForm: false,
+    showEditGroupModal: false,
+    showEditLectureModal: false,
+    showEditLecturerModal: false,
+    showEditTraineeModal: false,
+    showDeleteModal: false,
+    showSingleAccountModal: false,
+    deleteUrl: '',
+    editGroupId: '',
+    editGroupName: '',
+    editGroupCourseId: '',
+    editGroupCourseTitle: '',
+    editGroupInstructorId: '',
+    editGroupSupervisorId: '',
+    editGroupClassroom: '',
+    editGroupCode: '',
+    editGroupDays: [],
+    editGroupStartTime: '',
+    editGroupEndTime: '',
+    editLectureId: '',
+    editLectureTitle: '',
+    editLectureGroupId: '',
+    editLectureDate: '',
+    editLectureStartTime: '',
+    editLectureEndTime: '',
+    editLecturerId: '',
+    editLecturerFirstName: '',
+    editLecturerLastName: '',
+    editLecturerEmail: '',
+    editLecturerSpecialty: '',
+    editLecturerBio: '',
+    editTraineeId: '',
+    editTraineeFirstName: '',
+    editTraineeLastName: '',
+    editTraineeEmail: '',
+    editTraineeGroupId: '',
+    editTraineeGov: '',
+    editTraineeDist: '',
+    editTraineeUni: '',
+    editTraineeCol: '',
+    editTraineeDept: '',
+    editTraineeStage: '',
+    editTraineeSpec: '',
+    generatedUsername: '',
+    generatedEmail: '',
+    generatedPassword: '',
+    generatedRole: '',
+    generatedGroup: '',
+    lecturerSelectedIds: [],
+    traineeSelectedIds: [],
+    showBulkDeleteLecturersModal: false,
+    showBulkDeleteTraineesModal: false,
+    bulkDeleteLecturersAll: false,
+    bulkDeleteTraineesAll: false,
+    addGroupDays: ['الأحد', 'الثلاثاء', 'الخميس'],
+    scheduleType: 'existing',
+    showEditCourseModal: false,
+    editCourseId: '',
+    editCourseTitle: '',
+    editCourseHours: '',
+    editCourseDescription: ''
+}">
+    <!-- Left Navigation Menu -->
+    <div class="col-lg-3">
+        <div class="glass-card p-4 border-0 mb-4 shadow">
+            <h5 class="fw-bold mb-4 text-success"><i class="fas fa-tasks me-2"></i>أقسام الإدارة</h5>
+            <ul class="nav flex-column gap-2">
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'groups' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'groups'; showAddForm = false">
+                        <i class="fas fa-users-cog me-2"></i>الشعب والمجموعات
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'lectures' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'lectures'; showAddForm = false">
+                        <i class="fas fa-book-open me-2"></i>المحاضرات الأكاديمية
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'lecturers' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'lecturers'; showAddForm = false">
+                        <i class="fas fa-chalkboard-teacher me-2"></i>إدارة المدربين
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'trainees' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'trainees'; showAddForm = false">
+                        <i class="fas fa-user-graduate me-2"></i>إدارة المتدربين
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'courses' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'courses'; showAddForm = false">
+                        <i class="fas fa-graduation-cap me-2"></i>المواد الدراسية
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'badges' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'badges'; showAddForm = false">
+                        <i class="fas fa-medal me-2"></i>الشارات والتحفيز
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'certificates' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'certificates'; showAddForm = false">
+                        <i class="fas fa-certificate me-2"></i>الشهادات الرقمية
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'announcements' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'announcements'; showAddForm = false">
+                        <i class="fas fa-bullhorn me-2"></i>الرسائل والإعلانات
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'accounts' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'accounts'; showAddForm = false">
+                        <i class="fas fa-user-plus me-2"></i>توليد الحسابات
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
+                            :class="activeTab === 'settings' ? 'btn-primary-custom' : 'btn-light text-dark'"
+                            @click="activeTab = 'settings'; showAddForm = false">
+                        <i class="fas fa-sliders-h me-2"></i>إعدادات الشعار والمنصة
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Right Content Area -->
+    <div class="col-lg-9">
+        
+        <!-- SECTION 1: GROUPS / SECTIONS -->
+        <div x-show="activeTab === 'groups'" x-transition>
+            <!-- Add Group Form -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="showAddForm" x-transition style="display:none;">
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-plus-circle me-2 text-success"></i>إضافة شعبة / مجموعة جديدة</h5>
+                <form method="POST" action="{% url 'portal:add_group_post' %}">
+                    {% csrf_token %}
+                    <div class="mb-3 d-flex gap-3 align-items-center bg-light p-2 rounded-3 border">
+                        <span class="fw-bold text-dark fs-6"><i class="fas fa-tasks me-1 text-success"></i>نوع العملية:</span>
+                        <label class="form-check-label d-flex align-items-center gap-1 cursor-pointer">
+                            <input type="radio" name="schedule_type" value="existing" x-model="scheduleType" class="form-check-input">
+                            جدولة شعبة موجودة حالياً
+                        </label>
+                        <label class="form-check-label d-flex align-items-center gap-1 cursor-pointer">
+                            <input type="radio" name="schedule_type" value="new" x-model="scheduleType" class="form-check-input">
+                            إنشاء شعبة جديدة وجدولتها
+                        </label>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <!-- If Existing Group -->
+                        <div class="col-md-6" x-show="scheduleType === 'existing'">
+                            <label class="form-label text-dark fw-bold">اختر الشعبة الحالية</label>
+                            <select name="group_id" class="form-select" :required="scheduleType === 'existing'" @change="
+                                const opt = $event.target.options[$event.target.selectedIndex];
+                                if (opt.value) {
+                                    const classroom = opt.getAttribute('data-classroom');
+                                    const courseTitle = opt.getAttribute('data-course-title');
+                                    const instructorId = opt.getAttribute('data-instructor-id');
+                                    const supervisorId = opt.getAttribute('data-supervisor-id');
+                                    const daysAttr = opt.getAttribute('data-days');
+                                    const days = daysAttr ? daysAttr.split(/[،,]+/).map(d => d.trim()).filter(d => d) : [];
+                                    const startTime = opt.getAttribute('data-start');
+                                    const endTime = opt.getAttribute('data-end');
+                                    
+                                    const $form = $event.target.form;
+                                    if ($form) {
+                                        $form.elements['classroom'].value = classroom;
+                                        $form.elements['course_title'].value = courseTitle;
+                                        $form.elements['instructor'].value = instructorId || '';
+                                        $form.elements['supervisor'].value = supervisorId || '';
+                                        $form.elements['start_time'].value = startTime;
+                                        $form.elements['end_time'].value = endTime;
+                                    }
+                                    addGroupDays = days;
+                                }
+                            ">
+                                <option value="" disabled selected>اختر الشعبة من القائمة...</option>
+                                {% for g in groups %}
+                                <option value="{{ g.id }}" 
+                                        data-classroom="{{ g.classroom|default:'' }}"
+                                        data-course-title="{{ g.course.title }}"
+                                        data-instructor-id="{% if g.instructor %}{{ g.instructor.id }}{% endif %}"
+                                        data-supervisor-id="{% if g.supervisor %}{{ g.supervisor.id }}{% endif %}"
+                                        data-days="{{ g.days|default:'' }}"
+                                        data-start="{{ g.start_time|time:'H:i' }}"
+                                        data-end="{{ g.end_time|time:'H:i' }}">
+                                    {{ g.name }} (المادة الحالية: {{ g.course.title }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- If New Group -->
+                        <div class="col-md-6" x-show="scheduleType === 'new'">
+                            <label class="form-label text-dark fw-bold">اسم الشعبة الجديدة</label>
+                            <input type="text" name="name" class="form-control" placeholder="مثال: الشعبة C" :required="scheduleType === 'new'">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">المادة الدراسية (اسم المادة)</label>
+                            <input type="text" name="course_title" list="courses_list" class="form-control" placeholder="اكتب اسم المادة (مثال: بايثون)" required>
+                            <datalist id="courses_list">
+                                {% for course in courses %}
+                                <option value="{{ course.title }}"></option>
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">المدرب / المحاضر</label>
+                            <select name="instructor" class="form-select">
+                                <option value="">اختر المدرب (اختياري)</option>
+                                {% for lec in lecturers %}
+                                <option value="{{ lec.id }}">{{ lec.get_full_name|default:lec.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">المشرف المتابع</label>
+                            <select name="supervisor" class="form-select">
+                                <option value="">اختر المشرف (اختياري)</option>
+                                {% for sup in supervisors %}
+                                <option value="{{ sup.id }}">{{ sup.get_full_name|default:sup.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">القاعة الدراسية / الموقع</label>
+                            <input type="text" name="classroom" class="form-control" placeholder="مثال: قاعة سيد الأوصياء 1 / رابط Zoom" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">رمز المجموعة الفريد (Code) - اختياري</label>
+                            <input type="text" name="code" class="form-control" placeholder="مثال: PY-G1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold mb-2">أيام التدريب (اختر الأيام)</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="days" value="السبت" x-model="addGroupDays"> السبت
+                                </label>
+                                <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="days" value="الأحد" x-model="addGroupDays"> الأحد
+                                </label>
+                                <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="days" value="الإثنين" x-model="addGroupDays"> الإثنين
+                                </label>
+                                <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="days" value="الثلاثاء" x-model="addGroupDays"> الثلاثاء
+                                </label>
+                                <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="days" value="الأربعاء" x-model="addGroupDays"> الأربعاء
+                                </label>
+                                <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="days" value="الخميس" x-model="addGroupDays"> الخميس
+                                </label>
+                                <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="days" value="الجمعة" x-model="addGroupDays"> الجمعة
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-dark fw-bold">وقت البدء</label>
+                            <input type="time" name="start_time" class="form-control" value="16:00">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-dark fw-bold">وقت الانتهاء</label>
+                            <input type="time" name="end_time" class="form-control" value="18:00">
+                        </div>
+                    </div>
+                    <div class="mt-3 text-end gap-2 d-flex justify-content-end">
+                        <button type="button" class="btn btn-light" @click="showAddForm = false">إلغاء</button>
+                        <button type="submit" class="btn btn-primary-custom px-4">حفظ الشعبة</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Weekly Daily Schedule Grid -->
+            <div class="row g-3 mb-4" x-show="!showAddForm" x-transition>
+                <div class="col-12">
+                    <div class="glass-card p-4 border-0 shadow" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.01) 0%, rgba(25, 135, 84, 0.02) 100%);">
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                            <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-calendar-alt text-success me-2"></i>جدول المحاضرات اليومي الأسبوعي</h5>
+                            <button type="button" class="btn btn-success btn-sm fw-bold px-3" @click="
+                                addGroupDays = ['الأحد', 'الثلاثاء', 'الخميس'];
+                                showAddForm = true;
+                                window.scrollTo({top: 0, behavior: 'smooth'});
+                            ">
+                                <i class="fas fa-plus-circle me-1"></i>جدولة مادة/شعبة جديدة
+                            </button>
+                        </div>
+                        <p class="text-muted small mb-4">توزيع المواد الدراسية، المدربين، والشعب التدريبية مقسمة حسب أيام الأسبوع بشكل تلقائي وسهل القراءة.</p>
+                        
+                        <div class="row row-cols-1 row-cols-md-7 g-3">
+                            {% for day, day_groups in schedule_data.items %}
+                            <div class="col">
+                                <div class="card h-100 border-0 bg-light shadow-sm" style="border-radius: 12px; min-height: 250px;">
+                                    <div class="card-header text-center fw-bold text-white py-2 d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #198754 0%, #157347 100%); border-top-left-radius: 12px; border-top-right-radius: 12px; border-bottom: 0;">
+                                        <span>{{ day }}</span>
+                                        <button type="button" class="btn btn-sm btn-light p-0 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; border-radius: 50%;" title="إضافة وجدولة شعبة لهذا اليوم" @click="
+                                            addGroupDays = ['{{ day }}'];
+                                            showAddForm = true;
+                                            window.scrollTo({top: 0, behavior: 'smooth'});
+                                        ">
+                                            <i class="fas fa-plus text-success" style="font-size: 0.75rem;"></i>
+                                        </button>
+                                    </div>
+                                    <div class="card-body p-2 d-flex flex-column gap-2 overflow-auto" style="max-height: 350px;">
+                                        {% for g in day_groups %}
+                                        <div class="p-2 border rounded bg-white shadow-xs hover-card transition-all" style="font-size: 0.85rem; border-right: 4px solid #198754 !important;">
+                                            <div class="fw-bold text-success mb-1" style="font-size: 0.9rem;">{{ g.course.title }}</div>
+                                            <div class="text-dark fw-semibold mb-1"><i class="fas fa-users me-1 text-muted"></i>{{ g.name }}</div>
+                                            <div class="text-slate-700 small mb-1"><i class="fas fa-user-tie me-1 text-muted"></i>{% if g.instructor %}{{ g.instructor.get_full_name|default:g.instructor.username }}{% else %}غير محدد{% endif %}</div>
+                                            <div class="text-muted small mb-1"><i class="fas fa-clock me-1 text-muted"></i>{{ g.start_time|default:"16:00" }} - {{ g.end_time|default:"18:00" }}</div>
+                                            <div class="text-muted small"><i class="fas fa-map-marker-alt me-1 text-muted"></i>{{ g.classroom|default:"قاعة عامة" }}</div>
+                                        </div>
+                                        {% empty %}
+                                        <div class="text-center text-muted my-auto py-3 small">
+                                            <i class="fas fa-calendar-minus opacity-25 d-block fs-3 mb-1"></i>
+                                            لا توجد شعب
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Import/Export & Actions -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="!showAddForm">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+                    <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-users-cog text-success me-2"></i>الشعب والمجموعات التدريبية</h5>
+                    <button class="btn btn-primary-custom btn-sm px-3" @click="showAddForm = true">
+                        <i class="fas fa-plus me-1"></i>إضافة شعبة جديدة
+                    </button>
+                </div>
+
+                <!-- Bulk Excel Import/Export for Groups -->
+                <div class="row g-3 mb-4 bg-light p-3 rounded-3 align-items-center">
+                    <div class="col-md-6 text-md-start">
+                        <span class="fw-bold d-block text-dark"><i class="fas fa-file-excel text-success me-1"></i>تصدير واستيراد الشعب:</span>
+                        <small class="text-muted">يمكنك تصدير الشعب الحالية أو استيرادها دفعة واحدة عبر ملف Excel.</small>
+                    </div>
+                    <div class="col-md-6 text-md-end gap-2 d-flex justify-content-md-end justify-content-start">
+                        <a href="{% url 'portal:export_groups_view' %}" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-download me-1"></i>تصدير الشعب (Excel)
+                        </a>
+                        <form method="POST" action="{% url 'portal:import_groups_view' %}" enctype="multipart/form-data" class="d-inline-flex gap-1">
+                            {% csrf_token %}
+                            <input type="file" name="excel_file" class="form-control form-control-sm" required style="max-width: 180px;">
+                            <button type="submit" class="btn btn-success btn-sm">استيراد</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Groups Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>اسم الشعبة</th>
+                                <th>الدورة</th>
+                                <th>المحاضر</th>
+                                <th>المشرف المتابع</th>
+                                <th>القاعة الدراسية</th>
+                                <th>خيارات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for group in groups %}
+                            <tr>
+                                <td class="fw-bold text-dark">{{ group.name }}</td>
+                                <td>{{ group.course.title }}</td>
+                                <td>
+                                    {% if group.instructor %}
+                                        {{ group.instructor.get_full_name|default:group.instructor.username }}
+                                    {% else %}
+                                        -غير محدد-
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if group.supervisor %}
+                                        {{ group.supervisor.get_full_name|default:group.supervisor.username }}
+                                    {% else %}
+                                        -غير محدد-
+                                    {% endif %}
+                                </td>
+                                <td><span class="badge bg-secondary">{{ group.classroom|default:"قاعة عامة" }}</span></td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-primary" @click="
+                                            editGroupId = {{ group.id }};
+                                            editGroupName = '{{ group.name|escapejs }}';
+                                            editGroupCourseId = '{{ group.course.id }}';
+                                            editGroupCourseTitle = '{{ group.course.title|escapejs }}';
+                                            editGroupInstructorId = '{% if group.instructor %}{{ group.instructor.id }}{% endif %}';
+                                            editGroupSupervisorId = '{% if group.supervisor %}{{ group.supervisor.id }}{% endif %}';
+                                            editGroupClassroom = '{{ group.classroom|escapejs }}';
+                                            editGroupCode = '{{ group.code|escapejs }}';
+                                            editGroupDays = '{{ group.days|escapejs }}'.split(/[،,]+/).map(d => d.trim()).filter(d => d);
+                                            editGroupStartTime = '{{ group.start_time }}';
+                                            editGroupEndTime = '{{ group.end_time }}';
+                                            showEditGroupModal = true;
+                                        ">
+                                            <i class="fas fa-edit"></i> تعديل
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="
+                                            deleteUrl = '{% url 'portal:delete_group_post' group.id %}';
+                                            showDeleteModal = true;
+                                        ">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">لا توجد شعب مسجلة حالياً.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: LECTURES -->
+        <div x-show="activeTab === 'lectures'" x-transition style="display:none;">
+            <!-- Add Lecture Form -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="showAddForm" x-transition style="display:none;">
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-plus-circle me-2 text-success"></i>إضافة محاضرة جديدة</h5>
+                <form method="POST" action="{% url 'portal:add_lecture_post' %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">عنوان المحاضرة (مثال: مقدمة في لغة بايثون)</label>
+                            <input type="text" name="title" class="form-control" placeholder="عنوان المحاضرة" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">الشعبة / المجموعة</label>
+                            <select name="group" class="form-select" required>
+                                <option value="" disabled selected>اختر الشعبة</option>
+                                {% for g in groups %}
+                                <option value="{{ g.id }}">{{ g.name }} ({{ g.course.title }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-bold">تاريخ المحاضرة</label>
+                            <input type="date" name="date" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-bold">وقت البدء</label>
+                            <input type="time" name="start_time" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-bold">وقت الانتهاء</label>
+                            <input type="time" name="end_time" class="form-control" required>
+                        </div>
+                        <!-- Location field removed -->
+                    </div>
+                    <div class="mt-3 text-end gap-2 d-flex justify-content-end">
+                        <button type="button" class="btn btn-light" @click="showAddForm = false">إلغاء</button>
+                        <button type="submit" class="btn btn-primary-custom px-4">إضافة المحاضرة</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Import/Export & Lectures List -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="!showAddForm">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+                    <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-book-open text-success me-2"></i>سجل المحاضرات الأكاديمية</h5>
+                    <button class="btn btn-primary-custom btn-sm px-3" @click="showAddForm = true">
+                        <i class="fas fa-plus me-1"></i>إضافة محاضرة جديدة
+                    </button>
+                </div>
+
+                <!-- Bulk Excel Import/Export for Lectures -->
+                <div class="row g-3 mb-4 bg-light p-3 rounded-3 align-items-center">
+                    <div class="col-md-6 text-md-start">
+                        <span class="fw-bold d-block text-dark"><i class="fas fa-file-excel text-success me-1"></i>استيراد وتصدير المحاضرات:</span>
+                        <small class="text-muted">يمكنك تصدير جدول المحاضرات بالكامل أو تحميل محاضرات جديدة من الإكسل.</small>
+                    </div>
+                    <div class="col-md-6 text-md-end gap-2 d-flex justify-content-md-end justify-content-start">
+                        <a href="{% url 'portal:export_lectures_view' %}" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-download me-1"></i>تصدير الجدول (Excel)
+                        </a>
+                        <form method="POST" action="{% url 'portal:import_lectures_view' %}" enctype="multipart/form-data" class="d-inline-flex gap-1">
+                            {% csrf_token %}
+                            <input type="file" name="excel_file" class="form-control form-control-sm" required style="max-width: 180px;">
+                            <button type="submit" class="btn btn-success btn-sm">استيراد</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>عنوان المحاضرة</th>
+                                <th>الشعبة / المجموعة</th>
+                                <th>التاريخ</th>
+                                <th>التوقيت</th>
+                                <th>الموقع</th>
+                                <th>خيارات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lec in lectures %}
+                            <tr>
+                                <td class="fw-bold text-dark">{{ lec.title }}</td>
+                                <td><span class="badge bg-secondary">{{ lec.group.name }}</span></td>
+                                <td>{{ lec.date }}</td>
+                                <td>{{ lec.start_time|time:"H:i" }} - {{ lec.end_time|time:"H:i" }}</td>
+                                <td>{{ lec.location|default:"ميداني بالقاعة" }}</td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-primary" @click="
+                                            editLectureId = {{ lec.id }};
+                                            editLectureTitle = '{{ lec.title|escapejs }}';
+                                            editLectureGroupId = '{{ lec.group.id }}';
+                                            editLectureDate = '{{ lec.date|date:'Y-m-d' }}';
+                                            editLectureStartTime = '{{ lec.start_time|time:'H:i' }}';
+                                            editLectureEndTime = '{{ lec.end_time|time:'H:i' }}';
+                                            showEditLectureModal = true;
+                                        ">
+                                            <i class="fas fa-edit"></i> تعديل
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="
+                                            deleteUrl = '{% url 'portal:delete_lecture_post' lec.id %}';
+                                            showDeleteModal = true;
+                                        ">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">لا توجد محاضرات مجدولة حالياً.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 3: LECTURERS -->
+        <div x-show="activeTab === 'lecturers'" x-transition style="display:none;">
+            <!-- Add Lecturer Form -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="showAddForm" x-transition style="display:none;">
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-plus-circle me-2 text-success"></i>إضافة مدرب / محاضر جديد</h5>
+                <form method="POST" action="{% url 'portal:add_lecturer_post' %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label text-dark fw-bold">اسم المستخدم (بالإنجليزي - Username)</label>
+                            <input type="text" name="username" class="form-control" placeholder="مثال: ahmad_lecturer" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">الاسم الأول</label>
+                            <input type="text" name="first_name" class="form-control" placeholder="الاسم الأول" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">اسم العائلة</label>
+                            <input type="text" name="last_name" class="form-control" placeholder="اسم العائلة" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-dark fw-bold">التخصص التقني</label>
+                            <input type="text" name="specialty" class="form-control" placeholder="مثال: Full-stack Development / AI Engineering">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-dark fw-bold">نبذة تعريفية (Bio)</label>
+                            <textarea name="bio" class="form-control" rows="3" placeholder="اكتب نبذة مختصرة عن مؤهلات المحاضر..."></textarea>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-end gap-2 d-flex justify-content-end">
+                        <button type="button" class="btn btn-light" @click="showAddForm = false">إلغاء</button>
+                        <button type="submit" class="btn btn-primary-custom px-4">حفظ المدرب</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Lecturers List -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="!showAddForm">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-chalkboard-teacher text-success me-2"></i>هيئة التدريب والمدربين</h5>
+                    <button class="btn btn-primary-custom btn-sm px-3" @click="showAddForm = true">
+                        <i class="fas fa-plus me-1"></i>إضافة مدرب جديد
+                    </button>
+                </div>
+
+                <!-- Bulk Excel Import/Export for Lecturers -->
+                <div class="row g-3 mb-3 bg-light p-3 rounded-3 align-items-center">
+                    <div class="col-md-4 text-md-start">
+                        <span class="fw-bold d-block text-dark"><i class="fas fa-file-excel text-success me-1"></i>استيراد المدربين:</span>
+                        <small class="text-muted">استخدم ملف Excel لرفع حسابات المدربين والأساتذة دفعة واحدة.</small>
+                    </div>
+                    <div class="col-md-8 text-md-end gap-2 d-flex justify-content-md-end justify-content-start flex-wrap">
+                        <a href="{% url 'portal:export_lecturers_view' %}" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-download me-1"></i>تصدير المدربين (Excel)
+                        </a>
+                        <form method="POST" action="{% url 'portal:import_lecturers_view' %}" enctype="multipart/form-data" class="d-inline-flex gap-1">
+                            {% csrf_token %}
+                            <input type="file" name="excel_file" class="form-control form-control-sm" required style="max-width: 200px;">
+                            <button type="submit" class="btn btn-success btn-sm">استيراد</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Bulk Delete Actions for Lecturers -->
+                <div class="row g-2 mb-3 bg-danger bg-opacity-10 p-3 rounded-3 border border-danger border-opacity-25 align-items-center" 
+                     x-show="lecturerSelectedIds.length > 0" x-transition>
+                    <div class="col-md-6">
+                        <span class="fw-bold text-danger d-block">
+                            <i class="fas fa-trash-alt me-1"></i>حذف جماعي للمدربين
+                        </span>
+                        <small class="text-muted" x-show="lecturerSelectedIds.length > 0">
+                            تم تحديد <span class="fw-bold text-danger" x-text="lecturerSelectedIds.length"></span> مدرب
+                        </small>
+                    </div>
+                    <div class="col-md-6 text-md-end d-flex gap-2 justify-content-md-end justify-content-start flex-wrap">
+                        <button type="button" class="btn btn-outline-danger btn-sm" 
+                                x-show="lecturerSelectedIds.length > 0"
+                                @click="showBulkDeleteLecturersModal = true; bulkDeleteLecturersAll = false;">
+                            <i class="fas fa-user-times me-1"></i>حذف المحددين (<span x-text="lecturerSelectedIds.length"></span>)
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm" 
+                                @click="showBulkDeleteLecturersModal = true; bulkDeleteLecturersAll = true;">
+                            <i class="fas fa-exclamation-triangle me-1"></i>حذف الجميع
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lecturers Filter Bar -->
+                <div class="row g-2 mb-3 bg-light p-3 rounded-3 border border-light">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold text-muted mb-1">بحث بالاسم أو اسم المستخدم</label>
+                        <input type="text" id="lecturerSearch" class="form-control form-control-sm" placeholder="ابحث عن مدرب..." oninput="filterLecturerTable()">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold text-muted mb-1">التخصص</label>
+                        <input type="text" id="lecturerSpecialty" class="form-control form-control-sm" placeholder="ابحث بالتخصص..." oninput="filterLecturerTable()">
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" class="form-check-input" 
+                                           @change="
+                                               if($event.target.checked) {
+                                                   lecturerSelectedIds = [{% for lec in lecturers %}{{ lec.id }}{% if not forloop.last %},{% endif %}{% endfor %}];
+                                               } else {
+                                                   lecturerSelectedIds = [];
+                                               }
+                                           "
+                                           :checked="lecturerSelectedIds.length === {{ lecturers|length }} && lecturerSelectedIds.length > 0"
+                                           title="تحديد/إلغاء تحديد الكل">
+                                </th>
+                                <th>الاسم الكامل</th>
+                                <th>اسم المستخدم</th>
+                                <th>البريد الإلكتروني</th>
+                                <th>التخصص</th>
+                                <th>خيارات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lec in lecturers %}
+                            <tr class="lecturer-row" 
+                                data-name="{{ lec.get_full_name|default:lec.username|lower }}" 
+                                data-username="{{ lec.username|lower }}" 
+                                data-specialty="{{ lec.lecturer_profile.first.specialty|default:'مدرس تقني'|lower }}">
+                                <td>
+                                    <input type="checkbox" class="form-check-input lecturer-checkbox" 
+                                           value="{{ lec.id }}"
+                                           :checked="lecturerSelectedIds.includes({{ lec.id }})"
+                                           @change="
+                                               if($event.target.checked) {
+                                                   if(!lecturerSelectedIds.includes({{ lec.id }})) lecturerSelectedIds.push({{ lec.id }});
+                                               } else {
+                                                   lecturerSelectedIds = lecturerSelectedIds.filter(id => id !== {{ lec.id }});
+                                               }
+                                           ">
+                                </td>
+                                <td class="fw-bold text-dark">{{ lec.get_full_name|default:lec.username }}</td>
+                                <td class="text-muted">{{ lec.username }}</td>
+                                <td>{{ lec.email }}</td>
+                                <td><span class="badge bg-success-subtle text-success">{{ lec.lecturer_profile.first.specialty|default:"مدرس تقني" }}</span></td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-primary" @click="
+                                            editLecturerId = {{ lec.id }};
+                                            editLecturerFirstName = '{{ lec.first_name|escapejs }}';
+                                            editLecturerLastName = '{{ lec.last_name|escapejs }}';
+                                            editLecturerEmail = '{{ lec.email|escapejs }}';
+                                            editLecturerSpecialty = '{{ lec.lecturer_profile.first.specialty|default:''|escapejs }}';
+                                            editLecturerBio = '{{ lec.lecturer_profile.first.bio|default:''|escapejs }}';
+                                            showEditLecturerModal = true;
+                                        ">
+                                            <i class="fas fa-edit"></i> تعديل
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="
+                                            deleteUrl = '{% url 'portal:delete_lecturer_post' lec.id %}';
+                                            showDeleteModal = true;
+                                        ">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">لا يوجد مدربون مسجلون حالياً.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: TRAINEES -->
+        <div x-show="activeTab === 'trainees'" x-transition style="display:none;">
+            <!-- Add Trainee Form -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="showAddForm" x-transition style="display:none;">
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-plus-circle me-2 text-success"></i>إضافة متدرب جديد</h5>
+                <form method="POST" action="{% url 'portal:add_trainee_post' %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label text-dark fw-bold">اسم المستخدم (بالإنجليزي - Username)</label>
+                            <input type="text" name="username" class="form-control" required placeholder="مثال: student_99">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">الاسم الأول</label>
+                            <input type="text" name="first_name" class="form-control" required placeholder="الاسم الأول">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">اسم العائلة</label>
+                            <input type="text" name="last_name" class="form-control" required placeholder="اسم العائلة">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">الشعبة / المجموعة</label>
+                            <select name="group" class="form-select">
+                                <option value="">اختر المجموعة</option>
+                                {% for g in groups %}
+                                <option value="{{ g.id }}">{{ g.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">المحافظة</label>
+                            <input type="text" name="governorate" class="form-control" value="البصرة">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-bold">المدرسة</label>
+                            <input type="text" name="university" class="form-control" placeholder="اسم المدرسة (مثال: مدرسة العراق الابتدائية)">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-bold">الصف الدراسي</label>
+                            <input type="text" name="college" class="form-control" placeholder="مثال: الصف الخامس">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-bold">المرحلة الأكاديمية</label>
+                            <input type="text" name="academic_stage" class="form-control" placeholder="مثال: الابتدائية">
+                        </div>
+                    </div>
+                    <div class="mt-3 text-end gap-2 d-flex justify-content-end">
+                        <button type="button" class="btn btn-light" @click="showAddForm = false">إلغاء</button>
+                        <button type="submit" class="btn btn-primary-custom px-4">حفظ المتدرب</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Trainees List & Bulk Actions -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="!showAddForm">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+                    <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-user-graduate text-success me-2"></i>إدارة شؤون المتدربين</h5>
+                    <button class="btn btn-primary-custom btn-sm px-3" @click="showAddForm = true">
+                        <i class="fas fa-plus me-1"></i>إضافة متدرب جديد
+                    </button>
+                </div>
+
+                <!-- Bulk Excel Import/Export for Trainees -->
+                <div class="row g-3 mb-3 bg-light p-3 rounded-3 align-items-center">
+                    <div class="col-md-4 text-md-start">
+                        <span class="fw-bold d-block text-dark"><i class="fas fa-file-excel text-success me-1"></i>استيراد وتصدير المتدربين:</span>
+                        <small class="text-muted">استخدم ملف Excel لتنزيل التقرير الأكاديمي الشامل أو رفع متدربين جدد.</small>
+                    </div>
+                    <div class="col-md-8 text-md-end gap-2 d-flex justify-content-md-end justify-content-start flex-wrap">
+                        <a href="{% url 'portal:export_trainees_view' %}" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-download me-1"></i>تصدير المتدربين (Excel)
+                        </a>
+                        <form method="POST" action="{% url 'portal:import_trainees_view' %}" enctype="multipart/form-data" class="d-inline-flex gap-1">
+                            {% csrf_token %}
+                            <input type="file" name="excel_file" class="form-control form-control-sm" required style="max-width: 180px;">
+                            <button type="submit" class="btn btn-success btn-sm">استيراد</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Bulk Delete Actions for Trainees -->
+                <div class="row g-2 mb-3 bg-danger bg-opacity-10 p-3 rounded-3 border border-danger border-opacity-25 align-items-center"
+                     x-show="traineeSelectedIds.length > 0" x-transition>
+                    <div class="col-md-6">
+                        <span class="fw-bold text-danger d-block">
+                            <i class="fas fa-trash-alt me-1"></i>حذف جماعي للمتدربين
+                        </span>
+                        <small class="text-muted" x-show="traineeSelectedIds.length > 0">
+                            تم تحديد <span class="fw-bold text-danger" x-text="traineeSelectedIds.length"></span> متدرب
+                        </small>
+                    </div>
+                    <div class="col-md-6 text-md-end d-flex gap-2 justify-content-md-end justify-content-start flex-wrap">
+                        <button type="button" class="btn btn-outline-danger btn-sm"
+                                x-show="traineeSelectedIds.length > 0"
+                                @click="showBulkDeleteTraineesModal = true; bulkDeleteTraineesAll = false;">
+                            <i class="fas fa-user-times me-1"></i>حذف المحددين (<span x-text="traineeSelectedIds.length"></span>)
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm"
+                                @click="showBulkDeleteTraineesModal = true; bulkDeleteTraineesAll = true;">
+                            <i class="fas fa-exclamation-triangle me-1"></i>حذف الجميع
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Trainees Filter Bar -->
+                <div class="row g-2 mb-3 bg-light p-3 rounded-3 border border-light">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1">بحث بالاسم أو الرقم التدريبي</label>
+                        <input type="text" id="traineeSearch" class="form-control form-control-sm" placeholder="ابحث عن متدرب..." oninput="filterTraineeTable()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1">الشعبة الدراسية</label>
+                        <select id="traineeGroupFilter" class="form-select form-select-sm" onchange="filterTraineeTable()">
+                            <option value="">-- الكل --</option>
+                            {% for g in groups %}
+                            <option value="{{ g.name }}">{{ g.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1">المدرسة</label>
+                        <input type="text" id="traineeUniFilter" class="form-control form-control-sm" placeholder="ابحث بالمدرسة..." oninput="filterTraineeTable()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1">الجنس</label>
+                        <select id="traineeGenderFilter" class="form-select form-select-sm" onchange="filterTraineeTable()">
+                            <option value="">-- الكل --</option>
+                            <option value="male">ذكر</option>
+                            <option value="female">أنثى</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" class="form-check-input"
+                                           @change="
+                                               if($event.target.checked) {
+                                                   traineeSelectedIds = [{% for trainee in trainees %}{{ trainee.id }}{% if not forloop.last %},{% endif %}{% endfor %}];
+                                               } else {
+                                                   traineeSelectedIds = [];
+                                               }
+                                           "
+                                           :checked="traineeSelectedIds.length === {{ trainees|length }} && traineeSelectedIds.length > 0"
+                                           title="تحديد/إلغاء تحديد الكل">
+                                </th>
+                                <th>الرقم التدريبي</th>
+                                <th>الاسم الكامل</th>
+                                <th>الشعبة</th>
+                                <th>المدرسة والصف</th>
+                                <th>الجنس</th>
+                                <th>نقاط التفاعل</th>
+                                <th>خيارات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trainee in trainees %}
+                            <tr class="trainee-row" 
+                                data-name="{{ trainee.user.get_full_name|default:trainee.user.username|lower }}" 
+                                data-username="{{ trainee.user.username|lower }}" 
+                                data-number="{{ trainee.training_number }}" 
+                                data-group="{% if trainee.group %}{{ trainee.group.name }}{% else %}غير مسكن بشعبة{% endif %}" 
+                                data-uni="{{ trainee.university|lower }}" 
+                                data-gender="{{ trainee.user.gender|default:'male' }}">
+                                <td>
+                                    <input type="checkbox" class="form-check-input trainee-checkbox"
+                                           value="{{ trainee.id }}"
+                                           :checked="traineeSelectedIds.includes({{ trainee.id }})"
+                                           @change="
+                                               if($event.target.checked) {
+                                                   if(!traineeSelectedIds.includes({{ trainee.id }})) traineeSelectedIds.push({{ trainee.id }});
+                                               } else {
+                                                   traineeSelectedIds = traineeSelectedIds.filter(id => id !== {{ trainee.id }});
+                                               }
+                                           ">
+                                </td>
+                                <td class="fw-bold">{{ trainee.training_number }}</td>
+                                <td class="fw-bold text-dark">
+                                    <a href="{% url 'portal:view_trainee_profile_detail' trainee.user.id %}" class="text-decoration-none text-success fw-bold">
+                                        <i class="fas fa-external-link-alt me-1 small" style="font-size: 0.75rem;"></i>
+                                        {{ trainee.user.get_full_name|default:trainee.user.username }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">
+                                        {% if trainee.group %}
+                                            {{ trainee.group.name }}
+                                        {% else %}
+                                            غير مسكن بشعبة
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ trainee.university }} - {{ trainee.college }}</td>
+                                <td>
+                                    {% if trainee.user.gender == 'female' %}
+                                    <span class="badge bg-danger-subtle text-danger py-1"><i class="fas fa-venus me-1"></i>أنثى</span>
+                                    {% else %}
+                                    <span class="badge bg-primary-subtle text-primary py-1"><i class="fas fa-mars me-1"></i>ذكر</span>
+                                    {% endif %}
+                                </td>
+                                <td><span class="badge bg-success fs-6">{{ trainee.points }} نقطة</span></td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-primary" @click="
+                                            editTraineeId = {{ trainee.id }};
+                                            editTraineeFirstName = '{{ trainee.user.first_name|escapejs }}';
+                                            editTraineeLastName = '{{ trainee.user.last_name|escapejs }}';
+                                            editTraineeEmail = '{{ trainee.user.email|escapejs }}';
+                                            editTraineeGroupId = '{% if trainee.group %}{{ trainee.group.id }}{% endif %}';
+                                            editTraineeGov = '{{ trainee.governorate|escapejs }}';
+                                            editTraineeDist = '{{ trainee.district|escapejs }}';
+                                            editTraineeUni = '{{ trainee.university|default:''|escapejs }}';
+                                            editTraineeCol = '{{ trainee.college|default:''|escapejs }}';
+                                            editTraineeDept = '{{ trainee.department|default:''|escapejs }}';
+                                            editTraineeStage = '{{ trainee.academic_stage|default:''|escapejs }}';
+                                            editTraineeSpec = '{{ trainee.specialty|default:''|escapejs }}';
+                                            showEditTraineeModal = true;
+                                        ">
+                                            <i class="fas fa-edit"></i> تعديل
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="
+                                            deleteUrl = '{% url 'portal:delete_trainee_post' trainee.id %}';
+                                            showDeleteModal = true;
+                                        ">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">لا يوجد متدربون مسجلون حالياً.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- SECTION 5: COURSES -->
+        <div x-show="activeTab === 'courses'" x-transition style="display:none;">
+            <!-- Add Course Form -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="showAddForm" x-transition style="display:none;">
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-plus-circle me-2 text-success"></i>إضافة مادة دراسية جديدة</h5>
+                <form method="POST" action="{% url 'portal:add_course_post' %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label text-dark fw-bold">اسم المادة (مثال: البرمجة المتقدمة بلغة بايثون)</label>
+                            <input type="text" name="title" class="form-control" placeholder="اسم المادة" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-dark fw-bold">عدد الساعات</label>
+                            <input type="number" name="hours" class="form-control" value="60" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-dark fw-bold">وصف المادة ومنهاجها</label>
+                            <textarea name="description" class="form-control" rows="3" placeholder="اكتب تفاصيل المادة والأهداف المرجوة منها..."></textarea>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-end gap-2 d-flex justify-content-end">
+                        <button type="button" class="btn btn-light" @click="showAddForm = false">إلغاء</button>
+                        <button type="submit" class="btn btn-primary-custom px-4">حفظ المادة</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Courses List -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="!showAddForm">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+                    <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-graduation-cap text-success me-2"></i>المواد الدراسية المتاحة</h5>
+                    <button class="btn btn-primary-custom btn-sm px-3" @click="showAddForm = true">
+                        <i class="fas fa-plus me-1"></i>إضافة مادة جديدة
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>اسم المادة</th>
+                                <th>عدد الساعات</th>
+                                <th>الوصف</th>
+                                <th>خيارات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for course in courses %}
+                            <tr>
+                                <td class="fw-bold text-dark">{{ course.title }}</td>
+                                <td>{{ course.hours }} ساعة</td>
+                                <td class="small text-muted">{{ course.description }}</td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-primary" @click="
+                                            editCourseId = {{ course.id }};
+                                            editCourseTitle = '{{ course.title|escapejs }}';
+                                            editCourseHours = '{{ course.hours }}';
+                                            editCourseDescription = '{{ course.description|escapejs }}';
+                                            showEditCourseModal = true;
+                                        ">
+                                            <i class="fas fa-edit"></i> تعديل
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="
+                                            deleteUrl = '{% url 'portal:delete_course_post' course.id %}';
+                                            showDeleteModal = true;
+                                        ">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">لا توجد مواد دراسية مسجلة حالياً.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 6: BADGES -->
+        <div x-show="activeTab === 'badges'" x-transition style="display:none;">
+            <!-- Add Badge Form -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="showAddForm" x-transition style="display:none;">
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-plus-circle me-2 text-success"></i>إنشاء شارة تفاعلية جديدة</h5>
+                <form method="POST" action="{% url 'portal:add_badge_post' %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">اسم الشارة (مثال: المبرمج المتميز)</label>
+                            <input type="text" name="title" class="form-control" placeholder="اسم الشارة" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">النقاط المطلوبة / الممنوحة</label>
+                            <input type="number" name="points_required" class="form-control" value="100" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">أيقونة الشارة (Bootstrap/FontAwesome - بدون fa-)</label>
+                            <input type="text" name="icon" class="form-control" value="award" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-dark fw-bold">وصف الشارة وشروط ربحها</label>
+                            <textarea name="description" class="form-control" rows="2" placeholder="اكتب كيفية الحصول على هذه الشارة..."></textarea>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-end gap-2 d-flex justify-content-end">
+                        <button type="button" class="btn btn-light" @click="showAddForm = false">إلغاء</button>
+                        <button type="submit" class="btn btn-primary-custom px-4">حفظ الشارة</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Award Badge Form -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="!showAddForm">
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-medal text-warning me-2"></i>منح شارة لمتدرب يدوياً</h5>
+                <form method="POST" action="{% url 'portal:award_badge_post' %}" class="row g-3 align-items-end">
+                    {% csrf_token %}
+                    <div class="col-md-5">
+                        <label class="form-label text-dark fw-bold">اختر المتدرب</label>
+                        <select name="trainee" class="form-select" required>
+                            <option value="" disabled selected>اختر المتدرب</option>
+                            {% for t in trainees %}
+                            <option value="{{ t.user.id }}">{{ t.user.get_full_name|default:t.user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label text-dark fw-bold">اختر الشارة</label>
+                        <select name="badge" class="form-select" required>
+                            <option value="" disabled selected>اختر الشارة</option>
+                            {% for b in badges %}
+                            <option value="{{ b.id }}">{{ b.name }} (+{{ b.points_required }} نقطة)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary-custom w-100">
+                            منح الشارة
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Badges List -->
+            <div class="glass-card p-4 border-0 mb-4 shadow" x-show="!showAddForm">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+                    <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-trophy text-warning me-2"></i>الشارات المتاحة بالمبادرة</h5>
+                    <button class="btn btn-primary-custom btn-sm px-3" @click="showAddForm = true">
+                        <i class="fas fa-plus me-1"></i>إنشاء شارة جديدة
+                    </button>
+                </div>
+                <div class="row g-3">
+                    {% for b in badges %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="bg-light p-3 rounded-3 d-flex align-items-center gap-3">
+                            <div class="icon-box text-white rounded-circle bg-warning d-flex align-items-center justify-content-center shadow-sm" 
+                                 style="width: 50px; height: 50px;">
+                                <i class="fas fa-{{ b.icon_name|default:'award' }} fs-4"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold m-0 text-dark">{{ b.name }}</h6>
+                                <small class="text-muted d-block">{{ b.description }}</small>
+                                <span class="badge bg-success-subtle text-success mt-1" style="font-size: 0.7rem;">+{{ b.points_required }} نقطة</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-center text-muted py-3">لا توجد شارات تم إنشاؤها بعد.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 7: CERTIFICATES -->
+        <div x-show="activeTab === 'certificates'" x-transition style="display:none;">
+            <!-- Generate Certificate Form -->
+            <div class="glass-card p-4 border-0 mb-4 shadow">
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-graduation-cap text-success me-2"></i>إصدار وتوليد شهادة تخرج رقمية جديدة</h5>
+                <form method="POST" action="{% url 'portal:generate_certificate_post' %}" class="row g-3 align-items-end">
+                    {% csrf_token %}
+                    <div class="col-md-5">
+                        <label class="form-label text-dark fw-bold">اختر الخريج المتدرب</label>
+                        <select name="trainee" class="form-select" required>
+                            <option value="" disabled selected>اختر المتدرب</option>
+                            {% for t in trainees %}
+                            <option value="{{ t.user.id }}">{{ t.user.get_full_name|default:t.user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label text-dark fw-bold">الدورة التدريبية</label>
+                        <select name="course" class="form-select" required>
+                            <option value="" disabled selected>اختر الدورة</option>
+                            {% for c in courses %}
+                            <option value="{{ c.id }}">{{ c.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary-custom w-100">
+                            إصدار الشهادة
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Certificates List -->
+            <div class="glass-card p-4 border-0 mb-4 shadow">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-file-invoice text-success me-2"></i>الشهادات الرقمية المصدرة</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>اسم الخريج</th>
+                                <th>الدورة</th>
+                                <th>تاريخ الإصدار</th>
+                                <th>رابط الشهادة (PDF)</th>
+                                <th>كود التحقق</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cert in certificates %}
+                            <tr>
+                                <td class="fw-bold text-dark">{{ cert.trainee.get_full_name|default:cert.trainee.username }}</td>
+                                <td>{{ cert.course.title }}</td>
+                                <td>{{ cert.issued_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    {% if cert.pdf_file %}
+                                    <a href="{{ cert.pdf_file.url }}" target="_blank" class="text-decoration-none text-success">
+                                        <i class="fas fa-file-pdf me-1"></i>عرض الشهادة الرسمية
+                                    </a>
+                                    {% else %}
+                                    قيد التوليد
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'portal:verify_certificate' cert.verification_token %}" target="_blank" class="badge bg-secondary font-monospace text-decoration-none text-white">
+                                        {{ cert.verification_token }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">لا توجد شهادات رقمية مصدرة حالياً.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 8: ANNOUNCEMENTS -->
+        <div x-show="activeTab === 'announcements'" x-transition style="display:none;">
+            <!-- Post Announcement Form -->
+            <div class="glass-card p-4 border-0 mb-4 shadow">
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-plus-circle me-2 text-success"></i>بث إعلان عام لجميع منتسبي المبادرة</h5>
+                <form method="POST" action="{% url 'portal:add_announcement_post' %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">عنوان الإعلان</label>
+                            <input type="text" name="title" class="form-control" placeholder="مثال: تبليغ هام بخصوص الامتحان العملي" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">الجهة المستهدفة بالتبليغ</label>
+                            <select name="target_audience" id="targetAudience" class="form-select" onchange="toggleGroupSelect()" required>
+                                <option value="all">الجميع (المدربين والمتدربين)</option>
+                                <option value="trainees">المتدربين فقط (جميع الطلاب)</option>
+                                <option value="lecturers">المدربين فقط (جميع المحاضرين)</option>
+                                <option value="group">شعبة/مجموعة معينة</option>
+                            </select>
+                        </div>
+                        <div class="col-12" id="groupSelectContainer" style="display: none;">
+                            <label class="form-label text-dark fw-bold">اختر الشعبة المستهدفة</label>
+                            <select name="group_id" class="form-select">
+                                <option value="">-- اختر مجموعة دراسية --</option>
+                                {% for g in groups %}
+                                <option value="{{ g.id }}">{{ g.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                <label class="form-label text-dark fw-bold m-0">نص الإعلان التفصيلي (يدعم كود HTML)</label>
+                                <div class="d-flex gap-2">
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-secondary py-0" onclick="insertHtmlTag('strong')"><strong>عريض</strong></button>
+                                        <button type="button" class="btn btn-outline-secondary py-0" onclick="insertHtmlTag('a')">رابط تشعبي</button>
+                                        <button type="button" class="btn btn-outline-secondary py-0" onclick="insertHtmlTag('h5')">عنوان</button>
+                                        <button type="button" class="btn btn-outline-secondary py-0" onclick="insertHtmlTag('ul')">قائمة منقطة</button>
+                                        <button type="button" class="btn btn-outline-secondary py-0 text-danger" onclick="insertHtmlTag('span-red')">تنبيه أحمر</button>
+                                    </div>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-success py-0 active" id="dirRtlBtn" onclick="setTextareaDir('rtl')">عربي ➡</button>
+                                        <button type="button" class="btn btn-outline-primary py-0" id="dirLtrBtn" onclick="setTextareaDir('ltr')">⬅ LTR (كود)</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <textarea name="body" id="announcementBody" class="form-control" rows="5" placeholder="اكتب نص الإعلان هنا..." style="direction: rtl;" required></textarea>
+                            <small class="text-muted">انقر على الأزرار أعلاه لتنسيق النص وإضافة روابط أو قوائم في الإعلان.</small>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-end">
+                        <button type="submit" class="btn btn-primary-custom px-5">نشر وبث الإعلان الآن</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Announcements List -->
+            <div class="glass-card p-4 border-0 mb-4 shadow">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-history text-primary me-2"></i>تاريخ الإعلانات العامة السابقة</h5>
+                <div class="d-flex flex-column gap-3">
+                    {% for msg in announcements %}
+                    <div class="bg-light p-3 rounded-3 mb-2 d-flex justify-content-between align-items-start gap-3">
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                <span class="badge bg-success-subtle text-success"><i class="fas fa-bullhorn me-1"></i>إعلان عام للمبادرة</span>
+                                <span class="text-muted small font-monospace">{{ msg.created_at|date:"Y-m-d H:i" }}</span>
+                            </div>
+                            <div class="text-dark m-0 small">{{ msg.content|safe }}</div>
+                        </div>
+                        <div class="text-end">
+                            <form method="POST" action="{% url 'portal:delete_announcement_post' msg.id %}" onsubmit="return confirm('هل أنت متأكد من حذف هذا الإعلان نهائياً؟');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger btn-sm p-1 rounded-2" title="حذف الإعلان">
+                                    <i class="fas fa-trash-alt px-1"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-4">لا توجد إعلانات عامة سابقة.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- JavaScript helper for inserting HTML tags -->
+            <script>
+                function insertHtmlTag(tag) {
+                    const textarea = document.getElementById('announcementBody');
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const text = textarea.value;
+                    const selectedText = text.substring(start, end);
+                    
+                    let replacement = "";
+                    if (tag === 'strong') {
+                        replacement = `<strong>${selectedText || 'نص عريض'}</strong>`;
+                    } else if (tag === 'a') {
+                        replacement = `<a href="https://google.com" class="text-decoration-none text-success fw-bold" target="_blank">${selectedText || 'اسم الرابط'}</a>`;
+                    } else if (tag === 'h5') {
+                        replacement = `<h5 class="fw-bold text-success mt-2 mb-1">${selectedText || 'عنوان فرعي'}</h5>`;
+                    } else if (tag === 'ul') {
+                        replacement = `\n<ul>\n  <li>${selectedText || 'عنصر أول'}</li>\n  <li>عنصر ثانٍ</li>\n</ul>\n`;
+                    } else if (tag === 'span-red') {
+                        replacement = `<span class="text-danger fw-bold">${selectedText || 'تنبيه هام'}</span>`;
+                    }
+                    
+                    textarea.value = text.substring(0, start) + replacement + text.substring(end);
+                    textarea.focus();
+                    textarea.setSelectionRange(start + replacement.length, start + replacement.length);
+                }
+
+                function setTextareaDir(dir) {
+                    const textarea = document.getElementById('announcementBody');
+                    const rtlBtn = document.getElementById('dirRtlBtn');
+                    const ltrBtn = document.getElementById('dirLtrBtn');
+                    
+                    textarea.style.direction = dir;
+                    if (dir === 'ltr') {
+                        textarea.style.textAlign = 'left';
+                        textarea.style.fontFamily = 'monospace';
+                        
+                        ltrBtn.className = "btn btn-primary py-0 active";
+                        rtlBtn.className = "btn btn-outline-success py-0";
+                    } else {
+                        textarea.style.textAlign = 'right';
+                        textarea.style.fontFamily = 'inherit';
+                        
+                        rtlBtn.className = "btn btn-success py-0 active";
+                        ltrBtn.className = "btn btn-outline-primary py-0";
+                    }
+                }
+
+                function toggleGroupSelect() {
+                    const audience = document.getElementById('targetAudience').value;
+                    const container = document.getElementById('groupSelectContainer');
+                    if (audience === 'group') {
+                        container.style.display = 'block';
+                    } else {
+                        container.style.display = 'none';
+                    }
+                }
+                
+                function filterLecturerTable() {
+                    const nameVal = document.getElementById('lecturerSearch').value.toLowerCase();
+                    const specVal = document.getElementById('lecturerSpecialty').value.toLowerCase();
+                    const rows = document.querySelectorAll('.lecturer-row');
+                    rows.forEach(row => {
+                        const name = row.getAttribute('data-name');
+                        const username = row.getAttribute('data-username');
+                        const specialty = row.getAttribute('data-specialty');
+                        const matchName = !nameVal || name.includes(nameVal) || username.includes(nameVal);
+                        const matchSpec = !specVal || specialty.includes(specVal);
+                        row.style.display = (matchName && matchSpec) ? '' : 'none';
+                    });
+                }
+                
+                function filterTraineeTable() {
+                    const searchVal = document.getElementById('traineeSearch').value.toLowerCase();
+                    const groupVal = document.getElementById('traineeGroupFilter').value;
+                    const uniVal = document.getElementById('traineeUniFilter').value.toLowerCase();
+                    const genderVal = document.getElementById('traineeGenderFilter').value;
+                    
+                    const rows = document.querySelectorAll('.trainee-row');
+                    rows.forEach(row => {
+                        const name = row.getAttribute('data-name');
+                        const username = row.getAttribute('data-username');
+                        const number = row.getAttribute('data-number');
+                        const group = row.getAttribute('data-group');
+                        const uni = row.getAttribute('data-uni');
+                        const gender = row.getAttribute('data-gender');
+                        
+                        const matchSearch = !searchVal || name.includes(searchVal) || username.includes(searchVal) || number.includes(searchVal);
+                        const matchGroup = !groupVal || group === groupVal;
+                        const matchUni = !uniVal || uni.includes(uniVal);
+                        const matchGender = !genderVal || gender === genderVal;
+                        
+                        row.style.display = (matchSearch && matchGroup && matchUni && matchGender) ? '' : 'none';
+                    });
+                }
+            </script>
+        </div>
+
+        <!-- SECTION 9: CONFIGURATIONS / SETTINGS -->
+        <div x-show="activeTab === 'settings'" x-transition style="display:none;">
+            <div class="glass-card p-4 border-0 mb-4 shadow">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-sliders-h text-success me-2"></i>إعدادات الشعار هوية المنصة الشاملة</h5>
+                <form method="POST" action="{% url 'portal:update_site_config_post' %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">اسم الموقع/المبادرة الرئيسي</label>
+                            <input type="text" name="site_name" class="form-control" value="{{ site_config.site_name }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold">العنوان الفرعي (الجهة المنظمة)</label>
+                            <input type="text" name="sub_title" class="form-control" value="{{ site_config.sub_title }}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-dark fw-bold">تحميل/تعديل الشعار (Logo)</label>
+                            <input type="file" name="logo" class="form-control" accept="image/*">
+                            {% if site_config.logo %}
+                            <div class="mt-3 p-3 bg-light rounded-3 text-center d-inline-block">
+                                <span class="d-block small text-muted mb-2">الشعار الحالي:</span>
+                                <img src="{{ site_config.logo.url }}" class="img-fluid border rounded shadow-sm" style="max-height: 100px;">
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="mt-4 text-end">
+                        <button type="submit" class="btn btn-primary-custom px-5">حفظ وتحديث الإعدادات</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- SECTION 10: ACCOUNT GENERATOR -->
+        <div x-show="activeTab === 'accounts'" x-transition style="display:none;">
+            <div class="row g-4">
+                <!-- Single Account Provisioner -->
+                <div class="col-lg-6">
+                    <div class="glass-card p-4 border-0 mb-4 shadow">
+                        <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-user-plus text-primary me-2"></i>توليد حساب مفرد (فوري)</h5>
+                        <p class="text-muted small">قم بإنشاء حساب فوري لأي متدرب أو مدرب مع توليد تلقائي للبريد والكلمة السرية.</p>
+                        
+                        <form @submit.prevent="
+                            let formData = new FormData($el);
+                            fetch('{% url 'portal:generate_single_account_post' %}', {
+                                method: 'POST',
+                                body: formData,
+                                headers: {
+                                    'X-CSRFToken': '{{ csrf_token }}'
+                                }
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if(data.success) {
+                                    generatedUsername = data.username;
+                                    generatedEmail = data.email;
+                                    generatedPassword = data.password;
+                                    generatedRole = data.role;
+                                    generatedGroup = data.group;
+                                    showSingleAccountModal = true;
+                                } else {
+                                    alert('فشل التوليد: ' + data.message);
+                                }
+                            })
+                            .catch(error => {
+                                alert('حدث خطأ أثناء معالجة الطلب.');
+                            });
+                        ">
+                            {% csrf_token %}
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">اسم المستخدم (Username)</label>
+                                    <input type="text" name="username" class="form-control" placeholder="مثال: ali_programmer" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">الدور الوظيفي</label>
+                                    <select name="role" class="form-select" required x-ref="roleSelect" @change="$forceUpdate()">
+                                        <option value="trainee">متدرب</option>
+                                        <option value="lecturer">مدرب / محاضر</option>
+                                        <option value="supervisor">مشرف متابع</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">الاسم الأول</label>
+                                    <input type="text" name="first_name" class="form-control" placeholder="الاسم الأول">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">اسم العائلة</label>
+                                    <input type="text" name="last_name" class="form-control" placeholder="اسم العائلة">
+                                </div>
+                                <div class="col-12" x-show="$refs.roleSelect && $refs.roleSelect.value === 'trainee'">
+                                    <label class="form-label text-dark fw-bold">الشعبة / المجموعة</label>
+                                    <select name="group" class="form-select">
+                                        <option value="">اختر المجموعة (اختياري)</option>
+                                        {% for g in groups %}
+                                        <option value="{{ g.id }}">{{ g.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12 mt-4">
+                                    <button type="submit" class="btn btn-primary-custom w-100"><i class="fas fa-magic me-2"></i>توليد الحساب وعرض بيانات الاعتماد</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Batch Accounts Provisioner -->
+                <div class="col-lg-6">
+                    <div class="glass-card p-4 border-0 mb-4 shadow">
+                        <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-users-cog text-success me-2"></i>توليد حسابات دفعات (Batch)</h5>
+                        <p class="text-muted small">قم بإنشاء مجموعة حسابات دفعة واحدة. سيقوم النظام بتوليد الحسابات فوراً وتصدير ملف Excel يحتوي على بيانات الدخول والكلمات السرية الخاصة بهم.</p>
+                        
+                        <form method="POST" action="{% url 'portal:generate_batch_accounts_view' %}">
+                            {% csrf_token %}
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">البادئة (Prefix لاسم المستخدم)</label>
+                                    <input type="text" name="prefix" class="form-control" placeholder="مثال: basra_student" required>
+                                    <small class="text-muted">سيتم التوليد مثل: basra_student_01, basra_student_02...</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">العدد المطلوب توليده</label>
+                                    <input type="number" name="count" class="form-control" min="1" max="100" value="10" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">الدور الوظيفي للحسابات</label>
+                                    <select name="role" class="form-select" required x-ref="batchRoleSelect" @change="$forceUpdate()">
+                                        <option value="trainee">متدربين</option>
+                                        <option value="lecturer">مدربين</option>
+                                        <option value="supervisor">مشرفين</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6" x-show="$refs.batchRoleSelect && $refs.batchRoleSelect.value === 'trainee'">
+                                    <label class="form-label text-dark fw-bold">تسكين في شعبة</label>
+                                    <select name="group_id" class="form-select">
+                                        <option value="">-- بدون شعبة حالياً --</option>
+                                        {% for g in groups %}
+                                        <option value="{{ g.id }}">{{ g.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12 mt-4">
+                                    <button type="submit" class="btn btn-success w-100"><i class="fas fa-file-download me-2"></i>بدء التوليد وتحميل ملف الاعتمادات (Excel)</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODALS -->
+
+        <!-- DELETE CONFIRMATION MODAL -->
+        <div class="modal fade show" tabindex="-1" :style="showDeleteModal ? 'display: block; background: rgba(0,0,0,0.5);' : 'display: none;'" x-cloak>
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+                    <div class="modal-header bg-danger text-white border-0" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>تأكيد عملية الحذف</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="showDeleteModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4 text-center">
+                        <i class="fas fa-trash-alt text-danger fa-3x mb-3"></i>
+                        <h5 class="fw-bold text-dark">هل أنت متأكد من حذف هذا السجل نهائياً؟</h5>
+                        <p class="text-muted">تحذير: لا يمكن التراجع عن هذه العملية بعد إتمامها، وقد تؤثر على البيانات المرتبطة بها.</p>
+                    </div>
+                    <div class="modal-footer border-0 bg-light justify-content-center" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                        <form method="POST" :action="deleteUrl">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger px-4 fw-bold">تأكيد الحذف</button>
+                        </form>
+                        <button type="button" class="btn btn-secondary px-4 fw-bold" @click="showDeleteModal = false">إلغاء</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GENERATED ACCOUNT CREDENTIALS COPY MODAL -->
+        <div class="modal fade show" tabindex="-1" :style="showSingleAccountModal ? 'display: block; background: rgba(0,0,0,0.5);' : 'display: none;'" x-cloak>
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+                    <div class="modal-header bg-primary text-white border-0" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-magic me-2"></i>تم توليد الحساب بنجاح!</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="showSingleAccountModal = false"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="alert alert-success text-center border-0 mb-3 fw-bold">
+                            يرجى نسخ بيانات الاعتماد أدناه فوراً قبل إغلاق هذه النافذة.
+                        </div>
+                        <div class="bg-light p-3 rounded-3 mb-3 text-start font-monospace position-relative" style="direction: ltr;">
+                            <div class="mb-2"><strong>Role:</strong> <span x-text="generatedRole" class="text-primary fw-bold"></span></div>
+                            <div class="mb-2"><strong>Username:</strong> <span x-text="generatedUsername"></span></div>
+                            <div class="mb-2"><strong>Email:</strong> <span x-text="generatedEmail"></span></div>
+                            <div class="mb-2"><strong>Password:</strong> <span x-text="generatedPassword" class="text-danger fw-bold"></span></div>
+                            <div class="mb-2" x-show="generatedGroup"><strong>Group:</strong> <span x-text="generatedGroup"></span></div>
+                        </div>
+                        <button class="btn btn-outline-primary w-100" @click="
+                            let text = `الدور: ${generatedRole}\nاسم المستخدم: ${generatedUsername}\nالبريد الإلكتروني: ${generatedEmail}\nكلمة المرور: ${generatedPassword}`;
+                            if(generatedGroup) { text += `\nالشعبة: ${generatedGroup}`; }
+                            navigator.clipboard.writeText(text);
+                            alert('تم نسخ اعتمادات الدخول بنجاح!');
+                        "><i class="fas fa-copy me-2"></i>نسخ كافة الاعتمادات للذاكرة</button>
+                    </div>
+                    <div class="modal-footer border-0 bg-light" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                        <button type="button" class="btn btn-secondary w-100 fw-bold" @click="showSingleAccountModal = false">إغلاق</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EDIT GROUP MODAL -->
+        <div class="modal fade show" tabindex="-1" :style="showEditGroupModal ? 'display: block; background: rgba(0,0,0,0.5);' : 'display: none;'" x-cloak>
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+                    <div class="modal-header bg-primary text-white border-0" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>تعديل بيانات الشعبة</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="showEditGroupModal = false"></button>
+                    </div>
+                    <form method="POST" :action="'/manage/group/' + editGroupId + '/edit/'">
+                        {% csrf_token %}
+                        <div class="modal-body p-4">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">اسم الشعبة</label>
+                                    <input type="text" name="name" class="form-control" x-model="editGroupName" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">المادة الدراسية (اسم المادة)</label>
+                                    <input type="text" name="course_title" list="courses_list" class="form-control" x-model="editGroupCourseTitle" placeholder="اكتب اسم المادة (مثال: بايثون)" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">المحاضر / المدرب</label>
+                                    <select name="instructor" class="form-select" x-model="editGroupInstructorId">
+                                        <option value="">-- غير محدد --</option>
+                                        {% for lec in lecturers %}
+                                        <option value="{{ lec.id }}">{{ lec.get_full_name|default:lec.username }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">المشرف المتابع</label>
+                                    <select name="supervisor" class="form-select" x-model="editGroupSupervisorId">
+                                        <option value="">-- غير محدد --</option>
+                                        {% for sup in supervisors %}
+                                        <option value="{{ sup.id }}">{{ sup.get_full_name|default:sup.username }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">القاعة الدراسية</label>
+                                    <input type="text" name="classroom" class="form-control" x-model="editGroupClassroom">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">رمز الشعبة (Code)</label>
+                                    <input type="text" name="code" class="form-control" x-model="editGroupCode">
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label text-dark fw-bold mb-2">أيام التدريب (اختر الأيام)</label>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                            <input type="checkbox" name="days" value="السبت" x-model="editGroupDays"> السبت
+                                        </label>
+                                        <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                            <input type="checkbox" name="days" value="الأحد" x-model="editGroupDays"> الأحد
+                                        </label>
+                                        <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                            <input type="checkbox" name="days" value="الإثنين" x-model="editGroupDays"> الإثنين
+                                        </label>
+                                        <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                            <input type="checkbox" name="days" value="الثلاثاء" x-model="editGroupDays"> الثلاثاء
+                                        </label>
+                                        <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                            <input type="checkbox" name="days" value="الأربعاء" x-model="editGroupDays"> الأربعاء
+                                        </label>
+                                        <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                            <input type="checkbox" name="days" value="الخميس" x-model="editGroupDays"> الخميس
+                                        </label>
+                                        <label class="btn btn-outline-success btn-sm px-3 py-2 d-flex align-items-center gap-1" style="border-radius: 8px; cursor: pointer;">
+                                            <input type="checkbox" name="days" value="الجمعة" x-model="editGroupDays"> الجمعة
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label text-dark fw-bold">وقت البدء</label>
+                                    <input type="time" name="start_time" class="form-control" x-model="editGroupStartTime">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label text-dark fw-bold">وقت الانتهاء</label>
+                                    <input type="time" name="end_time" class="form-control" x-model="editGroupEndTime">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 bg-light" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                            <button type="submit" class="btn btn-primary-custom px-4 fw-bold">حفظ التغييرات</button>
+                            <button type="button" class="btn btn-secondary px-4 fw-bold" @click="showEditGroupModal = false">إلغاء</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- EDIT LECTURE MODAL -->
+        <div class="modal fade show" tabindex="-1" :style="showEditLectureModal ? 'display: block; background: rgba(0,0,0,0.5);' : 'display: none;'" x-cloak>
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+                    <div class="modal-header bg-primary text-white border-0" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>تعديل بيانات المحاضرة</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="showEditLectureModal = false"></button>
+                    </div>
+                    <form method="POST" :action="'/manage/lecture/' + editLectureId + '/edit/'">
+                        {% csrf_token %}
+                        <div class="modal-body p-4">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label text-dark fw-bold">عنوان المحاضرة</label>
+                                    <input type="text" name="title" class="form-control" x-model="editLectureTitle" required>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label text-dark fw-bold">الشعبة / المجموعة</label>
+                                    <select name="group" class="form-select" x-model="editLectureGroupId" required>
+                                        {% for g in groups %}
+                                        <option value="{{ g.id }}">{{ g.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label text-dark fw-bold">تاريخ المحاضرة</label>
+                                    <input type="date" name="date" class="form-control" x-model="editLectureDate" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">وقت البدء</label>
+                                    <input type="time" name="start_time" class="form-control" x-model="editLectureStartTime" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">وقت الانتهاء</label>
+                                    <input type="time" name="end_time" class="form-control" x-model="editLectureEndTime" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 bg-light" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                            <button type="submit" class="btn btn-primary-custom px-4 fw-bold">حفظ التغييرات</button>
+                            <button type="button" class="btn btn-secondary px-4 fw-bold" @click="showEditLectureModal = false">إلغاء</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- EDIT LECTURER MODAL -->
+        <div class="modal fade show" tabindex="-1" :style="showEditLecturerModal ? 'display: block; background: rgba(0,0,0,0.5);' : 'display: none;'" x-cloak>
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+                    <div class="modal-header bg-primary text-white border-0" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>تعديل بيانات المدرب</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="showEditLecturerModal = false"></button>
+                    </div>
+                    <form method="POST" :action="'/manage/lecturer/' + editLecturerId + '/edit/'">
+                        {% csrf_token %}
+                        <div class="modal-body p-4">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">الاسم الأول</label>
+                                    <input type="text" name="first_name" class="form-control" x-model="editLecturerFirstName" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">اسم العائلة</label>
+                                    <input type="text" name="last_name" class="form-control" x-model="editLecturerLastName" required>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label text-dark fw-bold">التخصص التقني</label>
+                                    <input type="text" name="specialty" class="form-control" x-model="editLecturerSpecialty">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label text-dark fw-bold">نبذة تعريفية (Bio)</label>
+                                    <textarea name="bio" class="form-control" rows="3" x-model="editLecturerBio"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 bg-light" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                            <button type="submit" class="btn btn-primary-custom px-4 fw-bold">حفظ التغييرات</button>
+                            <button type="button" class="btn btn-secondary px-4 fw-bold" @click="showEditLecturerModal = false">إلغاء</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- EDIT TRAINEE MODAL -->
+        <div class="modal fade show" tabindex="-1" :style="showEditTraineeModal ? 'display: block; background: rgba(0,0,0,0.5);' : 'display: none;'" x-cloak>
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+                    <div class="modal-header bg-primary text-white border-0" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>تعديل بيانات المتدرب</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="showEditTraineeModal = false"></button>
+                    </div>
+                    <form method="POST" :action="'/manage/trainee/' + editTraineeId + '/edit/'">
+                        {% csrf_token %}
+                        <div class="modal-body p-4">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">الاسم الأول</label>
+                                    <input type="text" name="first_name" class="form-control" x-model="editTraineeFirstName" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">اسم العائلة</label>
+                                    <input type="text" name="last_name" class="form-control" x-model="editTraineeLastName" required>
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label text-dark fw-bold">الشعبة / المجموعة</label>
+                                    <select name="group" class="form-select" x-model="editTraineeGroupId">
+                                        <option value="">-- بدون شعبة حالياً --</option>
+                                        {% for g in groups %}
+                                        <option value="{{ g.id }}">{{ g.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">المحافظة</label>
+                                    <input type="text" name="governorate" class="form-control" x-model="editTraineeGov" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">القضاء</label>
+                                    <input type="text" name="district" class="form-control" x-model="editTraineeDist">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">المدرسة</label>
+                                    <input type="text" name="university" class="form-control" x-model="editTraineeUni">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">الصف الدراسي</label>
+                                    <input type="text" name="college" class="form-control" x-model="editTraineeCol">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label text-dark fw-bold">القسم</label>
+                                    <input type="text" name="department" class="form-control" x-model="editTraineeDept">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label text-dark fw-bold">المرحلة الدراسية</label>
+                                    <input type="text" name="academic_stage" class="form-control" x-model="editTraineeStage">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label text-dark fw-bold">الاختصاص</label>
+                                    <input type="text" name="specialty" class="form-control" x-model="editTraineeSpec">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 bg-light" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                            <button type="submit" class="btn btn-primary-custom px-4 fw-bold">حفظ التغييرات</button>
+                            <button type="button" class="btn btn-secondary px-4 fw-bold" @click="showEditTraineeModal = false">إلغاء</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- EDIT COURSE MODAL -->
+        <div class="modal fade show" tabindex="-1" :style="showEditCourseModal ? 'display: block; background: rgba(0,0,0,0.5);' : 'display: none;'" x-cloak>
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+                    <div class="modal-header bg-success text-white border-0" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>تعديل المادة الدراسية</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="showEditCourseModal = false"></button>
+                    </div>
+                    <form method="POST" :action="'/manage/course/' + editCourseId + '/edit/'">
+                        {% csrf_token %}
+                        <div class="modal-body p-4">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label text-dark fw-bold">اسم المادة</label>
+                                    <input type="text" name="title" class="form-control" x-model="editCourseTitle" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label text-dark fw-bold">عدد الساعات</label>
+                                    <input type="number" name="hours" class="form-control" x-model="editCourseHours" required>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label text-dark fw-bold">وصف المادة ومنهاجها</label>
+                                    <textarea name="description" class="form-control" rows="4" x-model="editCourseDescription"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 bg-light" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                            <button type="submit" class="btn btn-success px-4 fw-bold">حفظ التغييرات</button>
+                            <button type="button" class="btn btn-secondary px-4 fw-bold" @click="showEditCourseModal = false">إلغاء</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- BULK DELETE LECTURERS CONFIRMATION MODAL -->
+        <div class="modal fade show" tabindex="-1" :style="showBulkDeleteLecturersModal ? 'display: block; background: rgba(0,0,0,0.5);' : 'display: none;'" x-cloak>
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+                    <div class="modal-header bg-danger text-white border-0" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>تأكيد الحذف الجماعي للمدربين</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="showBulkDeleteLecturersModal = false"></button>
+                    </div>
+                    <form method="POST" action="{% url 'portal:bulk_delete_lecturers_post' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="delete_all" :value="bulkDeleteLecturersAll ? 'true' : 'false'">
+                        <template x-for="id in lecturerSelectedIds" :key="id">
+                            <input type="hidden" name="selected_ids" :value="id">
+                        </template>
+                        
+                        <div class="modal-body p-4 text-center">
+                            <i class="fas fa-exclamation-circle text-danger fa-3x mb-3"></i>
+                            <h5 class="fw-bold text-dark">
+                                <span x-show="bulkDeleteLecturersAll">هل أنت متأكد من حذف جميع المدربين نهائياً؟</span>
+                                <span x-show="!bulkDeleteLecturersAll">هل أنت متأكد من حذف المدربين المحددين (<span x-text="lecturerSelectedIds.length"></span>)؟</span>
+                            </h5>
+                            <p class="text-muted">تحذير: لا يمكن التراجع عن هذه العملية بعد إتمامها، وسيتم حذف جميع الحسابات وبياناتهم المرتبطة بها.</p>
+                        </div>
+                        <div class="modal-footer border-0 bg-light justify-content-center" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                            <button type="submit" class="btn btn-danger px-4 fw-bold">تأكيد الحذف النهائي</button>
+                            <button type="button" class="btn btn-secondary px-4 fw-bold" @click="showBulkDeleteLecturersModal = false">إلغاء</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- BULK DELETE TRAINEES CONFIRMATION MODAL -->
+        <div class="modal fade show" tabindex="-1" :style="showBulkDeleteTraineesModal ? 'display: block; background: rgba(0,0,0,0.5);' : 'display: none;'" x-cloak>
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+                    <div class="modal-header bg-danger text-white border-0" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>تأكيد الحذف الجماعي للمتدربين</h5>
+                        <button type="button" class="btn-close btn-close-white" @click="showBulkDeleteTraineesModal = false"></button>
+                    </div>
+                    <form method="POST" action="{% url 'portal:bulk_delete_trainees_post' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="delete_all" :value="bulkDeleteTraineesAll ? 'true' : 'false'">
+                        <template x-for="id in traineeSelectedIds" :key="id">
+                            <input type="hidden" name="selected_ids" :value="id">
+                        </template>
+
+                        <div class="modal-body p-4 text-center">
+                            <i class="fas fa-exclamation-circle text-danger fa-3x mb-3"></i>
+                            <h5 class="fw-bold text-dark">
+                                <span x-show="bulkDeleteTraineesAll">هل أنت متأكد من حذف جميع المتدربين نهائياً؟</span>
+                                <span x-show="!bulkDeleteTraineesAll">هل أنت متأكد من حذف المتدربين المحددين (<span x-text="traineeSelectedIds.length"></span>)؟</span>
+                            </h5>
+                            <p class="text-muted">تحذير: لا يمكن التراجع عن هذه العملية بعد إتمامها، وسيتم حذف حسابات المتدربين وملفاتهم الأكاديمية بالكامل.</p>
+                        </div>
+                        <div class="modal-footer border-0 bg-light justify-content-center" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                            <button type="submit" class="btn btn-danger px-4 fw-bold">تأكيد الحذف النهائي</button>
+                            <button type="button" class="btn btn-secondary px-4 fw-bold" @click="showBulkDeleteTraineesModal = false">إلغاء</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

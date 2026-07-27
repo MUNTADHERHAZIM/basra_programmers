@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}رمز حضور QR للمحاضرة - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}شاشة بث كود الحضور الفعّال{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-8 col-lg-6 text-center">
+        <div class="glass-card p-5 border-0 shadow-lg">
+            <span class="badge bg-success-subtle text-success px-3 py-2 rounded-pill mb-3">رمز تسجيل حضور نشط للمجموعة</span>
+            <h3 class="fw-bold mb-1 text-slate-800">{{ lecture.title }}</h3>
+            <p class="text-muted mb-4">{{ lecture.group.name }} | {{ lecture.date }}</p>
+            
+            <!-- Dynamic QR Container loaded by HTMX -->
+            <div id="qr-container" class="my-4" 
+                 hx-get="{% url 'portal:get_lecture_qr_token' lecture.id %}" 
+                 hx-trigger="load, every 15s" 
+                 hx-swap="outerHTML">
+                <div class="spinner-border text-success" role="status">
+                    <span class="visually-hidden">جاري توليد كود التحضير...</span>
+                </div>
+                <p class="text-muted mt-2">جاري توليد كود التحضير...</p>
+            </div>
+
+            <div class="alert alert-warning py-2 mb-4" style="font-size: 0.85rem;">
+                <i class="fas fa-info-circle me-1"></i>يرجى من جميع الطلاب التواجد بالقرب وتوجيه كاميرا الهاتف لمسح هذا الرمز لتسجيل حضورهم فوراً.
+            </div>
+            
+            <button class="btn btn-secondary-custom px-4" onclick="window.close()"><i class="fas fa-times-circle me-2"></i>إغلاق شاشة البث</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

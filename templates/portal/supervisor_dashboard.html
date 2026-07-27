@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+
+{% block title %}لوحة تحكم المشرف - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}بوابة مشرف المتابعة والتقييم{% endblock %}
+
+{% block content %}
+<!-- Top Row Warnings -->
+<div class="row g-4 mb-4">
+    <!-- Absentee Warning Panel -->
+    <div class="col-12 col-lg-8">
+        <div class="glass-card p-4 border-0">
+            <h5 class="fw-bold mb-3 text-danger"><i class="fas fa-exclamation-triangle me-2"></i>تنبيهات الغياب المتكرر (متابعة عاجلة)</h5>
+            <p class="text-muted small">قائمة بالطلاب الذين بلغت غياباتهم محاضرتين أو أكثر. يرجى التواصل معهم لمعرفة الأسباب وحل المشكلات الفنية أو الشخصية.</p>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>الرقم التدريبي</th>
+                            <th>المتدرب</th>
+                            <th>المجموعة</th>
+                            <th>عدد الغيابات</th>
+                            <th>معدل الحضور الحالي</th>
+                            <th>إجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for warning in warnings %}
+                        <tr>
+                            <td><span class="badge bg-light text-dark border">{{ warning.trainee.training_number }}</span></td>
+                            <td class="fw-bold text-slate-800">{{ warning.trainee.user.get_full_name|default:warning.trainee.user.username }}</td>
+                            <td>{{ warning.trainee.group.name }}</td>
+                            <td><span class="text-danger fw-bold fs-5">{{ warning.absent_count }} غيابات</span></td>
+                            <td>
+                                <span class="text-danger fw-bold">{{ warning.trainee.attendance_percentage }}%</span>
+                            </td>
+                            <td>
+                                <a href="mailto:{{ warning.trainee.user.email }}" class="btn btn-sm btn-outline-danger"><i class="fas fa-envelope"></i> مراسلة</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-success"><i class="fas fa-check-circle me-1"></i>جميع الطلاب ملتزمون بنسب حضور ممتازة ولا توجد تنبيهات غياب.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Supervision Statistics -->
+    <div class="col-12 col-lg-4">
+        <div class="glass-card p-4 border-0 d-flex flex-column justify-content-between">
+            <div>
+                <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-chart-line me-2 text-success"></i>إحصائيات إشرافية</h5>
+                <hr>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">مجموعاتك الخاضعة للإشراف:</span>
+                    <span class="fw-bold">{{ groups.count }} مجموعة</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">إجمالي متدربي مجموعاتك:</span>
+                    <span class="fw-bold">{{ trainee_count }} متدرب</span>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <h6 class="fw-bold mb-2">التقارير السريعة</h6>
+                <a href="{% url 'portal:export_trainees_view' %}" class="btn btn-secondary-custom w-100 py-3"><i class="fas fa-download me-2"></i>تحميل تقرير الحضور والدرجات</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- All Trainees List Under Supervision -->
+<div class="row">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0">
+            <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-user-graduate me-2 text-primary"></i>قائمة طلاب المجموعات المشرف عليها</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>الرقم التدريبي</th>
+                            <th>الاسم الكامل</th>
+                            <th>البريد الإلكتروني</th>
+                            <th>رقم الهاتف</th>
+                            <th>المجموعة</th>
+                            <th>النقاط</th>
+                            <th>معدل الحضور</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trainee in trainees %}
+                        <tr>
+                            <td><span class="badge bg-light text-dark border">{{ trainee.training_number }}</span></td>
+                            <td class="fw-bold">
+                                <a href="{% url 'portal:view_trainee_profile_detail' trainee.user.id %}" class="text-decoration-none text-success fw-bold">
+                                    <i class="fas fa-external-link-alt me-1 small" style="font-size: 0.75rem;"></i>
+                                    {{ trainee.user.get_full_name|default:trainee.user.username }}
+                                </a>
+                            </td>
+                            <td>{{ trainee.user.email }}</td>
+                            <td>{{ trainee.user.phone_number|default:"-" }}</td>
+                            <td>{{ trainee.group.name }}</td>
+                            <td><span class="text-success fw-bold">{{ trainee.points }} نقطة</span></td>
+                            <td class="fw-bold">{{ trainee.attendance_percentage }}%</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">لا يوجد طلاب مسجلين تحت إشرافك حالياً.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
