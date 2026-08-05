@@ -253,20 +253,32 @@ def supervisor_dashboard(request):
 @login_required
 def trainee_dashboard(request):
     """Dashboard view for Trainees."""
-    if request.user.role not in [CustomUser.Role.TRAINEE, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    staff_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.SUPERVISOR,
+        CustomUser.Role.LECTURER,
+    ]
+    if request.user.role not in [CustomUser.Role.TRAINEE] + staff_roles:
         raise Http404("غير مصرح بالدخول.")
         
-    if request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
-        profile = TraineeProfile.objects.first()
+    is_staff_view = request.user.role in staff_roles
+    if is_staff_view:
+        profile = TraineeProfile.objects.select_related('user', 'group').first()
         if not profile:
-            raise Http404("لا يوجد متدربين في النظام للاستعراض.")
+            messages.warning(request, "لا يوجد متدربين في النظام للاستعراض حالياً.")
+            return redirect('portal:admin_dashboard')
         trainee = profile.user
     else:
         trainee = request.user
-        profile = get_object_or_404(TraineeProfile, user=trainee)
+        profile, _ = TraineeProfile.objects.get_or_create(user=trainee)
     
     # Leaderboard ranks
-    group_members = TraineeProfile.objects.filter(group=profile.group).order_by('-points')
+    if profile.group:
+        group_members = TraineeProfile.objects.filter(group=profile.group).order_by('-points')
+    else:
+        group_members = TraineeProfile.objects.all().order_by('-points')
     global_members = TraineeProfile.objects.all().order_by('-points')
     
     # Get group rank
@@ -288,7 +300,10 @@ def trainee_dashboard(request):
     evaluations = TraineeEvaluation.objects.filter(trainee=trainee).order_by('-lecture__date')
     
     # Pending assignments
-    upcoming_assignments = Assignment.objects.filter(group=profile.group, due_date__gt=timezone.now())
+    if profile.group:
+        upcoming_assignments = Assignment.objects.filter(group=profile.group, due_date__gt=timezone.now())
+    else:
+        upcoming_assignments = Assignment.objects.none()
     completed_submissions = AssignmentSubmission.objects.filter(trainee=trainee)
     
     submitted_assignment_ids = completed_submissions.values_list('assignment_id', flat=True)
@@ -310,9 +325,12 @@ def trainee_dashboard(request):
     # Fetch targeted and global announcements
     from django.db.models import Q
     from apps.notifications.models import InternalMessage
-    announcements = InternalMessage.objects.filter(
-        Q(group=profile.group) | Q(group__isnull=True)
-    ).order_by('-id')
+    if profile.group:
+        announcements = InternalMessage.objects.filter(
+            Q(group=profile.group) | Q(group__isnull=True)
+        ).order_by('-id')
+    else:
+        announcements = InternalMessage.objects.filter(group__isnull=True).order_by('-id')
     
     # Fetch staff notes with author & timestamp
     from apps.users.models import TraineeNote
@@ -336,6 +354,7 @@ def trainee_dashboard(request):
         'group_leaderboard': group_leaderboard,
         'announcements': announcements,
         'staff_notes': staff_notes,
+        'is_viewing_as_staff': is_staff_view,
     }
     return render(request, 'portal/trainee_dashboard.html', context)
 
