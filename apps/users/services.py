@@ -117,32 +117,67 @@ class ImportExportService:
                 col_uni = idx
             elif "الكلية" in h_clean or "col" in h_clean:
                 col_col = idx
+            elif "الشعبة" in h_clean or "المجموعة" in h_clean or "group" in h_clean or "section" in h_clean:
+                col_group = idx
             elif "القسم" in h_clean or "dept" in h_clean:
                 col_dept = idx
+            elif "المستخدم" in h_clean:
+                col_full_name = idx
+            elif "الكامل" in h_clean or "الاسم" in h_clean or "name" in h_clean:
+                col_full_name = idx
+            elif "المحافظة" in h_clean or "gov" in h_clean:
+                col_gov = idx
+            elif "القضاء" in h_clean or "dist" in h_clean:
+                col_dist = idx
+            elif "الجامعة" in h_clean or "uni" in h_clean:
+                col_uni = idx
+            elif "الكلية" in h_clean or "col" in h_clean:
+                col_col = idx
             elif "المرحلة" in h_clean or "stage" in h_clean:
                 col_stage = idx
             elif "الاختصاص" in h_clean or "التخصص" in h_clean or "spec" in h_clean:
                 col_spec = idx
-            elif "الشعبة" in h_clean or "المجموعة" in h_clean or "group" in h_clean:
-                col_group = idx
             elif "الجنس" in h_clean or "gender" in h_clean:
                 col_gender = idx
 
-        # Fallback to legacy static columns if headers could not be matched
-        if not any([col_username, col_email, col_first_name, col_full_name]):
-            col_username = 1
-            col_email = 2
-            col_first_name = 3
-            col_last_name = 4
-            col_gov = 5
-            col_dist = 6
-            col_uni = 7
-            col_col = 8
-            col_dept = 9
-            col_stage = 10
-            col_spec = 11
-            col_group = 12
-            col_gender = 13
+        # Helper to match group names robustly
+        def resolve_group_match(raw_val):
+            if not raw_val:
+                return None
+            val_s = str(raw_val).strip()
+            if not val_s:
+                return None
+            
+            # 1. Exact match by name or code
+            db_g = Group.objects.filter(Q(name__iexact=val_s) | Q(code__iexact=val_s)).first()
+            if db_g:
+                return db_g
+                
+            # 2. Normalized match
+            norm = val_s.upper()
+            for g in Group.objects.all():
+                if g.name.upper() == norm or g.code.upper() == norm:
+                    return g
+                    
+            # 3. Strip noise words to isolate section identifier (A, B, أ, ب, 1, 2)
+            clean = norm
+            for noise in ['الشعبة', 'شعبة', 'المجموعة', 'مجموعة', 'SECTION', 'GROUP', 'GRP', 'فرع', 'قسم']:
+                clean = clean.replace(noise, '')
+            clean = clean.strip(' :-_')
+            
+            # 4. Check for Section B
+            if any(k in clean for k in ['B', 'ب', '2', 'ثانية', 'SECOND']) or 'GRP-B' in norm:
+                db_g = Group.objects.filter(Q(name__icontains='B') | Q(code__icontains='B') | Q(name__icontains='الثانية') | Q(code__iexact='GRP-B')).first()
+                if db_g:
+                    return db_g
+                    
+            # 5. Check for Section A
+            if any(k in clean for k in ['A', 'أ', '1', 'أولى', 'FIRST']) or 'GRP-A' in norm:
+                db_g = Group.objects.filter(Q(name__icontains='A') | Q(code__icontains='A') | Q(name__icontains='الأولى') | Q(code__iexact='GRP-A')).first()
+                if db_g:
+                    return db_g
+                    
+            return Group.objects.filter(name__icontains=val_s).first()
 
         for row_idx in range(2, sheet.max_row + 1):
             # Extract values based on mapped columns
@@ -198,17 +233,13 @@ class ImportExportService:
                         group_val = email_str
             
             if group_val:
-                group_name = str(group_val).strip()
-                db_group = Group.objects.filter(name__iexact=group_name).first()
-                if not db_group:
-                    if any(x in group_name for x in ['A', 'أ', 'الاولى', 'الأولى', '1']):
-                        db_group = Group.objects.filter(Q(name__icontains='A') | Q(name__icontains='أ') | Q(name__icontains='الأولى') | Q(name__icontains='1')).first()
-                    elif any(x in group_name for x in ['B', 'ب', 'الثانية', '2']):
-                        db_group = Group.objects.filter(Q(name__icontains='B') | Q(name__icontains='ب') | Q(name__icontains='الثانية') | Q(name__icontains='2')).first()
-                    else:
-                        db_group = Group.objects.filter(name__icontains=group_name).first()
-                if db_group:
-                    resolved_group = db_group
+                matched_g = resolve_group_match(group_val)
+                if matched_g:
+                    resolved_group = matched_g
+            elif not resolved_group and dept:
+                matched_g = resolve_group_match(dept)
+                if matched_g:
+                    resolved_group = matched_g
 
             try:
                 with transaction.atomic():

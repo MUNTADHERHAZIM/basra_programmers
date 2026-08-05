@@ -494,18 +494,41 @@ def calendar_view(request):
     
     # Filter lectures & assignments based on user role
     from apps.assignments.models import Assignment
+    from apps.courses.models import Group
+    
     if user.role == CustomUser.Role.TRAINEE:
         profile = getattr(user, 'trainee_profile', None)
         user_group = profile.group if profile else None
-        lectures = Lecture.objects.filter(group=user_group) if user_group else Lecture.objects.none()
-        assignments = Assignment.objects.filter(group=user_group) if user_group else Assignment.objects.none()
+        if user_group:
+            groups = Group.objects.filter(id=user_group.id)
+            lectures = Lecture.objects.filter(group=user_group)
+            assignments = Assignment.objects.filter(group=user_group)
+        else:
+            groups = Group.objects.all()
+            lectures = Lecture.objects.all()
+            assignments = Assignment.objects.all()
     elif user.role == CustomUser.Role.LECTURER:
-        lectures = Lecture.objects.filter(group__instructor=user)
-        assignments = Assignment.objects.filter(group__instructor=user)
+        user_groups = Group.objects.filter(instructor=user)
+        if user_groups.exists():
+            groups = user_groups
+            lectures = Lecture.objects.filter(group__in=user_groups)
+            assignments = Assignment.objects.filter(group__in=user_groups)
+        else:
+            groups = Group.objects.all()
+            lectures = Lecture.objects.all()
+            assignments = Assignment.objects.all()
     elif user.role == CustomUser.Role.SUPERVISOR:
-        lectures = Lecture.objects.filter(group__supervisor=user)
-        assignments = Assignment.objects.filter(group__supervisor=user)
+        user_groups = Group.objects.filter(supervisor=user)
+        if user_groups.exists():
+            groups = user_groups
+            lectures = Lecture.objects.filter(group__in=user_groups)
+            assignments = Assignment.objects.filter(group__in=user_groups)
+        else:
+            groups = Group.objects.all()
+            lectures = Lecture.objects.all()
+            assignments = Assignment.objects.all()
     else:
+        groups = Group.objects.all()
         lectures = Lecture.objects.all()
         assignments = Assignment.objects.all()
         
@@ -547,23 +570,54 @@ def calendar_view(request):
     # 3. Weekly Schedule Grid Data by Days
     days_order = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'السبت', 'الجمعة']
     weekly_schedule = {day: [] for day in days_order}
+    
+    class ScheduleItem:
+        def __init__(self, group, title=None, start_time=None, end_time=None):
+            self.group = group
+            self.title = title or (group.course.title if group.course else group.name)
+            self.start_time = start_time or group.start_time
+            self.end_time = end_time or group.end_time
+            self.classroom = group.classroom
+            
+    # Add recurring Group schedule items
+    for g in groups.select_related('course', 'instructor'):
+        if g.days:
+            group_days = [d.strip() for d in g.days.replace('،', ',').split(',') if d.strip()]
+            for day in group_days:
+                matched_day = None
+                for d_name in days_order:
+                    if d_name in day or day in d_name:
+                        matched_day = d_name
+                        break
+                if matched_day and matched_day in weekly_schedule:
+                    weekly_schedule[matched_day].append(ScheduleItem(g))
+                    
+    # Add specific lectures if present
     for lec in lectures.select_related('group', 'group__course', 'group__instructor'):
         if lec.group and lec.group.days:
             group_days = [d.strip() for d in lec.group.days.replace('،', ',').split(',') if d.strip()]
             for day in group_days:
-                if day in weekly_schedule and lec not in weekly_schedule[day]:
-                    weekly_schedule[day].append(lec)
+                matched_day = None
+                for d_name in days_order:
+                    if d_name in day or day in d_name:
+                        matched_day = d_name
+                        break
+                if matched_day and matched_day in weekly_schedule:
+                    weekly_schedule[matched_day].append(ScheduleItem(lec.group, title=lec.title, start_time=lec.start_time, end_time=lec.end_time))
                     
     # Summary Metrics
     today_lectures = [e for e in events if e['type'] == 'lecture' and e['date'] == today.isoformat()]
     upcoming_assignments_count = len([e for e in events if e['type'] == 'assignment' and e['date'] >= today.isoformat()])
+    
+    total_schedule_items = sum(len(items) for items in weekly_schedule.values())
+    total_events_count = len(events) or total_schedule_items
     
     context = {
         'events': events,
         'weekly_schedule': weekly_schedule,
         'today_lectures_count': len(today_lectures),
         'upcoming_assignments_count': upcoming_assignments_count,
-        'total_events_count': len(events),
+        'total_events_count': total_events_count,
     }
     return render(request, 'portal/calendar.html', context)
 
@@ -829,6 +883,8 @@ def mark_attendance_manual_view(request, lecture_id):
         lecture = get_object_or_404(Lecture, id=lecture_id)
         
     trainees = TraineeProfile.objects.filter(group=lecture.group).select_related('user')
+    if not trainees.exists():
+        trainees = TraineeProfile.objects.all().select_related('user')
     
     if request.method == 'POST':
         for trainee in trainees:
