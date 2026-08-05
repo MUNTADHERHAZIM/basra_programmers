@@ -66,7 +66,48 @@
     editCourseId: '',
     editCourseTitle: '',
     editCourseHours: '',
-    editCourseDescription: ''
+    editCourseDescription: '',
+    batchGroupId: '',
+    batchNamesList: '',
+    batchCount: 10,
+    batchFetchLoading: false,
+    batchFetchMessage: '',
+    updateCountFromNames() {
+        if (this.batchNamesList) {
+            const lines = this.batchNamesList.split('\n').filter(l => l.trim().length > 0);
+            if (lines.length > 0) {
+                this.batchCount = lines.length;
+            }
+        }
+    },
+    fetchGroupStudents(groupId) {
+        if (!groupId) {
+            this.batchFetchMessage = '';
+            return;
+        }
+        this.batchFetchLoading = true;
+        this.batchFetchMessage = 'جاري جلب أسماء الطلاب المسجلين في هذه الشعبة...';
+        fetch('/api/group/' + groupId + '/students/')
+            .then(res => res.json())
+            .then(data => {
+                this.batchFetchLoading = false;
+                if (data.success) {
+                    if (data.count > 0) {
+                        this.batchNamesList = data.names_text;
+                        this.batchCount = data.count;
+                        this.batchFetchMessage = 'تم جلب أسماء ' + data.count + ' طالب مسجلين في الشعبة تلقائياً!';
+                    } else {
+                        this.batchFetchMessage = 'هذه الشعبة جديدة ولا تحتوي على طلاب مسجلين بعد.';
+                    }
+                } else {
+                    this.batchFetchMessage = 'تعذر جلب البيانات: ' + data.message;
+                }
+            })
+            .catch(err => {
+                this.batchFetchLoading = false;
+                this.batchFetchMessage = 'حدث خطأ أثناء جلب أسماء الطلاب.';
+            });
+    }
 }">
     <!-- Left Navigation Menu -->
     <div class="col-lg-3">
@@ -239,10 +280,12 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark fw-bold">المشرف المتابع</label>
-                            <select name="supervisor" class="form-select">
-                                <option value="">اختر المشرف (اختياري)</option>
+                            <select name="supervisor" class="form-select searchable-select">
+                                <option value="">-- غير محدد --</option>
                                 {% for sup in supervisors %}
                                 <option value="{{ sup.id }}">{{ sup.get_full_name|default:sup.username }}</option>
+                                {% empty %}
+                                <option value="" disabled>(لا يوجد مشرفون مسجلون بعد)</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -1113,8 +1156,8 @@
                     {% csrf_token %}
                     <div class="col-md-5">
                         <label class="form-label text-dark fw-bold">اختر المتدرب</label>
-                        <select name="trainee" class="form-select" required>
-                            <option value="" disabled selected>اختر المتدرب</option>
+                        <select name="trainee" class="form-select searchable-select" required>
+                            <option value="" disabled selected>ابحث عن المتدرب بالاسم...</option>
                             {% for t in trainees %}
                             <option value="{{ t.user.id }}">{{ t.user.get_full_name|default:t.user.username }}</option>
                             {% endfor %}
@@ -1122,7 +1165,7 @@
                     </div>
                     <div class="col-md-5">
                         <label class="form-label text-dark fw-bold">اختر الشارة</label>
-                        <select name="badge" class="form-select" required>
+                        <select name="badge" class="form-select searchable-select" required>
                             <option value="" disabled selected>اختر الشارة</option>
                             {% for b in badges %}
                             <option value="{{ b.id }}">{{ b.name }} (+{{ b.points_required }} نقطة)</option>
@@ -1176,8 +1219,8 @@
                     {% csrf_token %}
                     <div class="col-md-5">
                         <label class="form-label text-dark fw-bold">اختر الخريج المتدرب</label>
-                        <select name="trainee" class="form-select" required>
-                            <option value="" disabled selected>اختر المتدرب</option>
+                        <select name="trainee" class="form-select searchable-select" required>
+                            <option value="" disabled selected>ابحث عن المتدرب بالاسم...</option>
                             {% for t in trainees %}
                             <option value="{{ t.user.id }}">{{ t.user.get_full_name|default:t.user.username }}</option>
                             {% endfor %}
@@ -1552,7 +1595,8 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label text-dark fw-bold">العدد المطلوب توليده</label>
-                                    <input type="number" name="count" class="form-control" min="1" max="100" value="10" required>
+                                    <input type="number" name="count" class="form-control" min="1" max="500" x-model="batchCount" required>
+                                    <small class="text-muted">يتحدث تلقائياً حسب عدد الأسماء في القائمة أدناه.</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label text-dark fw-bold">الدور الوظيفي للحسابات</label>
@@ -1563,16 +1607,34 @@
                                     </select>
                                 </div>
                                 <div class="col-md-6" x-show="$refs.batchRoleSelect && $refs.batchRoleSelect.value === 'trainee'">
-                                    <label class="form-label text-dark fw-bold">تسكين في شعبة</label>
-                                    <select name="group_id" class="form-select">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="form-label text-dark fw-bold mb-0">تسكين في شعبة</label>
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-success text-decoration-none fw-bold small" 
+                                                x-show="batchGroupId" 
+                                                @click="fetchGroupStudents(batchGroupId)">
+                                            <i class="fas fa-sync me-1" :class="{'fa-spin': batchFetchLoading}"></i>جلب أسماء الشعبة
+                                        </button>
+                                    </div>
+                                    <select name="group_id" class="form-select" x-model="batchGroupId" @change="fetchGroupStudents($event.target.value)">
                                         <option value="">-- بدون شعبة حالياً --</option>
                                         {% for g in groups %}
                                         <option value="{{ g.id }}">{{ g.name }}</option>
                                         {% endfor %}
                                     </select>
                                 </div>
-                                <div class="col-12 mt-4">
-                                    <button type="submit" class="btn btn-success w-100"><i class="fas fa-file-download me-2"></i>بدء التوليد وتحميل ملف الاعتمادات (Excel)</button>
+                                <div class="col-12">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="form-label text-dark fw-bold mb-0"><i class="fas fa-list-ol me-1 text-success"></i>قائمة أسماء الطلاب (يتم جلبها تلقائياً عند اختيار شعبة)</label>
+                                    </div>
+                                    <textarea name="names_list" class="form-control" rows="4" x-model="batchNamesList" @input="updateCountFromNames()" placeholder="عند اختيار شعبة سيتم جلب أسماء طلابها هنا تلقائياً، أو يمكنك لصق أسماء جديدة (اسم واحد في كل سطر)..."></textarea>
+                                    <div x-show="batchFetchMessage" class="alert alert-info py-1 px-3 mt-2 mb-0 small rounded-3 d-flex align-items-center gap-2">
+                                        <i class="fas fa-info-circle text-primary"></i>
+                                        <span x-text="batchFetchMessage"></span>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">عند وجود أسماء طلاب، سيقوم النظام بتوليد وتحديث الحسابات باسم الطالب الحقيقي وتوليد اسم المستخدم تلقائياً!</small>
+                                </div>
+                                <div class="col-12 mt-3">
+                                    <button type="submit" class="btn btn-success w-100 py-2 fw-bold"><i class="fas fa-file-download me-2"></i>بدء التوليد وتحميل ملف الاعتمادات (Excel)</button>
                                 </div>
                             </div>
                         </form>
@@ -1863,15 +1925,15 @@
                                     <input type="text" name="college" class="form-control" x-model="editTraineeCol">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label text-dark fw-bold">القسم</label>
+                                    <label class="form-label text-dark fw-bold">الفرع / الشعبة</label>
                                     <input type="text" name="department" class="form-control" x-model="editTraineeDept">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label text-dark fw-bold">المرحلة الدراسية</label>
-                                    <input type="text" name="academic_stage" class="form-control" x-model="editTraineeStage">
+                                    <input type="text" name="academic_stage" class="form-control" x-model="editTraineeStage" placeholder="ابتدائي / متوسط / إعدادي">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label text-dark fw-bold">الاختصاص</label>
+                                    <label class="form-label text-dark fw-bold">المسار البرمجي</label>
                                     <input type="text" name="specialty" class="form-control" x-model="editTraineeSpec">
                                 </div>
                             </div>

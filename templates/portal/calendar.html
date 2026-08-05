@@ -1,20 +1,146 @@
 {% extends 'base.html' %}
 
-{% block title %}جدول محاضرات المبادرة - 1000 مبرمج{% endblock %}
+{% block title %}جدول المبادرة واللقاءات التدريبية - 1000 مبرمج{% endblock %}
 {% block header_title %}جدول المبادرة واللقاءات التدريبية{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="glass-card p-4 border-0 shadow-lg">
-            <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-calendar-alt me-2 text-success"></i>تقويم محاضرات ومواعيد تسليم المجموعات</h5>
-            <p class="text-muted small mb-4">يعرض هذا التقويم جميع المحاضرات المجدولة والواجبات المستحقة لمجموعتك الدراسية. يمكنك تصفحها باليوم، الأسبوع، أو الشهر.</p>
-            
-            <!-- Safe JSON script block outside of JavaScript literal -->
-            {{ events|json_script:"calendar-events" }}
+<!-- Top Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="glass-card p-3 border-0 shadow-sm d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(30, 58, 138, 0.05) 100%);">
+            <div>
+                <span class="text-muted small d-block mb-1">محاضرات اليوم</span>
+                <h3 class="fw-bold text-success m-0">{{ today_lectures_count }}</h3>
+            </div>
+            <div class="icon-box bg-success text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 50px; height: 50px;">
+                <i class="fas fa-calendar-day fs-4"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card p-3 border-0 shadow-sm d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);">
+            <div>
+                <span class="text-muted small d-block mb-1">الواجبات والمواعيد القادمة</span>
+                <h3 class="fw-bold text-danger m-0">{{ upcoming_assignments_count }}</h3>
+            </div>
+            <div class="icon-box bg-danger text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 50px; height: 50px;">
+                <i class="fas fa-tasks fs-4"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card p-3 border-0 shadow-sm d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);">
+            <div>
+                <span class="text-muted small d-block mb-1">إجمالي الأحداث والمحاضرات</span>
+                <h3 class="fw-bold text-primary m-0">{{ total_events_count }}</h3>
+            </div>
+            <div class="icon-box bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 50px; height: 50px;">
+                <i class="fas fa-calendar-alt fs-4"></i>
+            </div>
+        </div>
+    </div>
+</div>
 
-            <!-- Calendar Container -->
-            <div id="calendar" style="min-height: 600px;"></div>
+<!-- Main Calendar Container & Tabs -->
+<div class="glass-card p-4 border-0 shadow-lg" x-data="{ activeTab: 'calendar' }">
+    <!-- View Switcher Tabs -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4 pb-3 border-bottom">
+        <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-calendar-week text-success me-2"></i>جدول المحاضرات والواجبات المجدولة</h5>
+        
+        <div class="nav nav-pills custom-tabs bg-light p-1 rounded-pill" role="tablist">
+            <button class="nav-link rounded-pill px-4 py-2 fw-bold" :class="{ 'active bg-success text-white shadow-sm': activeTab === 'calendar' }" @click="activeTab = 'calendar'; setTimeout(() => window.dispatchEvent(new Event('resize')), 100)">
+                <i class="fas fa-calendar-alt me-1"></i>التقويم التفاعلي
+            </button>
+            <button class="nav-link rounded-pill px-4 py-2 fw-bold" :class="{ 'active bg-success text-white shadow-sm': activeTab === 'weekly' }" @click="activeTab = 'weekly'">
+                <i class="fas fa-list-check me-1"></i>الجدول الأسبوعي المقسم
+            </button>
+        </div>
+    </div>
+
+    <!-- TAB 1: FULLCALENDAR INTERACTIVE VIEW -->
+    <div x-show="activeTab === 'calendar'" x-transition>
+        <!-- Legend Bar -->
+        <div class="d-flex align-items-center flex-wrap gap-3 mb-3 p-3 bg-light rounded-3 border border-light">
+            <span class="fw-bold small text-dark me-2"><i class="fas fa-filter text-muted me-1"></i>دليل أنواع الأحداث:</span>
+            <span class="badge bg-success-subtle text-success py-2 px-3 rounded-pill border border-success border-opacity-25">
+                <i class="fas fa-chalkboard-teacher me-1"></i>محاضرة تدريبية
+            </span>
+            <span class="badge bg-danger-subtle text-danger py-2 px-3 rounded-pill border border-danger border-opacity-25">
+                <i class="fas fa-file-signature me-1"></i>موعد تسليم واجب
+            </span>
+        </div>
+
+        <!-- Embedded JSON Script -->
+        {{ events|json_script:"calendar-events" }}
+
+        <!-- Calendar Mounting Element -->
+        <div id="calendar" class="mt-3 bg-white p-3 rounded-3 shadow-sm border" style="min-height: 650px;"></div>
+    </div>
+
+    <!-- TAB 2: WEEKLY SCHEDULE DAY-BY-DAY GRID -->
+    <div x-show="activeTab === 'weekly'" x-transition style="display:none;">
+        <div class="mb-3">
+            <p class="text-muted small">جدول المحاضرات اليومي الأسبوعي مقسم بحسب أيام التدريب للشعب الدراسية:</p>
+        </div>
+
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3">
+            {% for day, lectures_list in weekly_schedule.items %}
+            <div class="col">
+                <div class="card h-100 border-0 bg-light shadow-sm" style="border-radius: 12px; min-height: 220px;">
+                    <div class="card-header text-center fw-bold text-white py-2 d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #198754 0%, #157347 100%); border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                        <span>{{ day }}</span>
+                        <span class="badge bg-white text-success font-monospace" style="font-size: 0.7rem;">{{ lectures_list|length }} محاضرة</span>
+                    </div>
+                    <div class="card-body p-2 d-flex flex-column gap-2 overflow-auto" style="max-height: 380px;">
+                        {% for lec in lectures_list %}
+                        <div class="bg-white p-3 rounded-3 shadow-sm border border-light border-start border-success border-3">
+                            <span class="badge bg-success-subtle text-success small mb-1 d-inline-block">{{ lec.group.name }}</span>
+                            <h6 class="fw-bold text-slate-800 m-0 fs-6">{{ lec.title }}</h6>
+                            <small class="text-muted d-block mt-1" style="font-size: 0.78rem;">
+                                <i class="fas fa-book-open text-muted me-1"></i>المادة: {{ lec.group.course.title }}
+                            </small>
+                            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-light text-muted small" style="font-size: 0.75rem;">
+                                <span><i class="fas fa-clock text-warning me-1"></i>{{ lec.start_time|time:"H:i" }} - {{ lec.end_time|time:"H:i" }}</span>
+                                <span><i class="fas fa-map-marker-alt text-danger me-1"></i>{{ lec.group.classroom|default:"قاعة 1" }}</span>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-muted my-auto py-4 small">
+                            <i class="fas fa-calendar-minus opacity-25 d-block fs-3 mb-2"></i>
+                            لا توجد محاضرات مجدولة لهذا اليوم
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Event Detail Modal Popup -->
+<div class="modal fade" id="eventDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-light rounded-top-4">
+                <h5 class="modal-title fw-bold text-slate-800" id="eventModalTitle">تفاصيل الحدث</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-3">
+                    <span id="eventModalBadge" class="badge bg-success py-2 px-3 fs-6 rounded-pill"></span>
+                </div>
+                <div class="p-3 bg-light rounded-3 mb-3">
+                    <p class="mb-2"><strong>المادة / المجموعة: </strong><span id="eventModalCourse" class="text-primary fw-bold"></span></p>
+                    <p class="mb-2"><strong>الشعبة: </strong><span id="eventModalGroup" class="text-dark"></span></p>
+                    <p class="mb-2"><strong>التاريخ والوقت: </strong><span id="eventModalTime" class="text-dark font-monospace"></span></p>
+                    <p class="mb-2"><strong>الموقع / القاعة: </strong><span id="eventModalClassroom" class="text-dark"></span></p>
+                    <p class="mb-0"><strong>المسؤول: </strong><span id="eventModalInstructor" class="text-dark"></span></p>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary-custom px-4" data-bs-dismiss="modal">إغلاق</button>
+            </div>
         </div>
     </div>
 </div>
@@ -24,20 +150,30 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const calendarEl = document.getElementById('calendar');
+        if (!calendarEl) return;
         
-        // Extract events from embedded JSON script block safely
-        const eventsData = JSON.parse(document.getElementById('calendar-events').textContent);
+        // Extract events safely from embedded JSON script
+        const eventsData = JSON.parse(document.getElementById('calendar-events').textContent || '[]');
         
-        // Format events list for fullCalendar layout mapping
+        // Format events list for FullCalendar
         const formattedEvents = eventsData.map(e => ({
+            id: e.id,
             title: e.title,
             start: `${e.date}T${e.start_time}`,
             end: `${e.date}T${e.end_time}`,
+            backgroundColor: e.color,
+            borderColor: e.color,
             extendedProps: {
-                classroom: e.classroom
-            },
-            backgroundColor: '#10b981', // Holy Shrine green color
-            borderColor: '#0f764e'
+                type: e.type,
+                badge: e.badge,
+                course: e.course,
+                group_name: e.group_name,
+                classroom: e.classroom,
+                instructor: e.instructor,
+                date: e.date,
+                start_time: e.start_time,
+                end_time: e.end_time
+            }
         }));
 
         // Setup FullCalendar
@@ -57,9 +193,24 @@
                 day: 'يوم'
             },
             events: formattedEvents,
+            eventClick: function(info) {
+                const props = info.event.extendedProps;
+                document.getElementById('eventModalTitle').innerText = info.event.title;
+                document.getElementById('eventModalBadge').innerText = props.badge || 'حدث';
+                document.getElementById('eventModalBadge').className = props.type === 'assignment' ? 'badge bg-danger py-2 px-3 fs-6 rounded-pill' : 'badge bg-success py-2 px-3 fs-6 rounded-pill';
+                document.getElementById('eventModalCourse').innerText = props.course || '';
+                document.getElementById('eventModalGroup').innerText = props.group_name || '';
+                document.getElementById('eventModalTime').innerText = `${props.date} (${props.start_time} - ${props.end_time})`;
+                document.getElementById('eventModalClassroom').innerText = props.classroom || 'غير محددة';
+                document.getElementById('eventModalInstructor').innerText = props.instructor || 'غير محدد';
+                
+                const modal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
+                modal.show();
+            },
             eventDidMount: function(info) {
-                // Add tooltip or display extra details on hover
-                info.el.title = `${info.event.title}\nالقاعة: ${info.event.extendedProps.classroom || 'غير محددة'}`;
+                info.el.style.cursor = 'pointer';
+                info.el.style.borderRadius = '6px';
+                info.el.style.padding = '2px 5px';
             }
         });
         

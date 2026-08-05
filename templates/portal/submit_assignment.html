@@ -1,28 +1,101 @@
 {% extends 'base.html' %}
 
 {% block title %}تسليم واجب دراسي - مبادرة 1000 مبرمج{% endblock %}
-{% block header_title %}تسليم حل الواجب{% endblock %}
+{% block header_title %}تسليم حل الواجب بالوسائط المتعددة{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
-        <div class="glass-card p-5 border-0 shadow-lg">
-            <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-file-upload me-2 text-primary"></i>تسليم حل: {{ assignment.title }}</h5>
-            <p class="text-muted small mb-4">تعليمات الواجب: {{ assignment.description }}</p>
-            <hr class="mb-4">
+    <div class="col-md-10 col-lg-8">
+        <div class="glass-card p-4 p-md-5 border-0 shadow-lg rounded-4">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="fw-bold m-0 text-slate-800"><i class="fas fa-file-upload me-2 text-success"></i>تسليم حل: {{ assignment.title }}</h5>
+                <span class="badge bg-warning text-dark px-3 py-2 rounded-pill"><i class="fas fa-calendar-alt me-1"></i>الاستحقاق: {{ assignment.due_date|date:"Y-m-d H:i" }}</span>
+            </div>
+            
+            <div class="bg-light p-3 rounded-3 border mb-4">
+                <h6 class="fw-bold text-dark mb-1"><i class="fas fa-info-circle me-1 text-primary"></i>تفاصيل وتوجيهات الواجب:</h6>
+                <p class="text-muted m-0 small">{{ assignment.description }}</p>
+                {% if assignment.file %}
+                <div class="mt-2 pt-2 border-top">
+                    <a href="{{ assignment.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-3">
+                        <i class="fas fa-download me-1"></i>تحميل ملف الواجب المرفق من المدرب
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if submission %}
+            <div class="alert alert-success d-flex align-items-center mb-4">
+                <i class="fas fa-check-circle fs-4 me-3"></i>
+                <div>
+                    <strong class="d-block">لقد قمت بتسليم هذا الواجب سابقاً بتاريخ {{ submission.submitted_at|date:"Y-m-d H:i" }}!</strong>
+                    <small>يمكنك تعديل الإجابة وإعادة رفع الوسائط أدناه في أي وقت قبل انتهاء الموعد النهائي.</small>
+                </div>
+            </div>
+            {% endif %}
             
             <form action="{% url 'portal:submit_assignment' assignment.id %}" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
                 
+                <!-- 1. Text Solution Response -->
                 <div class="mb-4">
-                    <label for="solution_file" class="form-label fw-bold">اختر ملف الحل (PDF, ZIP, DOCX...)</label>
-                    <input type="file" class="form-control py-2" id="solution_file" name="solution_file" required>
-                    <small class="text-muted mt-2 d-block">الرجاء ضغط الملفات البرمجية بصيغة ZIP قبل الرفع.</small>
+                    <label class="form-label fw-bold text-dark"><i class="fas fa-paragraph me-1 text-success"></i>1. الإجابة النصية والشرح (اختياري / نص):</label>
+                    <textarea name="submission_text" class="form-control" rows="4" placeholder="اكتب إجابتك أو الكود البرمجي أو أي ملاحظات توضيحية للمدرب هنا...">{{ submission.submission_text|default:'' }}</textarea>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <!-- 2. Document/Compressed File -->
+                    <div class="col-md-6">
+                        <div class="p-3 border rounded-3 bg-white h-100">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-file-archive me-1 text-primary"></i>2. ملف الحل المستند/المضغوط:</label>
+                            <input type="file" class="form-control" name="solution_file">
+                            {% if submission.file %}
+                                <small class="text-success d-block mt-2"><i class="fas fa-check me-1"></i>الملف المرفوع سابقاً: <a href="{{ submission.file.url }}" target="_blank">تحميل</a></small>
+                            {% else %}
+                                <small class="text-muted d-block mt-1">PDF, ZIP, DOCX, RAR (الملفات البرمجية والمشاريع)</small>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 3. Photo Attachment -->
+                    <div class="col-md-6">
+                        <div class="p-3 border rounded-3 bg-white h-100">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-image me-1 text-info"></i>3. صورة الحل (مخطط/لقطة شاشة):</label>
+                            <input type="file" class="form-control" name="submission_image" accept="image/*">
+                            {% if submission.image %}
+                                <small class="text-success d-block mt-2"><i class="fas fa-check me-1"></i>الصورة المرفوعة سابقاً: <a href="{{ submission.image.url }}" target="_blank">معاينة</a></small>
+                            {% else %}
+                                <small class="text-muted d-block mt-1">صور PNG, JPG (لقطات شاشة للمخرجات الكود)</small>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 4. Video Upload -->
+                    <div class="col-md-6">
+                        <div class="p-3 border rounded-3 bg-white h-100">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-file-video me-1 text-danger"></i>4. ملف فيديو للشرح (رفع مباشر):</label>
+                            <input type="file" class="form-control" name="video_file" accept="video/*">
+                            {% if submission.video_file %}
+                                <small class="text-success d-block mt-2"><i class="fas fa-check me-1"></i>الفيديو المرفوع سابقاً: <a href="{{ submission.video_file.url }}" target="_blank">مشاهدة</a></small>
+                            {% else %}
+                                <small class="text-muted d-block mt-1">تسجيل فيديو قصير لاستعراض عمل البرنامج</small>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 5. Video Link URL -->
+                    <div class="col-md-6">
+                        <div class="p-3 border rounded-3 bg-white h-100">
+                            <label class="form-label fw-bold text-dark"><i class="fab fa-youtube me-1 text-danger"></i>5. رابط فيديو خارجي (YouTube/Drive):</label>
+                            <input type="url" class="form-control" name="video_url" value="{{ submission.video_url|default:'' }}" placeholder="https://youtube.com/watch?v=...">
+                            <small class="text-muted d-block mt-1">رابط YouTube أو Google Drive في حال كبر حجم الفيديو</small>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="d-flex gap-3">
-                    <button type="submit" class="btn btn-primary-custom w-50 py-3 shadow"><i class="fas fa-upload me-2"></i>تسليم وتثبيت نقاطي</button>
-                    <a href="{% url 'portal:trainee_dashboard' %}" class="btn btn-outline-secondary w-50 py-3 d-flex align-items-center justify-content-center">إلغاء الرجوع</a>
+                <div class="d-flex gap-3 pt-3 border-top">
+                    <button type="submit" class="btn btn-success px-5 py-3 shadow fw-bold"><i class="fas fa-check-circle me-2"></i>حفظ وتسليم الواجب البرمجي</button>
+                    <a href="{% url 'portal:trainee_dashboard' %}" class="btn btn-outline-secondary px-4 py-3 d-flex align-items-center justify-content-center">رجوع للوحة الطالب</a>
                 </div>
             </form>
         </div>

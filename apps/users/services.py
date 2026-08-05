@@ -393,7 +393,7 @@ class ImportExportService:
         return imported_count, errors
 
     @staticmethod
-    def generate_batch_accounts(prefix, count, role, group_id=None):
+    def generate_batch_accounts(prefix, count, role, group_id=None, names_list=None):
         import random
         import string
         
@@ -416,54 +416,99 @@ class ImportExportService:
         generated_count = 0
         row_idx = 2
         
-        for i in range(1, count + 1):
-            username = f"{prefix}_{i:02d}"
-            base_username = username
-            while User.objects.filter(username=username).exists():
-                username = f"{base_username}_{random.randint(10, 99)}"
+        if names_list and len(names_list) > 0:
+            target_names = names_list
+        else:
+            target_names = [None] * count
+        
+        for i, raw_name in enumerate(target_names, 1):
+            first_name = ""
+            last_name = ""
+            
+            if raw_name:
+                name_parts = str(raw_name).strip().split()
+                if name_parts:
+                    first_name = name_parts[0]
+                    if len(name_parts) > 1:
+                        last_name = " ".join(name_parts[1:])
+                full_name = str(raw_name).strip()
+                # Check if existing user with this full name or name parts exists
+                existing_user = User.objects.filter(first_name__iexact=first_name, last_name__iexact=last_name).first()
+                if not existing_user and full_name:
+                    existing_user = User.objects.filter(first_name__iexact=full_name).first()
+                
+                if existing_user:
+                    username = existing_user.username
+                else:
+                    if prefix and prefix != 'student':
+                        username = f"{prefix}_{i:02d}"
+                        base_username = username
+                        while User.objects.filter(username=username).exists():
+                            username = f"{base_username}_{random.randint(10, 99)}"
+                    else:
+                        username = ImportExportService.generate_safe_username(first_name, last_name, prefix=prefix or 'student')
+            else:
+                full_name = f"طالب المبادرة {i}" if role == User.Role.TRAINEE else f"مستخدَم {i}"
+                if group:
+                    full_name += f" ({group.name})"
+                username = f"{prefix}_{i:02d}"
+                base_username = username
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}_{random.randint(10, 99)}"
+                existing_user = None
                 
             chars = string.ascii_letters + string.digits
             password = "".join(random.choice(chars) for _ in range(8))
-            email = f"{username}@1000programmers.org"
-            full_name = f"مستخدَم موَلد {i}"
             
             try:
                 with transaction.atomic():
-                    user = User.objects.create_user(
-                        username=username,
-                        email=email,
-                        first_name=full_name,
-                        role=role,
-                        password=password
-                    )
-                    
-                    if role == User.Role.TRAINEE:
-                        profile = TraineeProfile.objects.create(
-                            user=user,
-                            governorate='البصرة',
-                            group=group
-                        )
-                        user.email = f"{profile.training_number.lower()}@1000programmers.org"
+                    if existing_user:
+                        user = existing_user
+                        user.set_password(password)
+                        if group and role == User.Role.TRAINEE:
+                            profile, _ = TraineeProfile.objects.get_or_create(user=user)
+                            profile.group = group
+                            profile.save()
                         user.save()
                         email = user.email
-                    elif role == User.Role.LECTURER:
-                        from .models import LecturerProfile
-                        LecturerProfile.objects.create(
-                            user=user,
-                            specialty='مدرب تقني'
-                        )
-                    elif role == User.Role.SUPERVISOR:
-                        from .models import SupervisorProfile
-                        SupervisorProfile.objects.create(
-                            user=user
+                    else:
+                        email = f"{username}@1000programmers.org"
+                        user = User.objects.create_user(
+                            username=username,
+                            email=email,
+                            first_name=first_name if first_name else full_name,
+                            last_name=last_name if last_name else '',
+                            role=role,
+                            password=password
                         )
                         
-                    sheet.cell(row=row_idx, column=1, value=full_name)
-                    sheet.cell(row=row_idx, column=2, value=username)
-                    sheet.cell(row=row_idx, column=3, value=email)
+                        if role == User.Role.TRAINEE:
+                            profile = TraineeProfile.objects.create(
+                                user=user,
+                                governorate='البصرة',
+                                group=group
+                            )
+                            user.email = f"{profile.training_number.lower()}@1000programmers.org"
+                            user.save()
+                            email = user.email
+                        elif role == User.Role.LECTURER:
+                            from .models import LecturerProfile
+                            LecturerProfile.objects.create(
+                                user=user,
+                                specialty='مدرب تقني'
+                            )
+                        elif role == User.Role.SUPERVISOR:
+                            from .models import SupervisorProfile
+                            SupervisorProfile.objects.create(
+                                user=user
+                            )
+                        
+                    sheet.cell(row=row_idx, column=1, value=user.get_full_name() or full_name)
+                    sheet.cell(row=row_idx, column=2, value=user.username)
+                    sheet.cell(row=row_idx, column=3, value=user.email)
                     sheet.cell(row=row_idx, column=4, value=password)
                     sheet.cell(row=row_idx, column=5, value=dict(User.Role.choices).get(role, role))
-                    sheet.cell(row=row_idx, column=6, value=group.name if group else '')
+                    sheet.cell(row=row_idx, column=6, value=group.name if group else (user.trainee_profile.group.name if hasattr(user, 'trainee_profile') and user.trainee_profile.group else ''))
                     row_idx += 1
                     generated_count += 1
             except Exception as e:

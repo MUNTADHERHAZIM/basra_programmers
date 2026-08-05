@@ -9,10 +9,29 @@
     <div class="col-lg-8">
         <div class="glass-card p-4 border-0 shadow-lg mb-4">
             <h5 class="fw-bold mb-4 text-success"><i class="fas fa-user-edit me-2"></i>البيانات الشخصية والمهنية</h5>
-            <form method="POST" action="{% url 'portal:edit_profile' %}">
+            <form method="POST" action="{% url 'portal:edit_profile' %}" enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_info">
                 
+                <!-- Avatar Upload Section -->
+                <div class="d-flex align-items-center gap-4 mb-4 p-3 bg-light rounded-4 border">
+                    <div class="position-relative">
+                        {% if user.avatar %}
+                            <img id="avatar-preview" src="{{ user.avatar.url }}" class="rounded-circle border border-3 border-success shadow" width="90" height="90" style="object-fit: cover;" alt="Avatar">
+                        {% else %}
+                            <div id="avatar-preview-fallback" class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center shadow border border-3 border-success fw-bold fs-2" style="width: 90px; height: 90px;">
+                                {{ user.username|slice:":1"|upper }}
+                            </div>
+                            <img id="avatar-preview" src="" class="rounded-circle border border-3 border-success shadow d-none" width="90" height="90" style="object-fit: cover;" alt="Avatar">
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-1"><i class="fas fa-camera text-success me-1"></i>الصورة الشخصية (البروفايل)</h6>
+                        <p class="text-muted small mb-2">يمكنك رفع صورة شخصية جديدة تظهر في النظام والدردشة وللمدربين والطلاب.</p>
+                        <input type="file" name="avatar" id="avatar-input" class="form-control form-control-sm" accept="image/*" onchange="previewAvatar(event)">
+                    </div>
+                </div>
+
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label text-dark fw-bold">الاسم الأول</label>
@@ -30,6 +49,10 @@
                     <div class="col-md-6">
                         <label class="form-label text-dark fw-bold">البريد الإلكتروني</label>
                         <input type="email" name="email" class="form-control" value="{{ user.email }}" placeholder="email@domain.com">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">رقم الهاتف</label>
+                        <input type="text" name="phone_number" class="form-control" value="{{ user.phone_number|default:'' }}" placeholder="077XXXXXXXX">
                     </div>
 
                     <!-- Role-specific fields for LECTURER -->
@@ -50,27 +73,27 @@
                     <!-- Role-specific fields for TRAINEE -->
                     {% if user.role == 'trainee' %}
                     <div class="col-12 mt-4 border-top pt-3">
-                        <h6 class="fw-bold text-success mb-3"><i class="fas fa-graduation-cap me-1"></i>التفاصيل الدراسية للمتدرب</h6>
+                        <h6 class="fw-bold text-success mb-3"><i class="fas fa-school me-1"></i>التفاصيل الدراسية للطالب / المدرسة</h6>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label text-dark fw-bold">الجامعة</label>
-                        <input type="text" name="university" class="form-control" value="{{ trainee_profile.university|default:'' }}" placeholder="جامعة البصرة">
+                        <label class="form-label text-dark fw-bold">المدرسة / اسم المدرسة</label>
+                        <input type="text" name="university" class="form-control" value="{{ trainee_profile.university|default:'' }}" placeholder="مثال: مدرسة البصرة للمتميزين">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label text-dark fw-bold">الكلية</label>
-                        <input type="text" name="college" class="form-control" value="{{ trainee_profile.college|default:'' }}" placeholder="علوم الحاسوب وتكنولوجيا المعلومات">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-dark fw-bold">القسم</label>
-                        <input type="text" name="department" class="form-control" value="{{ trainee_profile.department|default:'' }}" placeholder="قسم نظم المعلومات البرمجية">
+                        <label class="form-label text-dark fw-bold">الصف الدراسي</label>
+                        <input type="text" name="college" class="form-control" value="{{ trainee_profile.college|default:'' }}" placeholder="مثال: السادس الابتدائي / الخامس الإعدادي">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label text-dark fw-bold">المرحلة الدراسية</label>
-                        <input type="text" name="academic_stage" class="form-control" value="{{ trainee_profile.academic_stage|default:'' }}" placeholder="المرحلة الثالثة">
+                        <input type="text" name="academic_stage" class="form-control" value="{{ trainee_profile.academic_stage|default:'' }}" placeholder="ابتدائي / متوسط / إعدادي">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label text-dark fw-bold">التخصص التقني / الاهتمام</label>
-                        <input type="text" name="specialty" class="form-control" value="{{ trainee_profile.specialty|default:'' }}" placeholder="مثال: Backend Web Development">
+                        <label class="form-label text-dark fw-bold">الفرع / الشعبة بالمدرسة</label>
+                        <input type="text" name="department" class="form-control" value="{{ trainee_profile.department|default:'' }}" placeholder="مثال: العلمي / شعبة أ">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-dark fw-bold">المسار والاهتمام البرمجي</label>
+                        <input type="text" name="specialty" class="form-control" value="{{ trainee_profile.specialty|default:'' }}" placeholder="مثال: البرمجة بلغة Scratch / Python / تصميم المواقع">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label text-dark fw-bold">المحافظة</label>
@@ -124,4 +147,23 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function previewAvatar(event) {
+    const input = event.target;
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('avatar-preview');
+            const fallback = document.getElementById('avatar-preview-fallback');
+            preview.src = e.target.result;
+            preview.classList.remove('d-none');
+            if (fallback) fallback.classList.add('d-none');
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
 {% endblock %}

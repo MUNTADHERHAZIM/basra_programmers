@@ -1,0 +1,89 @@
+<div class="col-12 col-md-6 col-lg-4">
+    <div class="card h-100 border-0 shadow-sm glass-card overflow-hidden rounded-4 transition-hover">
+        
+        <!-- Media Header / Media Preview Area -->
+        {% if item.media_type == 'video' %}
+            <div class="ratio ratio-16x9 bg-dark">
+                {% if item.video_file %}
+                    <video controls class="w-100 h-100 rounded-top" style="object-fit: cover;">
+                        <source src="{{ item.video_file.url }}">
+                        متصفحك لا يدعم تشغيل الفيديو المباشر.
+                    </video>
+                {% elif item.video_url %}
+                    <a href="{{ item.video_url }}" target="_blank" class="d-flex align-items-center justify-content-center text-white text-decoration-none bg-dark position-relative">
+                        {% if item.image %}
+                            <img src="{{ item.image.url }}" class="w-100 h-100 opacity-75" style="object-fit: cover;" alt="Thumbnail">
+                        {% endif %}
+                        <div class="position-absolute top-50 start-50 translate-middle text-center">
+                            <i class="fab fa-youtube text-danger display-3 shadow"></i>
+                            <p class="m-0 fw-bold small text-white mt-1">مشاهدة الفيديو على الرابط الخارجي</p>
+                        </div>
+                    </a>
+                {% else %}
+                    <div class="d-flex align-items-center justify-content-center text-muted">
+                        <i class="fas fa-video fs-1"></i>
+                    </div>
+                {% endif %}
+            </div>
+        {% elif item.image %}
+            <div class="ratio ratio-16x9 overflow-hidden bg-light">
+                <a href="{{ item.image.url }}" target="_blank">
+                    <img src="{{ item.image.url }}" class="w-100 h-100" style="object-fit: cover; transition: transform 0.3s ease;" alt="{{ item.title }}" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                </a>
+            </div>
+        {% else %}
+            <div class="ratio ratio-16x9 bg-light d-flex align-items-center justify-content-center text-primary">
+                <i class="fas fa-bullhorn display-4 opacity-50"></i>
+            </div>
+        {% endif %}
+
+        <!-- Card Body -->
+        <div class="card-body p-4 d-flex flex-column">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="badge {% if item.media_type == 'video' %}bg-danger{% elif item.media_type == 'image' %}bg-success{% else %}bg-primary{% endif %} rounded-pill px-3">
+                    {{ item.get_media_type_display }}
+                </span>
+                <small class="text-muted font-monospace" style="font-size: 0.75rem;">{{ item.created_at|date:"Y-m-d H:i" }}</small>
+            </div>
+
+            <h5 class="fw-bold text-dark mb-2 text-truncate" title="{{ item.title }}">{{ item.title }}</h5>
+
+            {% if item.description %}
+            <p class="text-muted small flex-grow-1 mb-3" style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+                {{ item.description }}
+            </p>
+            {% endif %}
+
+            {% if item.attachment %}
+            <div class="mb-3">
+                <a href="{{ item.attachment.url }}" target="_blank" class="btn btn-outline-primary btn-sm w-100 rounded-3">
+                    <i class="fas fa-paperclip me-1"></i>تحميل المستند المرفق
+                </a>
+            </div>
+            {% endif %}
+
+            <!-- Footer Meta -->
+            <div class="pt-3 border-top d-flex align-items-center justify-content-between mt-auto">
+                <div class="d-flex align-items-center gap-2">
+                    {% if item.created_by.avatar %}
+                        <img src="{{ item.created_by.avatar.url }}" class="rounded-circle border" width="28" height="28" style="object-fit: cover;" alt="Avatar">
+                    {% else %}
+                        <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold small" style="width: 28px; height: 28px;">
+                            {{ item.created_by.username|slice:":1"|upper }}
+                        </div>
+                    {% endif %}
+                    <span class="small fw-bold text-slate-700" style="font-size: 0.8rem;">{{ item.created_by.get_full_name|default:item.created_by.username }}</span>
+                </div>
+
+                {% if user.role == 'super_admin' or user.role == 'director' or item.created_by == user %}
+                <form method="POST" action="{% url 'portal:delete_initiative_media_post' item.id %}" onsubmit="return confirm('هل أنت تأكد من رغبتك بحذف هذا العنصر؟')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm border-0 p-1" title="حذف">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

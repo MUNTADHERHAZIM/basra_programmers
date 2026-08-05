@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+
+{% block title %}مركز إعلام المبادرة - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}مركز إعلام المبادرة والوسائط المرئية{% endblock %}
+
+{% block content %}
+<!-- Hero Header -->
+<div class="glass-card p-4 p-md-5 border-0 shadow-lg rounded-4 mb-4 text-white position-relative overflow-hidden" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+    <div class="row align-items-center position-relative" style="z-index: 2;">
+        <div class="col-lg-8">
+            <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold mb-3">
+                <i class="fas fa-video me-1"></i>المكتبة الإعلامية والأنشطة
+            </span>
+            <h2 class="fw-bold mb-2">إعلام المبادرة والوسائط المرئية</h2>
+            <p class="text-slate-300 fs-6 m-0">استعرض أحدث الفيديوهات التعليمية، المعارض والأنشطة البرمجية، والإعلانات التوجيهية الخاصة بمبادرة 1000 مبرمج بالبصرة.</p>
+        </div>
+        <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
+            {% if user.role == 'super_admin' or user.role == 'director' %}
+            <button class="btn btn-warning px-4 py-2 fw-bold text-dark rounded-3 shadow" data-bs-toggle="modal" data-bs-target="#addMediaModal">
+                <i class="fas fa-plus-circle me-1"></i>نشر فيديو / ميديا جديدة
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .custom-media-tab {
+        color: #475569 !important;
+        background-color: transparent !important;
+        border-radius: 0.6rem !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+    .custom-media-tab:hover {
+        background-color: #f1f5f9 !important;
+        color: #0f172a !important;
+    }
+
+    #all-tab.active {
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25) !important;
+    }
+
+    #videos-tab.active {
+        background-color: #dc2626 !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25) !important;
+    }
+
+    #images-tab.active {
+        background-color: #059669 !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25) !important;
+    }
+
+    #announcements-tab.active {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25) !important;
+    }
+</style>
+
+<!-- Tabs & Category Filter -->
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+    <ul class="nav nav-pills bg-white p-1 rounded-3 shadow-sm border" id="mediaTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link custom-media-tab active fw-bold px-4 py-2" id="all-tab" data-bs-toggle="pill" data-bs-target="#all-content" type="button" role="tab">
+                <i class="fas fa-th-large me-1"></i>كل المحتوى ({{ all_media|length }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link custom-media-tab fw-bold px-4 py-2" id="videos-tab" data-bs-toggle="pill" data-bs-target="#videos-content" type="button" role="tab">
+                <i class="fas fa-play-circle me-1 text-danger"></i>الفيديوهات ({{ videos|length }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link custom-media-tab fw-bold px-4 py-2" id="images-tab" data-bs-toggle="pill" data-bs-target="#images-content" type="button" role="tab">
+                <i class="fas fa-images me-1 text-success"></i>معرض الصور ({{ images|length }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link custom-media-tab fw-bold px-4 py-2" id="announcements-tab" data-bs-toggle="pill" data-bs-target="#announcements-content" type="button" role="tab">
+                <i class="fas fa-bullhorn me-1 text-primary"></i>الإعلانات والأخبار ({{ announcements|length }})
+            </button>
+        </li>
+    </ul>
+</div>
+
+<!-- Tab Contents -->
+<div class="tab-content" id="mediaTabsContent">
+    
+    <!-- All Content Tab -->
+    <div class="tab-pane fade show active" id="all-content" role="tabpanel">
+        <div class="row g-4">
+            {% for item in all_media %}
+                {% include 'portal/includes/media_card.html' with item=item %}
+            {% empty %}
+                <div class="col-12 text-center py-5 text-muted glass-card">
+                    <i class="fas fa-photo-video fs-1 text-secondary opacity-50 mb-3 d-block"></i>
+                    <h5>لا يوجد محتوى إعلامي منشور حالياً</h5>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Videos Tab -->
+    <div class="tab-pane fade" id="videos-content" role="tabpanel">
+        <div class="row g-4">
+            {% for item in videos %}
+                {% include 'portal/includes/media_card.html' with item=item %}
+            {% empty %}
+                <div class="col-12 text-center py-5 text-muted glass-card">
+                    <i class="fas fa-video fs-1 text-secondary opacity-50 mb-3 d-block"></i>
+                    <h5>لا يوجد فيديوهات مرفوعة حالياً</h5>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Images Tab -->
+    <div class="tab-pane fade" id="images-content" role="tabpanel">
+        <div class="row g-4">
+            {% for item in images %}
+                {% include 'portal/includes/media_card.html' with item=item %}
+            {% empty %}
+                <div class="col-12 text-center py-5 text-muted glass-card">
+                    <i class="fas fa-images fs-1 text-secondary opacity-50 mb-3 d-block"></i>
+                    <h5>لا يوجد صور في المعرض حالياً</h5>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Announcements Tab -->
+    <div class="tab-pane fade" id="announcements-content" role="tabpanel">
+        <div class="row g-4">
+            {% for item in announcements %}
+                {% include 'portal/includes/media_card.html' with item=item %}
+            {% empty %}
+                <div class="col-12 text-center py-5 text-muted glass-card">
+                    <i class="fas fa-bullhorn fs-1 text-secondary opacity-50 mb-3 d-block"></i>
+                    <h5>لا يوجد إعلانات منشورة حالياً</h5>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal: Add New Initiative Media -->
+{% if user.role == 'super_admin' or user.role == 'director' or user.role == 'lecturer' or user.role == 'supervisor' %}
+<div class="modal fade" id="addMediaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg glass-card">
+            <div class="modal-header bg-slate-900 text-white">
+                <h5 class="modal-title fw-bold"><i class="fas fa-cloud-upload-alt text-warning me-2"></i>نشر فيديو / محتوى ميديا جديد</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{% url 'portal:add_initiative_media_post' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold text-dark">عنوان المحتوى / الفيديو</label>
+                            <input type="text" name="title" class="form-control" placeholder="مثال: التقرير الفيديوي للحسابات والأنشطة البرمجية" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-dark">نوع المحتوى</label>
+                            <select name="media_type" class="form-select" required>
+                                <option value="video">🎥 فيديو تعليمي / نشاط</option>
+                                <option value="image" selected>📷 صورة ومعرض</option>
+                                <option value="announcement">📢 إعلان / خبر رسمي</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold text-dark">الوصف والتفاصيل الشارحة</label>
+                            <textarea name="description" class="form-control" rows="3" placeholder="أدخل ملخصاً أو شرحاً مفصلاً للمحتوى..."></textarea>
+                        </div>
+                        
+                        <div class="col-md-6 border-top pt-3">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-image me-1 text-success"></i>إرفاق صورة</label>
+                            <input type="file" name="image" class="form-control" accept="image/*">
+                        </div>
+
+                        <div class="col-md-6 border-top pt-3">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-file-video me-1 text-danger"></i>رفع ملف فيديو</label>
+                            <input type="file" name="video_file" class="form-control" accept="video/*">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark"><i class="fab fa-youtube me-1 text-danger"></i>أو رابط فيديو (YouTube / Drive / Vimeo)</label>
+                            <input type="url" name="video_url" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-paperclip me-1 text-primary"></i>ملف مستند إضافي (مرفق)</label>
+                            <input type="file" name="attachment" class="form-control">
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="is_public" id="isPublicCheck" checked>
+                                <label class="form-check-label fw-bold text-dark" for="isPublicCheck">
+                                    إظهار المحتوى للجميع والطلاب على المبادرة
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light px-4 py-3">
+                    <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning px-5 fw-bold text-dark">
+                        <i class="fas fa-paper-plane me-1"></i>نشر المحتوى الآن
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

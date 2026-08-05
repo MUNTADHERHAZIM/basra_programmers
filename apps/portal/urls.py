@@ -93,4 +93,20 @@ urlpatterns = [
     path('reports/daily/list/', views.daily_reports_list_view, name='daily_reports_list'),
     path('reports/daily/review/', views.review_daily_report_post, name='review_daily_report_post_general'),
     path('reports/daily/<int:report_id>/review/', views.review_daily_report_post, name='review_daily_report_post'),
+    
+    # Communication Platform (Chat Hub)
+    path('chat/', views.chat_view, name='chat_view'),
+    path('chat/fetch/', views.chat_fetch_messages_api, name='chat_fetch_messages_api'),
+    path('chat/send/', views.chat_send_message_api, name='chat_send_message_api'),
+    path('chat/unread-count/', views.chat_unread_count_api, name='chat_unread_count_api'),
+    path('chat/message/<int:message_id>/delete/', views.chat_delete_message_api, name='chat_delete_message_api'),
+    path('notifications/unread-count/', views.notifications_unread_count_api, name='notifications_unread_count_api'),
+
+    path('api/group/<int:group_id>/students/', views.get_group_students_api, name='get_group_students_api'),
+
+    # Initiative Media & Announcements
+    path('media/', views.initiative_media_view, name='initiative_media_view'),
+    path('manage/media/add/', views.add_initiative_media_post, name='add_initiative_media_post'),
+    path('manage/media/<int:media_id>/delete/', views.delete_initiative_media_post, name='delete_initiative_media_post'),
 ]
+

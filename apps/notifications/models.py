@@ -51,8 +51,18 @@ class InternalMessage(models.Model):
         related_name='group_messages',
         verbose_name="المجموعة المستهدفة (جماعي)"
     )
-    content = models.TextField(verbose_name="نص الرسالة")
-    file = models.FileField(upload_to='messages/', blank=True, null=True, verbose_name="ملف مرفق")
+    course = models.ForeignKey(
+        'courses.Course',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='course_messages',
+        verbose_name="المادة الدراسية المستهدفة"
+    )
+    content = models.TextField(verbose_name="نص الرسالة", blank=True, null=True)
+    file = models.FileField(upload_to='messages/files/', blank=True, null=True, verbose_name="ملف مرفق")
+    image = models.ImageField(upload_to='messages/images/', blank=True, null=True, verbose_name="صورة مرفقة")
+    is_read = models.BooleanField(default=False, verbose_name="مقروءة؟")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإرسال")
 
     def __str__(self):

@@ -1,0 +1,366 @@
+{% extends 'base.html' %}
+
+{% block title %}منصة التواصل والدردشة - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}منصة التواصل البرمجية والدردشة المباشرة{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-lg glass-card overflow-hidden" style="height: calc(100vh - 160px); min-height: 550px;">
+    <div class="row g-0 h-100">
+        
+        <!-- Channels & Contacts Sidebar -->
+        <div class="col-12 col-md-4 col-lg-3 border-end bg-white d-flex flex-column h-100">
+            <!-- Sidebar Header & Search -->
+            <div class="p-3 border-bottom bg-light">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h6 class="fw-bold m-0 text-slate-800"><i class="fas fa-comments text-success me-2"></i>منصة التواصل</h6>
+                    <span class="badge bg-success-subtle text-success rounded-pill px-3">نشط</span>
+                </div>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                    <input type="text" id="contact-search" class="form-control border-start-0 ps-0" placeholder="بحث عن قناة أو متدرب أو مدرب..." onkeyup="filterContacts()">
+                </div>
+            </div>
+
+            <!-- List Container -->
+            <div class="overflow-auto flex-grow-1" id="contacts-list-container">
+                <!-- Channels Section -->
+                <div class="px-3 py-2 bg-light border-bottom text-muted small fw-bold">
+                    <i class="fas fa-hashtag me-1 text-warning"></i>قنوات المبادرة والشعب الدراسية
+                </div>
+                <div class="list-group list-group-flush" id="channels-list">
+                    {% for channel in channels %}
+                    <a href="javascript:void(0)" 
+                       class="list-group-item list-group-item-action py-3 px-3 border-bottom chat-target-item {% if forloop.first %}active-target bg-success-subtle{% endif %}"
+                       data-target-type="{{ channel.type }}" 
+                       data-target-id="{{ channel.id }}"
+                       data-name="{{ channel.name }}"
+                       data-subtitle="{{ channel.subtitle }}"
+                       data-icon="{{ channel.icon }}"
+                       onclick="switchChatTarget(this)">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-3 border" style="width: 42px; height: 42px; min-width: 42px;">
+                                <i class="fas {{ channel.icon }} fs-5"></i>
+                            </div>
+                            <div class="flex-grow-1 overflow-hidden">
+                                <h6 class="m-0 fw-bold text-dark text-truncate" style="font-size: 0.9rem;">{{ channel.name }}</h6>
+                                <small class="text-muted text-truncate d-block" style="font-size: 0.75rem;">{{ channel.subtitle }}</small>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+
+                <!-- Direct Messages Section -->
+                <div class="px-3 py-2 bg-light border-bottom border-top text-muted small fw-bold mt-2">
+                    <i class="fas fa-user-friends me-1 text-primary"></i>المحادثات المباشرة (المدربون والزملاء)
+                </div>
+                <div class="list-group list-group-flush" id="direct-contacts-list">
+                    {% for contact in contacts %}
+                    <a href="javascript:void(0)" 
+                       class="list-group-item list-group-item-action py-3 px-3 border-bottom chat-target-item"
+                       data-target-type="direct" 
+                       data-target-id="{{ contact.user_id }}"
+                       data-name="{{ contact.name }}"
+                       data-subtitle="{{ contact.role_display }}"
+                       data-avatar="{{ contact.avatar_url|default:'' }}"
+                       onclick="switchChatTarget(this)">
+                        <div class="d-flex align-items-center">
+                            <div class="position-relative me-3">
+                                {% if contact.avatar_url %}
+                                    <img src="{{ contact.avatar_url }}" class="rounded-circle border" width="42" height="42" style="object-fit: cover;" alt="Avatar">
+                                {% else %}
+                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold border" style="width: 42px; height: 42px; font-size: 0.9rem;">
+                                        {{ contact.name|slice:":1"|upper }}
+                                    </div>
+                                {% endif %}
+                                {% if contact.unread_count > 0 %}
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
+                                        {{ contact.unread_count }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1 overflow-hidden">
+                                <h6 class="m-0 fw-bold text-dark text-truncate" style="font-size: 0.9rem;">{{ contact.name }}</h6>
+                                <span class="badge bg-secondary-subtle text-secondary font-monospace" style="font-size: 0.7rem;">{{ contact.role_display }}</span>
+                            </div>
+                        </div>
+                    </a>
+                    {% empty %}
+                    <div class="text-center py-4 text-muted small">لا يوجد جهات اتصال متوفرة حالياً</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Stream Main Area -->
+        <div class="col-12 col-md-8 col-lg-9 d-flex flex-column h-100 bg-slate-50" style="background-color: #f8fafc;">
+            
+            <!-- Active Chat Header -->
+            <div class="p-3 bg-white border-bottom shadow-sm d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    <div id="active-chat-avatar-container" class="me-3">
+                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center border" style="width: 44px; height: 44px;">
+                            <i id="active-chat-icon" class="fas fa-globe-asia text-warning fs-5"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h6 id="active-chat-title" class="m-0 fw-bold text-dark">القناة العامة لمبادرة 1000 مبرمج</h6>
+                        <small id="active-chat-subtitle" class="text-muted">مناقشات وتوجيهات عامة لجميع أعضاء المبادرة</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-outline-secondary btn-sm rounded-circle" title="تحديث المحادثة" onclick="fetchMessages()"><i class="fas fa-sync-alt"></i></button>
+                </div>
+            </div>
+
+            <!-- Messages Stream Scroll Area -->
+            <div class="flex-grow-1 overflow-auto p-4" id="chat-messages-container" style="background-image: radial-gradient(#e2e8f0 1px, transparent 1px); background-size: 20px 20px;">
+                <div class="text-center py-5 text-muted" id="chat-loading">
+                    <div class="spinner-border text-success spinner-border-sm me-2" role="status"></div>
+                    جاري تحميل المحادثات...
+                </div>
+            </div>
+
+            <!-- Chat Input Footer Bar -->
+            <div class="p-3 bg-white border-top">
+                <!-- Preview attachment file / image -->
+                <div id="attachment-preview-bar" class="d-none mb-2 p-2 bg-light rounded-3 d-flex align-items-center justify-content-between border">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-paperclip text-primary"></i>
+                        <span id="attachment-file-name" class="small fw-bold text-dark"></span>
+                    </div>
+                    <button type="button" class="btn-close btn-sm" onclick="clearAttachment()"></button>
+                </div>
+
+                <form id="chat-form" onsubmit="sendMessage(event)" enctype="multipart/form-data">
+                    <div class="input-group">
+                        <!-- Attachment Buttons -->
+                        <button type="button" class="btn btn-outline-secondary border" title="إرفاق ملف أو صورة" onclick="document.getElementById('chat-file-input').click()">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <input type="file" id="chat-file-input" class="d-none" onchange="handleFileSelect(event)">
+                        
+                        <!-- Main Message Input -->
+                        <input type="text" id="chat-content-input" class="form-control px-3" placeholder="اكتب رسالتك هنا..." autocomplete="off">
+
+                        <!-- Send Button -->
+                        <button type="submit" class="btn btn-success px-4 fw-bold">
+                            إرسال <i class="fas fa-paper-plane ms-1"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentTargetType = 'group';
+let currentTargetId = 'general';
+let selectedAttachmentFile = null;
+let pollTimer = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initial fetch for general channel
+    fetchMessages();
+    
+    // Auto poll every 4 seconds for new messages
+    pollTimer = setInterval(fetchMessages, 4000);
+});
+
+function switchChatTarget(element) {
+    document.querySelectorAll('.chat-target-item').forEach(el => {
+        el.classList.remove('active-target', 'bg-success-subtle');
+    });
+    element.classList.add('active-target', 'bg-success-subtle');
+
+    currentTargetType = element.getAttribute('data-target-type');
+    currentTargetId = element.getAttribute('data-target-id');
+    const name = element.getAttribute('data-name');
+    const subtitle = element.getAttribute('data-subtitle');
+    const icon = element.getAttribute('data-icon');
+    const avatar = element.getAttribute('data-avatar');
+
+    // Update Header
+    document.getElementById('active-chat-title').innerText = name;
+    document.getElementById('active-chat-subtitle').innerText = subtitle;
+
+    const avatarContainer = document.getElementById('active-chat-avatar-container');
+    if (currentTargetType === 'direct' && avatar) {
+        avatarContainer.innerHTML = `<img src="${avatar}" class="rounded-circle border" width="44" height="44" style="object-fit: cover;">`;
+    } else if (currentTargetType === 'direct') {
+        avatarContainer.innerHTML = `<div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold border" style="width: 44px; height: 44px;">${name.charAt(0).toUpperCase()}</div>`;
+    } else {
+        avatarContainer.innerHTML = `<div class="rounded-circle bg-light d-flex align-items-center justify-content-center border" style="width: 44px; height: 44px;"><i class="fas ${icon || 'fa-users'} text-warning fs-5"></i></div>`;
+    }
+
+    fetchMessages();
+}
+
+function fetchMessages() {
+    const container = document.getElementById('chat-messages-container');
+    
+    fetch(`{% url 'portal:chat_fetch_messages_api' %}?target_type=${currentTargetType}&target_id=${currentTargetId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderMessages(data.messages);
+            }
+        })
+        .catch(err => console.error("Error fetching messages:", err));
+}
+
+function renderMessages(messages) {
+    const container = document.getElementById('chat-messages-container');
+    if (!messages || messages.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-comments fs-1 text-secondary opacity-50 mb-3 d-block"></i>
+                <p class="m-0 fw-bold">لا يوجد رسائل سابقة في هذه المحادثة</p>
+                <small>كن أول من يبدأ بالنقاش والإجابة على الاستفسارات البرمجية!</small>
+            </div>`;
+        return;
+    }
+
+    let html = '';
+    messages.forEach(msg => {
+        const isMe = msg.is_me;
+        const alignClass = isMe ? 'justify-content-end' : 'justify-content-start';
+        const bubbleBg = isMe ? 'bg-success text-white' : 'bg-white text-dark shadow-sm border';
+        const subTextColor = isMe ? 'text-white-50' : 'text-muted';
+        
+        let mediaHtml = '';
+        if (msg.image_url) {
+            mediaHtml += `<div class="my-2"><a href="${msg.image_url}" target="_blank"><img src="${msg.image_url}" class="img-fluid rounded-3 border" style="max-height: 220px;" alt="Image"></a></div>`;
+        }
+        if (msg.file_url) {
+            mediaHtml += `
+                <div class="my-2 p-2 bg-light-subtle rounded border d-flex align-items-center gap-2 text-truncate">
+                    <i class="fas fa-file-download fs-4"></i>
+                    <a href="${msg.file_url}" target="_blank" class="text-reset text-decoration-none fw-bold small text-truncate">${msg.file_name || 'ملف مرفق'}</a>
+                </div>`;
+        }
+
+        let avatarHtml = '';
+        if (!isMe) {
+            if (msg.sender_avatar) {
+                avatarHtml = `<img src="${msg.sender_avatar}" class="rounded-circle border me-2" width="34" height="34" style="object-fit: cover;">`;
+            } else {
+                avatarHtml = `<div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold" style="width: 34px; height: 34px; font-size: 0.8rem;">${msg.sender_name.charAt(0)}</div>`;
+            }
+        }
+
+        const canDelete = isMe || {% if user.role == 'super_admin' or user.role == 'director' %}true{% else %}false{% endif %};
+        const deleteBtn = canDelete ? `<button onclick="deleteChatMessage(${msg.id})" class="btn btn-link ${isMe ? 'text-white-50' : 'text-danger'} p-0 ms-2 text-decoration-none" title="حذف الرسالة" style="font-size: 0.75rem;"><i class="fas fa-trash-alt"></i></button>` : '';
+
+        html += `
+            <div class="d-flex ${alignClass} mb-3" id="msg-bubble-${msg.id}">
+                ${avatarHtml}
+                <div class="card border-0 rounded-4 px-3 py-2 ${bubbleBg}" style="max-width: 75%; font-size: 0.95rem;">
+                    ${!isMe ? `<div class="fw-bold mb-1" style="font-size: 0.8rem; color: #1e293b;">${msg.sender_name} <span class="badge bg-primary-subtle text-primary font-monospace" style="font-size: 0.65rem;">${msg.sender_role}</span></div>` : ''}
+                    <div>${msg.content}</div>
+                    ${mediaHtml}
+                    <div class="d-flex align-items-center justify-content-between mt-1 ${subTextColor}" style="font-size: 0.65rem;">
+                        <span>${msg.created_at}</span>
+                        ${deleteBtn}
+                    </div>
+                </div>
+            </div>`;
+    });
+
+    container.innerHTML = html;
+    container.scrollTop = container.scrollHeight;
+}
+
+function deleteChatMessage(msgId) {
+    if (!confirm('هل أنت متأكد من حذف هذه الرسالة نهائياً؟')) return;
+    fetch(`/chat/message/${msgId}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const bubble = document.getElementById(`msg-bubble-${msgId}`);
+            if (bubble) bubble.remove();
+        } else {
+            alert(data.message || 'تعذر حذف الرسالة');
+        }
+    })
+    .catch(err => alert('حدث خطأ أثناء حذف الرسالة'));
+}
+
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        selectedAttachmentFile = file;
+        document.getElementById('attachment-file-name').innerText = file.name;
+        document.getElementById('attachment-preview-bar').classList.remove('d-none');
+    }
+}
+
+function clearAttachment() {
+    selectedAttachmentFile = null;
+    document.getElementById('chat-file-input').value = '';
+    document.getElementById('attachment-preview-bar').classList.add('d-none');
+}
+
+function sendMessage(event) {
+    event.preventDefault();
+    const input = document.getElementById('chat-content-input');
+    const content = input.value.trim();
+
+    if (!content && !selectedAttachmentFile) return;
+
+    const formData = new FormData();
+    formData.append('target_type', currentTargetType);
+    formData.append('target_id', currentTargetId);
+    formData.append('content', content);
+
+    if (selectedAttachmentFile) {
+        if (selectedAttachmentFile.type.startsWith('image/')) {
+            formData.append('image', selectedAttachmentFile);
+        } else {
+            formData.append('file', selectedAttachmentFile);
+        }
+    }
+
+    input.value = '';
+    clearAttachment();
+
+    fetch("{% url 'portal:chat_send_message_api' %}", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            fetchMessages();
+        } else {
+            alert(data.message || "حدث خطأ أثناء إرسال الرسالة.");
+        }
+    })
+    .catch(err => console.error("Error sending message:", err));
+}
+
+function filterContacts() {
+    const q = document.getElementById('contact-search').value.toLowerCase();
+    document.querySelectorAll('.chat-target-item').forEach(item => {
+        const name = item.getAttribute('data-name').toLowerCase();
+        if (name.includes(q)) {
+            item.classList.remove('d-none');
+        } else {
+            item.classList.add('d-none');
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -36,7 +36,11 @@ class AssignmentSubmission(models.Model):
         limit_choices_to={'role': 'trainee'},
         verbose_name="المتدرب"
     )
-    file = models.FileField(upload_to='submissions/', verbose_name="ملف الحل المرفوع")
+    file = models.FileField(upload_to='submissions/files/', blank=True, null=True, verbose_name="ملف الحل المرفوع")
+    submission_text = models.TextField(blank=True, null=True, verbose_name="نص الإجابة والملاحظات")
+    image = models.ImageField(upload_to='submissions/images/', blank=True, null=True, verbose_name="صورة الحل المرفقة")
+    video_file = models.FileField(upload_to='submissions/videos/', blank=True, null=True, verbose_name="فيديو الحل المرفوع")
+    video_url = models.URLField(blank=True, null=True, verbose_name="رابط فيديو الحل (YouTube/Drive)")
     submitted_at = models.DateTimeField(auto_now_add=True, verbose_name="وقت التسليم")
     grade = models.PositiveIntegerField(null=True, blank=True, verbose_name="الدرجة")
     feedback = models.TextField(blank=True, null=True, verbose_name="ملاحظات المصحح")

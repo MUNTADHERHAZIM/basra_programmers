@@ -26,21 +26,22 @@ def award_points(trainee, points, reason):
 
 def check_and_unlock_badges(trainee, current_points=None):
     """
-    Checks if a trainee qualifies for any badges they haven't earned yet,
-    based on their current points or specific criteria.
+    Checks if a trainee qualifies for any automated badges they haven't earned yet.
     """
     if current_points is None:
-        current_points = trainee.trainee_profile.points
+        try:
+            current_points = trainee.trainee_profile.points
+        except Exception:
+            return []
         
     earned_badge_ids = TraineeBadge.objects.filter(trainee=trainee).values_list('badge_id', flat=True)
-    unearned_badges = Badge.objects.exclude(id__in=earned_badge_ids)
+    # Only automatically unlock attendance or points milestone badges if threshold reached
+    unearned_badges = Badge.objects.exclude(id__in=earned_badge_ids).filter(name__icontains="حضور")
     
     unlocked_badges = []
     for badge in unearned_badges:
         if current_points >= badge.points_required:
             TraineeBadge.objects.create(trainee=trainee, badge=badge)
-            # Log additional points reward for unlocking the badge
-            # (without recursion, just log the reward point separately if needed)
             unlocked_badges.append(badge)
             
     return unlocked_badges

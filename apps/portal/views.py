@@ -469,33 +469,84 @@ def export_trainees_view(request):
 
 @login_required
 def calendar_view(request):
-    """Displays weekly/monthly classes calendar."""
+    """Displays rich weekly/monthly interactive calendar and daily schedule."""
     user = request.user
     today = timezone.now().date()
     
-    # Filter lectures based on role
+    # Filter lectures & assignments based on user role
+    from apps.assignments.models import Assignment
     if user.role == CustomUser.Role.TRAINEE:
-        profile = get_object_or_404(TraineeProfile, user=user)
-        lectures = Lecture.objects.filter(group=profile.group)
+        profile = getattr(user, 'trainee_profile', None)
+        user_group = profile.group if profile else None
+        lectures = Lecture.objects.filter(group=user_group) if user_group else Lecture.objects.none()
+        assignments = Assignment.objects.filter(group=user_group) if user_group else Assignment.objects.none()
     elif user.role == CustomUser.Role.LECTURER:
         lectures = Lecture.objects.filter(group__instructor=user)
+        assignments = Assignment.objects.filter(group__instructor=user)
     elif user.role == CustomUser.Role.SUPERVISOR:
         lectures = Lecture.objects.filter(group__supervisor=user)
+        assignments = Assignment.objects.filter(group__supervisor=user)
     else:
         lectures = Lecture.objects.all()
+        assignments = Assignment.objects.all()
         
-    # Format events list for fullCalendar or standard loop
     events = []
-    for lec in lectures:
+    # 1. Format Lectures for Calendar
+    for lec in lectures.select_related('group', 'group__course', 'group__instructor'):
         events.append({
-            'title': f"{lec.title} ({lec.group.name})",
+            'id': f"lec-{lec.id}",
+            'type': 'lecture',
+            'title': f"📚 {lec.title}",
+            'course': lec.group.course.title if (lec.group and lec.group.course) else "مادة عامة",
+            'group_name': lec.group.name if lec.group else "عامة",
             'date': lec.date.isoformat(),
             'start_time': lec.start_time.strftime('%H:%M'),
             'end_time': lec.end_time.strftime('%H:%M'),
-            'classroom': lec.group.classroom,
+            'classroom': lec.group.classroom if lec.group else "قاعة التدريب",
+            'instructor': (lec.group.instructor.get_full_name() or lec.group.instructor.username) if (lec.group and lec.group.instructor) else "غير محدد",
+            'color': '#10b981',
+            'badge': 'محاضرة تدريبية',
         })
         
-    return render(request, 'portal/calendar.html', {'events': events})
+    # 2. Format Assignments for Calendar
+    for asg in assignments.select_related('group', 'group__course'):
+        events.append({
+            'id': f"asg-{asg.id}",
+            'type': 'assignment',
+            'title': f"📝 تسليم واجب: {asg.title}",
+            'course': asg.group.course.title if (asg.group and asg.group.course) else "واجب مادة",
+            'group_name': asg.group.name if asg.group else "شعبة",
+            'date': asg.due_date.date().isoformat(),
+            'start_time': asg.due_date.strftime('%H:%M'),
+            'end_time': asg.due_date.strftime('%H:%M'),
+            'classroom': "تسليم إلكتروني عبر المنصة",
+            'instructor': "المحاضر المصحح",
+            'color': '#ef4444',
+            'badge': 'موعد تسليم واجب',
+        })
+        
+    # 3. Weekly Schedule Grid Data by Days
+    days_order = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'السبت', 'الجمعة']
+    weekly_schedule = {day: [] for day in days_order}
+    for lec in lectures.select_related('group', 'group__course', 'group__instructor'):
+        if lec.group and lec.group.days:
+            group_days = [d.strip() for d in lec.group.days.replace('،', ',').split(',') if d.strip()]
+            for day in group_days:
+                if day in weekly_schedule and lec not in weekly_schedule[day]:
+                    weekly_schedule[day].append(lec)
+                    
+    # Summary Metrics
+    today_lectures = [e for e in events if e['type'] == 'lecture' and e['date'] == today.isoformat()]
+    upcoming_assignments_count = len([e for e in events if e['type'] == 'assignment' and e['date'] >= today.isoformat()])
+    
+    context = {
+        'events': events,
+        'weekly_schedule': weekly_schedule,
+        'today_lectures_count': len(today_lectures),
+        'upcoming_assignments_count': upcoming_assignments_count,
+        'total_events_count': len(events),
+    }
+    return render(request, 'portal/calendar.html', context)
 
 # ==========================================
 # Public Verification Page
@@ -541,27 +592,52 @@ def create_assignment_view(request, group_id):
 
 @login_required
 def submit_assignment_view(request, assignment_id):
-    """Allows students to submit a homework file."""
+    """Allows students to submit a homework with text, files, images, or video uploads/links."""
     if request.user.role not in [CustomUser.Role.TRAINEE, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
         raise Http404()
         
     assignment = get_object_or_404(Assignment, id=assignment_id)
-    if request.method == 'POST' and request.FILES.get('solution_file'):
-        file = request.FILES['solution_file']
+    submission = AssignmentSubmission.objects.filter(assignment=assignment, trainee=request.user).first()
+
+    if request.method == 'POST':
+        submission_text = request.POST.get('submission_text', '').strip()
+        video_url = request.POST.get('video_url', '').strip()
+        solution_file = request.FILES.get('solution_file')
+        submission_image = request.FILES.get('submission_image')
+        video_file = request.FILES.get('video_file')
         
-        submission, created = AssignmentSubmission.objects.update_or_create(
+        if not (submission_text or solution_file or submission_image or video_file or video_url):
+            messages.error(request, "يرجى إضافة إجابة نصية، صورة، فيديو، أو ملف مرفق لتسليم الواجب.")
+            return render(request, 'portal/submit_assignment.html', {'assignment': assignment, 'submission': submission})
+
+        defaults = {'submitted_at': timezone.now()}
+        if submission_text:
+            defaults['submission_text'] = submission_text
+        if video_url:
+            defaults['video_url'] = video_url
+        if solution_file:
+            defaults['file'] = solution_file
+        if submission_image:
+            defaults['image'] = submission_image
+        if video_file:
+            defaults['video_file'] = video_file
+
+        sub, created = AssignmentSubmission.objects.update_or_create(
             assignment=assignment,
             trainee=request.user,
-            defaults={'file': file, 'submitted_at': timezone.now()}
+            defaults=defaults
         )
         
-        # Award points for submission
-        award_points(request.user, 15, f"تسليم الواجب الدراسي: '{assignment.title}'")
-        
-        messages.success(request, "تم رفع حل الواجب وحساب نقاط المبادرة!")
+        # Award points for submission if created
+        if created:
+            award_points(request.user, 15, f"تسليم الواجب الدراسي: '{assignment.title}'")
+            messages.success(request, "تم تسليم الواجب الدراسي وإضافة نقاط المبادرة بنجاح!")
+        else:
+            messages.success(request, "تم تحديث تسليم الواجب بنجاح!")
+
         return redirect('portal:trainee_dashboard')
         
-    return render(request, 'portal/submit_assignment.html', {'assignment': assignment})
+    return render(request, 'portal/submit_assignment.html', {'assignment': assignment, 'submission': submission})
 
 
 @login_required
@@ -1195,7 +1271,7 @@ def add_badge_post(request):
 @login_required
 @require_POST
 def award_badge_post(request):
-    """Awards a badge to a trainee manually from HTML form."""
+    """Awards a specific badge to a trainee manually from HTML form."""
     if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
     trainee_id = request.POST.get('trainee')
@@ -1204,9 +1280,22 @@ def award_badge_post(request):
         try:
             trainee_user = get_object_or_404(CustomUser, id=trainee_id)
             badge = get_object_or_404(Badge, id=badge_id)
-            TraineeBadge.objects.get_or_create(trainee=trainee_user, badge=badge)
-            from apps.gamification.services import award_points
-            award_points(trainee_user, badge.points_required, f"الحصول على شارة: {badge.name}")
+            
+            # Grant ONLY this specific badge
+            t_badge, created = TraineeBadge.objects.get_or_create(trainee=trainee_user, badge=badge)
+            
+            # Safely log activity points for this badge without cascading
+            from apps.gamification.models import ActivityPointsLog
+            ActivityPointsLog.objects.create(
+                trainee=trainee_user,
+                points=badge.points_required,
+                reason=f"الحصول على شارة التميز: {badge.name}"
+            )
+            prof = getattr(trainee_user, 'trainee_profile', None)
+            if prof:
+                prof.points += badge.points_required
+                prof.save()
+                
             messages.success(request, f"تم منح الشارة '{badge.name}' للمتدرب {trainee_user.get_full_name() or trainee_user.username} بنجاح.")
         except Exception as e:
             messages.error(request, f"فشل منح الشارة: {str(e)}")
@@ -1520,6 +1609,13 @@ def create_announcements_view(request):
 
 
 @login_required
+def notifications_unread_count_api(request):
+    """API for real-time live polling of unread bell notifications."""
+    count = request.user.notifications.filter(is_read=False).count()
+    return JsonResponse({'unread_count': count})
+
+
+@login_required
 def send_notifications_view(request):
     """Dedicated management page for sending and reviewing individual/group bell notifications."""
     if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
@@ -1550,14 +1646,24 @@ def send_notifications_view(request):
                 group_id = request.POST.get('group_id')
                 if group_id:
                     group = get_object_or_404(Group, id=group_id)
-                    users_to_notify = list(CustomUser.objects.filter(role=CustomUser.Role.TRAINEE, trainee_profile__group=group))
-                    target_desc = f"شعبة {group.name}"
+                    users_to_notify = list(CustomUser.objects.filter(
+                        Q(role=CustomUser.Role.TRAINEE, trainee_profile__group=group) |
+                        Q(id=group.instructor_id) |
+                        Q(id=group.supervisor_id)
+                    ).distinct())
+                    target_desc = f"منتسبي شعبة {group.name}"
             elif target_type == 'all_trainees':
                 users_to_notify = list(CustomUser.objects.filter(role=CustomUser.Role.TRAINEE))
                 target_desc = "جميع الطلاب"
             elif target_type == 'all_lecturers':
                 users_to_notify = list(CustomUser.objects.filter(role=CustomUser.Role.LECTURER))
                 target_desc = "جميع المدربين"
+            elif target_type == 'all_supervisors':
+                users_to_notify = list(CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR))
+                target_desc = "جميع المشرفين"
+            elif target_type == 'all_users':
+                users_to_notify = list(CustomUser.objects.all())
+                target_desc = "جميع المستخدمين"
                 
             if users_to_notify and title and message:
                 for u in users_to_notify:
@@ -1567,6 +1673,18 @@ def send_notifications_view(request):
                         message=message.strip(),
                         notification_type=notif_type
                     )
+                    if notif_type in [Notification.Type.EMAIL, Notification.Type.BOTH] and u.email:
+                        try:
+                            from django.core.mail import send_mail
+                            send_mail(
+                                subject=f"تنبيه من مبادرة 1000 مبرمج: {title.strip()}",
+                                message=message.strip(),
+                                from_email=None,
+                                recipient_list=[u.email],
+                                fail_silently=True
+                            )
+                        except Exception:
+                            pass
                 messages.success(request, f"تم إرسال الإشعار لـ ({target_desc}) بنجاح!")
             else:
                 messages.warning(request, "يرجى تعبئة جميع الحقول المستهدفة وإدخال البيانات.")
@@ -1966,16 +2084,21 @@ def generate_batch_accounts_view(request):
         
     if request.method == 'POST':
         prefix = request.POST.get('prefix', 'student')
-        count = int(request.POST.get('count', 10))
+        count_val = request.POST.get('count', '10')
+        count = int(count_val) if count_val.isdigit() else 10
         role = request.POST.get('role', 'trainee')
         group_id = request.POST.get('group_id')
+        names_text = request.POST.get('names_list', '')
         
+        names_list = [n.strip() for n in names_text.splitlines() if n.strip()] if names_text else None
+
         try:
             buffer, generated = ImportExportService.generate_batch_accounts(
                 prefix=prefix.strip(),
                 count=count,
                 role=role,
-                group_id=group_id
+                group_id=group_id,
+                names_list=names_list
             )
             
             response = HttpResponse(
@@ -1988,6 +2111,43 @@ def generate_batch_accounts_view(request):
             messages.error(request, f"فشل توليد الحسابات الجماعية: {str(e)}")
             
     return redirect('portal:admin_management_hub')
+
+
+@login_required
+def get_group_students_api(request, group_id):
+    """API endpoint to fetch all registered student full names in a specific group."""
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR]:
+        return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
+        
+    try:
+        group = Group.objects.get(id=group_id)
+        trainees = TraineeProfile.objects.filter(group=group).select_related('user').order_by('id')
+        
+        students = []
+        names_text_lines = []
+        for t in trainees:
+            full_name = t.user.get_full_name().strip() or t.user.username
+            students.append({
+                'id': t.id,
+                'user_id': t.user.id,
+                'full_name': full_name,
+                'username': t.user.username,
+                'email': t.user.email
+            })
+            names_text_lines.append(full_name)
+            
+        return JsonResponse({
+            'success': True,
+            'group_id': group.id,
+            'group_name': group.name,
+            'count': len(students),
+            'students': students,
+            'names_text': "\n".join(names_text_lines)
+        })
+    except Group.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'المجموعة غير موجودة.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
 
 @login_required
@@ -2171,3 +2331,410 @@ def review_daily_report_post(request, report_id=None):
     
     messages.success(request, f"تم مراجعة وتحديث حالة التقرير اليومي بنجاح.")
     return redirect('portal:daily_reports_list')
+
+
+# ==========================================
+# Profile Edit View (Avatar Upload & Password Change)
+# ==========================================
+
+@login_required
+def edit_profile_view(request):
+    """Allows all users (trainees, lecturers, supervisors, admins) to edit profile avatar, info, and change password."""
+    user = request.user
+    trainee_profile = getattr(user, 'trainee_profile', None)
+    lecturer_profile = getattr(user, 'lecturer_profile', None)
+    
+    if request.method == 'POST':
+        action = request.POST.get('action', 'update_info')
+        
+        if action == 'change_password':
+            old_password = request.POST.get('old_password')
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+            
+            if not user.check_password(old_password):
+                messages.error(request, "كلمة المرور الحالية غير صحيحة.")
+            elif not new_password or len(new_password) < 6:
+                messages.error(request, "يجب أن تتكون كلمة المرور الجديدة من 6 أحرف على الأقل.")
+            elif new_password != confirm_password:
+                messages.error(request, "كلمة المرور الجديدة وتأكيدها غير متطابقين.")
+            else:
+                user.set_password(new_password)
+                user.save()
+                from django.contrib.auth import update_session_auth_hash
+                update_session_auth_hash(request, user)
+                messages.success(request, "تم تغيير كلمة المرور بنجاح!")
+            return redirect('portal:edit_profile')
+
+        else:
+            # update profile info and avatar
+            first_name = request.POST.get('first_name')
+            last_name = request.POST.get('last_name')
+            email = request.POST.get('email')
+            phone_number = request.POST.get('phone_number')
+            
+            if first_name is not None: user.first_name = first_name.strip()
+            if last_name is not None: user.last_name = last_name.strip()
+            if email is not None: user.email = email.strip()
+            if phone_number is not None: user.phone_number = phone_number.strip()
+            
+            if request.FILES.get('avatar'):
+                user.avatar = request.FILES['avatar']
+                
+            user.save()
+            
+            # Role specific profile update
+            if user.role == CustomUser.Role.TRAINEE and trainee_profile:
+                uni = request.POST.get('university')
+                col = request.POST.get('college')
+                dept = request.POST.get('department')
+                stage = request.POST.get('academic_stage')
+                spec = request.POST.get('specialty')
+                gov = request.POST.get('governorate')
+                dist = request.POST.get('district')
+                
+                if uni is not None: trainee_profile.university = uni.strip()
+                if col is not None: trainee_profile.college = col.strip()
+                if dept is not None: trainee_profile.department = dept.strip()
+                if stage is not None: trainee_profile.academic_stage = stage.strip()
+                if spec is not None: trainee_profile.specialty = spec.strip()
+                if gov is not None: trainee_profile.governorate = gov.strip()
+                if dist is not None: trainee_profile.district = dist.strip()
+                trainee_profile.save()
+
+            elif user.role == CustomUser.Role.LECTURER and lecturer_profile:
+                spec = request.POST.get('specialty')
+                bio = request.POST.get('bio')
+                if spec is not None: lecturer_profile.specialty = spec.strip()
+                if bio is not None: lecturer_profile.bio = bio.strip()
+                lecturer_profile.save()
+
+            messages.success(request, "تم تحديث بيانات الملف الشخصي والصورة الشخصية بنجاح!")
+            return redirect('portal:edit_profile')
+
+    context = {
+        'user': user,
+        'trainee_profile': trainee_profile,
+        'lecturer_profile': lecturer_profile,
+    }
+    return render(request, 'portal/edit_profile.html', context)
+
+
+# ==========================================
+# Communication Platform (Chat Hub & Messaging)
+# ==========================================
+
+@login_required
+def chat_view(request):
+    """Main Communication Platform / Real-time Messaging Hub view."""
+    user = request.user
+    from apps.courses.models import Course
+    
+    # 1. Fetch available channels (General initiative channel, Course chats, Group chats)
+    channels = []
+    # General initiative channel
+    channels.append({
+        'id': 'general',
+        'type': 'group',
+        'group_id': None,
+        'name': 'القناة العامة لمبادرة 1000 مبرمج',
+        'icon': 'fa-globe-asia text-warning',
+        'category': 'عامة',
+        'subtitle': 'مناقشات وتوجيهات عامة لجميع أعضاء المبادرة',
+    })
+    
+    # Course-specific channels (كروبات وتواصل خاص لكل مادة دراسية)
+    from apps.courses.models import Course
+    courses_qs = Course.objects.all()
+    for c in courses_qs:
+        channels.append({
+            'id': f"course_{c.id}",
+            'type': 'course',
+            'course_id': c.id,
+            'name': f"كروب مادة: {c.title}",
+            'icon': 'fa-book-open text-primary',
+            'category': 'مواد دراسية',
+            'subtitle': f"مجتمع ومناقشات مادة {c.title}",
+        })
+
+    # Group-specific channels (كروبات الشعب الدراسية)
+    all_groups = list(Group.objects.all())
+    if not all_groups:
+        c_default = Course.objects.first()
+        if not c_default:
+            c_default = Course.objects.create(title="أساسيات البرمجة", description="منهج المبادرة العام")
+        
+        g1 = Group.objects.create(name="الشعبة A", code="GRP-A", course=c_default, classroom="قاعة 1", days="الأحد، الثلاثاء", start_time="16:00", end_time="18:00")
+        g2 = Group.objects.create(name="الشعبة B", code="GRP-B", course=c_default, classroom="قاعة 2", days="الاثنين، الأربعاء", start_time="16:00", end_time="18:00")
+        all_groups = [g1, g2]
+
+    if user.role == CustomUser.Role.TRAINEE:
+        trainee_prof = getattr(user, 'trainee_profile', None)
+        user_group = trainee_prof.group if trainee_prof else None
+        
+        if user_group and user_group in all_groups:
+            ordered_groups = [user_group] + [g for g in all_groups if g.id != user_group.id]
+        else:
+            ordered_groups = all_groups
+            
+        for g in ordered_groups:
+            is_my_group = (user_group and g.id == user_group.id)
+            channels.append({
+                'id': f"group_{g.id}",
+                'type': 'group',
+                'group_id': g.id,
+                'name': f"كروب شعبة: {g.name}",
+                'icon': 'fa-users text-info' if not is_my_group else 'fa-users text-success',
+                'category': 'شعب دراسية',
+                'subtitle': f"قناة شعبتك الخاصة ({g.name})" if is_my_group else f"قناة وتواصل شعبة {g.name}",
+            })
+    else: # Lecturers / Admins / Supervisors
+        for g in all_groups:
+            channels.append({
+                'id': f"group_{g.id}",
+                'type': 'group',
+                'group_id': g.id,
+                'name': f"كروب شعبة: {g.name}",
+                'icon': 'fa-users text-info',
+                'category': 'شعب دراسية',
+                'subtitle': f"قناة وتواصل شعبة {g.name}",
+            })
+            
+    # 2. Fetch direct message contacts (Users)
+    if user.role == CustomUser.Role.TRAINEE:
+        trainee_prof = getattr(user, 'trainee_profile', None)
+        if trainee_prof and trainee_prof.group:
+            group_members = CustomUser.objects.filter(
+                Q(trainee_profile__group=trainee_prof.group) |
+                Q(id=trainee_prof.group.instructor_id) |
+                Q(role__in=[CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR])
+            ).exclude(id=user.id).distinct()
+        else:
+            group_members = CustomUser.objects.filter(
+                role__in=[CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR, CustomUser.Role.SUPER_ADMIN]
+            ).exclude(id=user.id).distinct()
+    else:
+        group_members = CustomUser.objects.exclude(id=user.id).order_by('first_name', 'username')[:100]
+
+    contacts = []
+    for c_user in group_members:
+        unread_count = InternalMessage.objects.filter(sender=c_user, recipient=user, is_read=False).count()
+        contacts.append({
+            'user_id': c_user.id,
+            'name': c_user.get_full_name() or c_user.username,
+            'role_display': c_user.get_role_display(),
+            'avatar_url': c_user.avatar.url if c_user.avatar else None,
+            'unread_count': unread_count,
+        })
+        
+    context = {
+        'channels': channels,
+        'contacts': contacts,
+    }
+    return render(request, 'portal/chat.html', context)
+
+
+@login_required
+def chat_fetch_messages_api(request):
+    """AJAX endpoint to fetch chat message stream for active target."""
+    target_type = request.GET.get('target_type') # 'group', 'course', or 'direct'
+    target_id = str(request.GET.get('target_id', ''))
+    user = request.user
+    
+    if target_type == 'course' or target_id.startswith('course_'):
+        c_id = int(target_id.replace('course_', ''))
+        messages_qs = InternalMessage.objects.filter(course_id=c_id).select_related('sender')
+    elif target_type == 'group':
+        if target_id and target_id != 'general' and target_id != 'None':
+            g_id = int(target_id.replace('group_', ''))
+            messages_qs = InternalMessage.objects.filter(group_id=g_id).select_related('sender')
+        else:
+            messages_qs = InternalMessage.objects.filter(recipient=None, group=None, course=None).select_related('sender')
+    elif target_type == 'direct' and target_id:
+        recipient_id = int(target_id)
+        messages_qs = InternalMessage.objects.filter(
+            (Q(sender=user, recipient_id=recipient_id) | Q(sender_id=recipient_id, recipient=user))
+        ).select_related('sender')
+        
+        InternalMessage.objects.filter(sender_id=recipient_id, recipient=user, is_read=False).update(is_read=True)
+    else:
+        return JsonResponse({'success': False, 'messages': []})
+
+    messages_qs = messages_qs.order_by('created_at')[:200]
+    
+    data = []
+    for m in messages_qs:
+        data.append({
+            'id': m.id,
+            'sender_id': m.sender_id,
+            'sender_name': m.sender.get_full_name() or m.sender.username,
+            'sender_role': m.sender.get_role_display(),
+            'sender_avatar': m.sender.avatar.url if m.sender.avatar else None,
+            'content': m.content or '',
+            'image_url': m.image.url if m.image else None,
+            'file_url': m.file.url if m.file else None,
+            'file_name': m.file.name.split('/')[-1] if m.file else None,
+            'created_at': m.created_at.strftime("%H:%M - %Y/%m/%d"),
+            'is_me': m.sender_id == user.id,
+        })
+
+    return JsonResponse({'success': True, 'messages': data})
+
+
+@login_required
+@require_POST
+def chat_send_message_api(request):
+    """AJAX endpoint to send text/image/file message."""
+    target_type = request.POST.get('target_type')
+    target_id = str(request.POST.get('target_id', ''))
+    content = request.POST.get('content', '').strip()
+    image = request.FILES.get('image')
+    file_attachment = request.FILES.get('file')
+    user = request.user
+    
+    if not (content or image or file_attachment):
+        return JsonResponse({'success': False, 'message': 'لا يمكن إرسال رسالة فارغة.'}, status=400)
+        
+    msg_kwargs = {
+        'sender': user,
+        'content': content,
+        'image': image,
+        'file': file_attachment,
+    }
+    
+    if target_type == 'course' or target_id.startswith('course_'):
+        c_id = int(target_id.replace('course_', ''))
+        msg_kwargs['course_id'] = c_id
+    elif target_type == 'group':
+        if target_id and target_id != 'general' and target_id != 'None':
+            g_id = int(target_id.replace('group_', ''))
+            msg_kwargs['group_id'] = g_id
+        else:
+            msg_kwargs['group'] = None
+            msg_kwargs['recipient'] = None
+            msg_kwargs['course'] = None
+    elif target_type == 'direct' and target_id:
+        msg_kwargs['recipient_id'] = int(target_id)
+    else:
+        return JsonResponse({'success': False, 'message': 'وجهة إرسال غير صالحة.'}, status=400)
+
+    message = InternalMessage.objects.create(**msg_kwargs)
+    
+    return JsonResponse({
+        'success': True,
+        'message': {
+            'id': message.id,
+            'sender_id': message.sender_id,
+            'sender_name': message.sender.get_full_name() or message.sender.username,
+            'sender_avatar': message.sender.avatar.url if message.sender.avatar else None,
+            'content': message.content or '',
+            'image_url': message.image.url if message.image else None,
+            'file_url': message.file.url if message.file else None,
+            'file_name': message.file.name.split('/')[-1] if message.file else None,
+            'created_at': message.created_at.strftime("%H:%M - %Y/%m/%d"),
+            'is_me': True,
+        }
+    })
+
+
+@login_required
+def chat_unread_count_api(request):
+    """API for total unread direct messages for header badge."""
+    count = InternalMessage.objects.filter(recipient=request.user, is_read=False).count()
+    return JsonResponse({'unread_count': count})
+
+
+@login_required
+@require_POST
+def chat_delete_message_api(request, message_id):
+    """AJAX endpoint to delete a chat message sent by current user or admin."""
+    message = get_object_or_404(InternalMessage, id=message_id)
+    
+    is_admin = request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]
+    if message.sender_id != request.user.id and not is_admin:
+        return JsonResponse({'success': False, 'message': 'غير مصرح بحذف هذه الرسالة.'}, status=403)
+        
+    message.delete()
+    return JsonResponse({'success': True, 'message_id': message_id})
+
+
+# ==========================================
+# Initiative Media & Announcements Center
+# ==========================================
+
+def initiative_media_view(request):
+    """Public & Student Media Center showcasing videos, photo gallery, and announcements."""
+    from apps.portal.models import InitiativeMedia
+    user = request.user
+    
+    media_items = InitiativeMedia.objects.select_related('created_by').all()
+    if not user.is_authenticated or user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR]:
+        media_items = media_items.filter(is_public=True)
+
+    videos = [m for m in media_items if m.media_type == InitiativeMedia.MediaType.VIDEO]
+    images = [m for m in media_items if m.media_type == InitiativeMedia.MediaType.IMAGE]
+    announcements = [m for m in media_items if m.media_type == InitiativeMedia.MediaType.ANNOUNCEMENT]
+    
+    context = {
+        'all_media': media_items,
+        'videos': videos,
+        'images': images,
+        'announcements': announcements,
+    }
+    return render(request, 'portal/initiative_media.html', context)
+
+
+@login_required
+@require_POST
+def add_initiative_media_post(request):
+    """Allows Admins only to publish initiative photos, videos, and media updates."""
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+        messages.error(request, "غير مصرح بنشر محتوى الميديا. هذه الخاصية مقتصرة على إدارة المبادرة فقط.")
+        return redirect('portal:initiative_media_view')
+        
+    title = request.POST.get('title')
+    description = request.POST.get('description', '')
+    media_type = request.POST.get('media_type', 'image')
+    video_url = request.POST.get('video_url', '')
+    is_public = request.POST.get('is_public') == 'on' or request.POST.get('is_public') == 'true'
+    
+    image = request.FILES.get('image')
+    video_file = request.FILES.get('video_file')
+    attachment = request.FILES.get('attachment')
+    
+    if not title:
+        messages.error(request, "عنوان المحتوى حقل مطلوب.")
+        return redirect('portal:initiative_media_view')
+        
+    from apps.portal.models import InitiativeMedia
+    InitiativeMedia.objects.create(
+        title=title.strip(),
+        description=description.strip() if description else None,
+        media_type=media_type,
+        image=image,
+        video_file=video_file,
+        video_url=video_url.strip() if video_url else None,
+        attachment=attachment,
+        is_public=is_public,
+        created_by=request.user
+    )
+    
+    messages.success(request, "تم نشر المحتوى الإعلامي والفيديو بنجاح وإظهاره للطلاب والجميع!")
+    return redirect('portal:initiative_media_view')
+
+
+@login_required
+@require_POST
+def delete_initiative_media_post(request, media_id):
+    """Allows deletion of initiative media items."""
+    from apps.portal.models import InitiativeMedia
+    media = get_object_or_404(InitiativeMedia, id=media_id)
+    
+    if request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR] or media.created_by == request.user:
+        media.delete()
+        messages.success(request, "تم حذف عنصر الميديا بنجاح.")
+    else:
+        messages.error(request, "غير مصرح لك بحذف هذا العنصر.")
+        
+    return redirect('portal:initiative_media_view')
+
