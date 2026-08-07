@@ -234,11 +234,11 @@
                                     <div
                                         class="dropdown-item py-2 px-3 border-bottom d-flex flex-column text-wrap {% if not notif.is_read %}bg-light fw-bold{% endif %}">
                                         <span class="text-primary" style="font-size: 0.85rem;">{{ notif.title }}</span>
-                                        <small class="text-muted mt-1" style="font-size: 0.75rem;">{{ notif.message|safe
-                                            }}</small>
+                                        <small class="text-muted mt-1" style="font-size: 0.75rem;">{{
+                                            notif.message|safe}}</small>
                                         <span class="text-muted font-monospace mt-1"
-                                            style="font-size: 0.65rem; text-align: left;">{{
-                                            notif.created_at|date:"Y-m-d H:i" }}</span>
+                                            style="font-size: 0.65rem; text-align: left;">{{notif.created_at|date:"Y-m-d
+                                            H:i" }}</span>
                                     </div>
                                 </li>
                                 {% empty %}
