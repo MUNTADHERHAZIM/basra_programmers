@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}404 - الصفحة غير موجودة | منصة 1000 برمجة{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-5 d-flex align-items-center justify-content-center min-vh-100" style="background: radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 45%), radial-gradient(circle at bottom left, rgba(147, 51, 234, 0.12), transparent 45%);">
+    <div class="col-12 col-md-10 col-lg-8 col-xl-6 text-center">
+        
+        <!-- Glowing Floating 404 Graphic -->
+        <div class="position-relative mb-4 d-inline-block">
+            <h1 class="display-1 fw-black text-transparent bg-clip-text m-0" style="font-size: 8.5rem; letter-spacing: -3px; background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 10px 20px rgba(37, 99, 235, 0.3)); animation: float404 6s ease-in-out infinite;">
+                404
+            </h1>
+            <div class="position-absolute top-50 start-50 translate-middle w-100 h-100 rounded-circle" style="background: radial-gradient(circle, rgba(37,99,235,0.2) 0%, rgba(0,0,0,0) 70%); filter: blur(30px); z-index: -1;"></div>
+        </div>
+
+        <!-- Glassmorphism Card Info -->
+        <div class="glass-card shadow-lg p-4 p-md-5 rounded-4 border border-1 border-primary-subtle backdrop-blur bg-white">
+            <div class="badge bg-primary-subtle text-primary border border-primary px-3 py-2 rounded-pill mb-3 fw-bold fs-7">
+                <i class="fas fa-exclamation-triangle me-2"></i>عذراً! الصفحة المطلوبة غير متوفرة
+            </div>
+
+            <h2 class="fw-extrabold text-slate-800 mb-3 fs-3">عذراً، تائه في الفضاء البرمجي؟ 🚀</h2>
+            
+            <p class="text-secondary mb-4 lead fs-6 fw-medium">
+                {% if exception %}
+                    {{ exception }}
+                {% else %}
+                    الصفحة التي تحاول الوصول إليها قد تكون حُذفت، تم تغيير رابطها، أو أنك لا تملك الصلاحيات الكافية لاستعراضها.
+                {% endif %}
+            </p>
+
+            <!-- Quick Action Options -->
+            <div class="d-flex flex-column flex-sm-row justify-content-center align-items-center gap-3 pt-2">
+                <a href="{% url 'portal:dashboard' %}" class="btn btn-primary btn-lg rounded-pill px-4 fw-bold shadow-sm w-100 w-sm-auto">
+                    <i class="fas fa-home me-2"></i>العودة للوحة الرئيسية
+                </a>
+                
+                <button onclick="window.history.back()" class="btn btn-outline-secondary btn-lg rounded-pill px-4 fw-bold w-100 w-sm-auto">
+                    <i class="fas fa-arrow-right me-2"></i>الرجوع للصفحة السابقة
+                </button>
+            </div>
+        </div>
+
+        <!-- Help Notice -->
+        <div class="mt-4 text-muted small">
+            إذا كنت تعتقد أن هذا خطأ برمجي، يمكنك التواصل مع إدارة منصة 1000 برمجة لتقديم المساعدة.
+        </div>
+
+    </div>
+</div>
+
+<style>
+@keyframes float404 {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-15px); }
+}
+</style>
+{% endblock %}

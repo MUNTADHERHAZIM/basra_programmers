@@ -22,6 +22,14 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/styles.css">
 
+    <!-- PWA Settings -->
+    <link rel="manifest" href="{% url 'portal:pwa_manifest' %}">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="1000 برمجة">
+
+
     <!-- HTMX & Alpine.js -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -30,8 +38,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- FullCalendar -->
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
 
     <!-- Tom-Select CSS & JS (Searchable Selects) -->
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
@@ -59,7 +67,8 @@
     {% if messages %}
     <div class="position-fixed top-0 end-0 p-3" style="z-index: 1050; max-width: 350px;">
         {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-lg glass-card" role="alert">
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show shadow-lg glass-card p-3" role="alert">
+
             <div class="d-flex align-items-center">
                 {% if message.tags == 'success' %}
                 <i class="fas fa-check-circle text-success me-2 fs-5"></i>
@@ -68,11 +77,12 @@
                 {% else %}
                 <i class="fas fa-info-circle text-primary me-2 fs-5"></i>
                 {% endif %}
-                <div class="pe-3">{{ message }}</div>
+                <div class="pe-3 fw-bold">{{ message }}</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         {% endfor %}
+
     </div>
     {% endif %}
 
@@ -134,7 +144,12 @@
                         class="{% if request.resolver_match.url_name == 'admin_management_hub' %}active{% endif %}">
                         <i class="fas fa-tasks me-2"></i>إدارة المبادرة (الشعب/الطلاب)
                     </a>
-                    {% else %}
+                    <a href="{% url 'portal:accounts_management' %}"
+                        class="{% if request.resolver_match.url_name == 'accounts_management' %}active{% endif %}">
+                        <i class="fas fa-users-cog me-2 text-warning"></i>إدارة وتوليد جميع الحسابات
+                    </a>
+{% else %}
+
                     <!-- Standard Role Links -->
                     <a href="{% url 'portal:dashboard' %}"
                         class="{% if request.resolver_match.url_name == 'dashboard' or 'dashboard/' in request.path %}active{% endif %}">
@@ -253,10 +268,8 @@
                                 class="btn btn-link text-decoration-none d-flex align-items-center gap-2 p-0 border-0"
                                 type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <div class="text-end d-none d-sm-block">
-                                    <p class="m-0 fw-bold text-dark" style="font-size: 0.9rem;">{{
-                                        user.get_full_name|default:user.username }}</p>
-                                    <span class="badge bg-success-subtle text-success" style="font-size: 0.75rem;">{{
-                                        user.get_role_display }}</span>
+                                    <p class="m-0 fw-bold text-dark" style="font-size: 0.9rem;">{{user.get_full_name|default:user.username }}</p>
+                                    <span class="badge bg-success-subtle text-success" style="font-size: 0.75rem;">{{ user.get_role_display }}</span>
                                 </div>
                                 {% if user.avatar %}
                                 <img src="{{ user.avatar.url }}"
@@ -276,6 +289,23 @@
                                         <i class="fas fa-user-edit text-success me-2"></i>تعديل الملف الشخصي
                                     </a>
                                 </li>
+                                <li>
+                                    <a class="dropdown-item py-2 rounded-2 fw-bold text-dark"
+                                        href="{% url 'portal:telegram_settings' %}">
+                                        <i class="fab fa-telegram text-primary me-2"></i>إعدادات التليغرام
+
+                                    </a>
+                                </li>
+                                {% if user.role == 'super_admin' or user.role == 'director' %}
+                                <li>
+                                    <a class="dropdown-item py-2 rounded-2 fw-bold text-dark"
+                                        href="{% url 'portal:accounts_management' %}">
+                                        <i class="fas fa-users-cog text-warning me-2"></i>إدارة وتوليد جميع الحسابات
+                                    </a>
+                                </li>
+                                {% endif %}
+
+
                                 <li>
                                     <hr class="dropdown-divider text-muted">
                                 </li>
@@ -316,10 +346,8 @@
                                 <i class="fas fa-cubes text-success fs-3"></i>
                                 {% endif %}
                                 <div class="text-start">
-                                    <h6 class="fw-bold m-0 text-slate-800">{{ site_config.site_name|default:"مبادرة 1000
-                                        مبرمج بالبصرة" }}</h6>
-                                    <small class="text-muted">{{ site_config.sub_title|default:"برعاية العتبة الحسينية
-                                        المقدسة" }}</small>
+                                    <h6 class="fw-bold m-0 text-slate-800">{{ site_config.site_name|default:"مبادرة 1000 مبرمج بالبصرة" }}</h6>
+                                    <small class="text-muted">{{ site_config.sub_title|default:"برعاية العتبة الحسينية  المقدسة" }}</small>
                                 </div>
                             </div>
                         </div>
@@ -441,9 +469,73 @@
         document.addEventListener('DOMContentLoaded', function () {
             initSearchableSelects();
         });
+
+        // PWA Service Worker & Install Prompt Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                    console.log('PWA ServiceWorker registered:', reg.scope);
+                }).catch(function(err) {
+                    console.log('PWA ServiceWorker error:', err);
+                });
+            });
+        }
+
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBanner = document.getElementById('pwa-install-banner');
+            if (installBanner && !localStorage.getItem('pwa_prompt_dismissed')) {
+                installBanner.classList.remove('d-none');
+            }
+        });
+
+        function dismissPwaBanner() {
+            const installBanner = document.getElementById('pwa-install-banner');
+            if (installBanner) {
+                installBanner.classList.add('d-none');
+                installBanner.style.display = 'none';
+            }
+            localStorage.setItem('pwa_prompt_dismissed', 'true');
+        }
+
+        function installPwaApp() {
+            dismissPwaBanner();
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted PWA install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        }
     </script>
+
+    <!-- PWA Install Prompt Banner -->
+    <div id="pwa-install-banner" class="position-fixed bottom-0 start-50 translate-middle-x p-3 mb-3 shadow-lg rounded-4 text-white d-none" style="z-index: 1080; max-width: 480px; width: 92%; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.15);">
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <div class="bg-primary text-white rounded-3 p-2 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                    <i class="fas fa-mobile-alt fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold mb-0 text-white">تثبيت تطبيق 1000 برمجة</h6>
+                    <small class="text-slate-300" style="font-size: 0.78rem;">وصول سريع للمحاضرات والحضور بدون إنترنت</small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button id="pwa-install-btn" onclick="installPwaApp()" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm">تثبيت التطبيق</button>
+                <button id="pwa-close-btn" onclick="dismissPwaBanner()" class="btn btn-sm btn-outline-light rounded-circle ms-1 d-flex align-items-center justify-content-center" style="width:32px; height:32px; padding:0;" aria-label="إغلاق">✕</button>
+            </div>
+        </div>
+    </div>
+
 
     {% block extra_js %}{% endblock %}
 </body>
+
 
 </html>

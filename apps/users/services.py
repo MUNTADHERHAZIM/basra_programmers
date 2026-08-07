@@ -496,6 +496,7 @@ class ImportExportService:
                     if existing_user:
                         user = existing_user
                         user.set_password(password)
+                        user.temp_password = password
                         if group and role == User.Role.TRAINEE:
                             profile, _ = TraineeProfile.objects.get_or_create(user=user)
                             profile.group = group
@@ -510,8 +511,10 @@ class ImportExportService:
                             first_name=first_name if first_name else full_name,
                             last_name=last_name if last_name else '',
                             role=role,
-                            password=password
+                            password=password,
+                            temp_password=password
                         )
+
                         
                         if role == User.Role.TRAINEE:
                             profile = TraineeProfile.objects.create(

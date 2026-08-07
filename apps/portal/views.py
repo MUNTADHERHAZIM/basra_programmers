@@ -4,8 +4,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse, Http404
 from django.utils import timezone
+from django.conf import settings
 from django.db.models import Avg, Count, Q
 from django.views.decorators.http import require_POST
+
 import qrcode
 from io import BytesIO
 import base64
@@ -164,7 +166,7 @@ def admin_dashboard(request):
 
 @login_required
 def lecturer_dashboard(request):
-    """Dashboard view for Lecturers."""
+    """Dashboard view for Lecturers - strictly scoped to assigned groups and dates."""
     if request.user.role not in [CustomUser.Role.LECTURER, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
         raise Http404("غير مصرح بالدخول.")
         
@@ -172,35 +174,41 @@ def lecturer_dashboard(request):
         groups = Group.objects.all()
     else:
         groups = Group.objects.filter(instructor=request.user)
-        if not groups.exists():
-            # Fallback if no specific group is assigned to this instructor yet
-            groups = Group.objects.all()
         
-    # Calculate trainee count
-    trainees = TraineeProfile.objects.filter(group__in=groups).select_related('user', 'group')
+    # Calculate trainee count for assigned groups only
+    trainees = TraineeProfile.objects.filter(group__in=groups).select_related('user', 'group') if groups.exists() else TraineeProfile.objects.none()
     
-    # Fetch upcoming & completed lectures
     today = timezone.now().date()
-    upcoming_lectures = Lecture.objects.filter(group__in=groups, date__gte=today).order_by('date')
-    past_lectures = Lecture.objects.filter(group__in=groups, date__lt=today).order_by('-date')
-    if not upcoming_lectures.exists() and not past_lectures.exists():
-        upcoming_lectures = Lecture.objects.filter(date__gte=today).order_by('date')
-        past_lectures = Lecture.objects.filter(date__lt=today).order_by('-date')
     
-    # Active assignments
-    assignments = Assignment.objects.filter(group__in=groups).order_by('-due_date')
-    
-    # Daily reports archive
-    from apps.courses.models import DailyReport
-    daily_reports = DailyReport.objects.filter(group__in=groups).select_related('group', 'lecture').order_by('-created_at')[:10]
-    
-    # Fetch global/management announcements for lecturers
+    if groups.exists():
+        # Today's lectures specifically for active attendance marking
+        today_lectures = Lecture.objects.filter(group__in=groups, date=today).order_by('start_time')
+        # Future scheduled lectures (strictly date > today)
+        upcoming_lectures = Lecture.objects.filter(group__in=groups, date__gt=today).order_by('date', 'start_time')
+        # Completed past lectures (strictly date < today)
+        past_lectures = Lecture.objects.filter(group__in=groups, date__lt=today).order_by('-date', '-start_time')
+        # Active assignments
+        assignments = Assignment.objects.filter(group__in=groups).order_by('-due_date')
+        # Daily reports archive
+        from apps.courses.models import DailyReport
+        daily_reports = DailyReport.objects.filter(group__in=groups).select_related('group', 'lecture').order_by('-created_at')[:10]
+    else:
+        today_lectures = Lecture.objects.none()
+        upcoming_lectures = Lecture.objects.none()
+        past_lectures = Lecture.objects.none()
+        assignments = Assignment.objects.none()
+        from apps.courses.models import DailyReport
+        daily_reports = DailyReport.objects.none()
+
+    # Global/management announcements for lecturers
     from apps.notifications.models import InternalMessage
     announcements = InternalMessage.objects.filter(group__isnull=True).order_by('-created_at')[:5]
     
     context = {
         'groups': groups,
         'trainee_count': trainees.count(),
+        'today': today,
+        'today_lectures': today_lectures,
         'upcoming_lectures': upcoming_lectures,
         'past_lectures': past_lectures,
         'assignments': assignments,
@@ -209,6 +217,7 @@ def lecturer_dashboard(request):
         'daily_reports': daily_reports,
     }
     return render(request, 'portal/lecturer_dashboard.html', context)
+
 
 # ==========================================
 # Supervisor Dashboard
@@ -878,9 +887,11 @@ def mark_attendance_manual_view(request, lecture_id):
     if request.user.role not in [CustomUser.Role.LECTURER, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
         raise Http404("غير مصرح بالدخول.")
         
-    lecture = Lecture.objects.filter(id=lecture_id, group__instructor=request.user).first()
-    if not lecture:
+    if request.user.role == CustomUser.Role.LECTURER:
+        lecture = get_object_or_404(Lecture, id=lecture_id, group__instructor=request.user)
+    else:
         lecture = get_object_or_404(Lecture, id=lecture_id)
+
         
     trainees = TraineeProfile.objects.filter(group=lecture.group).select_related('user')
     if not trainees.exists():
@@ -2115,8 +2126,10 @@ def generate_single_account_post(request):
                 first_name=first_name.strip(),
                 last_name=last_name.strip(),
                 role=role,
-                password=password
+                password=password,
+                temp_password=password
             )
+
             
             group_name = ""
             if role == CustomUser.Role.TRAINEE:
@@ -2189,7 +2202,379 @@ def generate_batch_accounts_view(request):
 
 
 @login_required
+def accounts_management_view(request):
+    """
+    Dedicated Admin Dashboard for viewing, searching, filtering, and managing all generated user accounts.
+    Accessible strictly to SuperAdmin and Director roles.
+    """
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("غير مصرح لك بالوصول لصفحة إدارة الحسابات.")
+
+
+    # Base Queryset
+    users_qs = CustomUser.objects.all().select_related('trainee_profile__group', 'lecturer_profile', 'supervisor_profile').order_by('-date_joined')
+
+    # Filters
+    search_query = request.GET.get('q', '').strip()
+    role_filter = request.GET.get('role', 'all')
+    group_filter = request.GET.get('group', 'all')
+    status_filter = request.GET.get('status', 'all')
+    telegram_filter = request.GET.get('telegram', 'all')
+
+    if search_query:
+        from django.db.models import Q
+        users_qs = users_qs.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(trainee_profile__training_number__icontains=search_query)
+        )
+
+    if role_filter != 'all':
+        users_qs = users_qs.filter(role=role_filter)
+
+    if group_filter != 'all' and group_filter.isdigit():
+        users_qs = users_qs.filter(trainee_profile__group_id=int(group_filter))
+
+
+    if status_filter == 'active':
+        users_qs = users_qs.filter(is_active=True)
+    elif status_filter == 'inactive':
+        users_qs = users_qs.filter(is_active=False)
+
+    if telegram_filter == 'linked':
+        users_qs = users_qs.exclude(telegram_chat_id__isnull=True).exclude(telegram_chat_id__exact='')
+    elif telegram_filter == 'unlinked':
+        from django.db.models import Q
+        users_qs = users_qs.filter(Q(telegram_chat_id__isnull=True) | Q(telegram_chat_id__exact=''))
+
+    # Calculate overall statistics
+    total_users = CustomUser.objects.count()
+    stats = {
+        'total': total_users,
+        'trainees': CustomUser.objects.filter(role=CustomUser.Role.TRAINEE).count(),
+        'lecturers': CustomUser.objects.filter(role=CustomUser.Role.LECTURER).count(),
+        'supervisors': CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR).count(),
+        'admins': CustomUser.objects.filter(role__in=[CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]).count(),
+        'active': CustomUser.objects.filter(is_active=True).count(),
+        'telegram_linked': CustomUser.objects.exclude(telegram_chat_id__isnull=True).exclude(telegram_chat_id__exact='').count(),
+    }
+
+    groups = Group.objects.all().order_by('name')
+
+    context = {
+        'users_list': users_qs,
+        'groups': groups,
+        'stats': stats,
+        'search_query': search_query,
+        'role_filter': role_filter,
+        'group_filter': group_filter,
+        'status_filter': status_filter,
+        'telegram_filter': telegram_filter,
+        'role_choices': CustomUser.Role.choices,
+    }
+    return render(request, 'portal/accounts_management.html', context)
+
+
+@login_required
+@require_POST
+def reset_user_password_post(request, user_id):
+    """Resets the password for a specific user and returns or displays the new credentials."""
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+        return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
+
+    user = get_object_or_404(CustomUser, id=user_id)
+    new_password = request.POST.get('new_password', '').strip()
+
+    if not new_password:
+        import random
+        import string
+        chars = string.ascii_letters + string.digits
+        new_password = "".join(random.choice(chars) for _ in range(8))
+
+    user.set_password(new_password)
+    user.temp_password = new_password
+    user.save(update_fields=['password', 'temp_password'])
+
+
+    # Send telegram notification to user if linked
+    telegram_sent = False
+    if user.telegram_chat_id:
+        from apps.notifications.telegram import send_telegram_message
+        send_telegram_message(
+            user.telegram_chat_id,
+            f"<b>🔑 تحديث كلمة المرور</b>\n\nأهلاً بك {user.get_full_name() or user.username}، تم تحديث كلمة المرور الخاصة بحسابك في المنصة.\n\n<b>اسم المستخدم:</b> <code>{user.username}</code>\n<b>كلمة المرور الجديدة:</b> <code>{new_password}</code>"
+        )
+        telegram_sent = True
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('json_response') == 'true':
+        return JsonResponse({
+            'success': True,
+            'message': f"تمت إعادة تعيين كلمة المرور بنجاح للمستخدم {user.username}.",
+            'username': user.username,
+            'new_password': new_password,
+            'telegram_sent': telegram_sent
+        })
+
+    messages.success(request, f"تمت إعادة تعيين كلمة المرور للحساب {user.username}. كلمة المرور الجديدة هي: {new_password}")
+    return redirect('portal:accounts_management')
+
+
+@login_required
+@require_POST
+def send_credentials_telegram_post(request, user_id):
+    """Sends account login credentials directly to the user's Telegram."""
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+        return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
+
+    user = get_object_or_404(CustomUser, id=user_id)
+    if not user.telegram_chat_id:
+        return JsonResponse({'success': False, 'message': 'حساب المستخدم غير مربوط بالتليغرام حتى الآن.'}, status=400)
+
+    from apps.notifications.telegram import send_telegram_message
+    text = (
+        f"<b>🔐 بيانات تسجيل الدخول لحسابك في منصة 1000 برمجة</b>\n\n"
+        f"👤 <b>الاسم:</b> {user.get_full_name() or user.username}\n"
+        f"🆔 <b>اسم المستخدم:</b> <code>{user.username}</code>\n"
+        f"📧 <b>البريد الإلكتروني:</b> <code>{user.email}</code>\n"
+        f"🌐 <b>رابط الدخول:</b> https://1000programmers.net/portal/login/\n\n"
+        f"<i>يمكنك طلب إعادة تعيين كلمة المرور من إدارة المنصة في أي وقت.</i>"
+    )
+    success, msg = send_telegram_message(user.telegram_chat_id, text)
+    if success:
+        return JsonResponse({'success': True, 'message': f"تم إرسال بيانات الدخول بنجاح إلى تليغرام المستخدم ({user.username})."})
+    else:
+        return JsonResponse({'success': False, 'message': f"فشل الإرسال عبر التليغرام: {msg}"}, status=400)
+
+
+
+@login_required
+@require_POST
+def toggle_user_active_post(request, user_id):
+    """Toggles the is_active status of a specific user account (Activate/Deactivate)."""
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+        return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
+
+    user = get_object_or_404(CustomUser, id=user_id)
+    if user == request.user:
+        return JsonResponse({'success': False, 'message': 'لا يمكنك تجميد حسابك الشخصي الحالي.'}, status=400)
+
+    user.is_active = not user.is_active
+    user.save(update_fields=['is_active'])
+
+    status_str = "تفعيل" if user.is_active else "تجميد/تعطيل"
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'is_active': user.is_active,
+            'message': f"تم {status_str} حساب {user.username} بنجاح."
+        })
+
+    messages.success(request, f"تم {status_str} حساب {user.username} بنجاح.")
+    return redirect('portal:accounts_management')
+
+
+
+@login_required
+def export_accounts_excel_view(request):
+    """Exports the filtered accounts list to an Excel spreadsheet."""
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+        raise Http404("غير مصرح.")
+
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "حسابات النظام"
+
+    headers = ["#", "اسم المستخدم", "كلمة المرور / الرمز", "الاسم الكامل", "البريد الإلكتروني", "الدور الوظيفي", "الشعبة/المجموعة", "ربط التليغرام", "حالة الحساب", "تاريخ الإنشاء"]
+    ws.append(headers)
+
+    users_qs = CustomUser.objects.all().select_related('trainee_profile__group').order_by('-date_joined')
+    role_map = dict(CustomUser.Role.choices)
+
+    for idx, u in enumerate(users_qs, start=1):
+        group_name = ""
+        if u.role == CustomUser.Role.TRAINEE and hasattr(u, 'trainee_profile') and u.trainee_profile.group:
+            group_name = u.trainee_profile.group.name
+
+        telegram_status = "مربوط (" + str(u.telegram_chat_id) + ")" if u.telegram_chat_id else "غير مربوط"
+        active_status = "مفعل" if u.is_active else "مجمد"
+        password_val = u.temp_password if u.temp_password else "مشفرة بـ PBKDF2 (استخدم زر التعيين)"
+
+        ws.append([
+            idx,
+            u.username,
+            password_val,
+            u.get_full_name() or "-",
+            u.email or "-",
+            role_map.get(u.role, u.role),
+            group_name or "-",
+            telegram_status,
+            active_status,
+            u.date_joined.strftime("%Y-%m-%d %H:%M")
+        ])
+
+
+    from io import BytesIO
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="all_system_accounts.xlsx"'
+    return response
+
+
+def custom_404_view(request, exception=None, *args, **kwargs):
+    """Custom 404 Error Page View"""
+    return render(request, '404.html', {'exception': exception}, status=404)
+
+def custom_403_view(request, exception=None, *args, **kwargs):
+    """Custom 403 Permission Denied View"""
+    return render(request, '403.html', {'exception': exception}, status=403)
+
+def custom_500_view(request, *args, **kwargs):
+    """Custom 500 Internal Error View"""
+    return render(request, '404.html', status=500)
+
+
+
+
+@login_required
+@require_POST
+def bulk_accounts_action_post(request):
+    """
+    Performs bulk actions (Delete, Reset Passwords, Send Telegram Credentials, Toggle Active)
+    on a selected list of user IDs.
+    """
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+        return JsonResponse({'success': False, 'message': 'غير مصرح لك بإجراء العمليات الجماعية.'}, status=403)
+
+    import json
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        action = body.get('action')
+        user_ids = body.get('user_ids', [])
+    except Exception:
+        action = request.POST.get('action')
+        user_ids = request.POST.getlist('user_ids[]') or request.POST.getlist('user_ids')
+
+    if not user_ids:
+        return JsonResponse({'success': False, 'message': 'لم يتم تحديد أي حسابات للإجراء.'}, status=400)
+
+    user_ids = [int(uid) for uid in user_ids if str(uid).isdigit()]
+    users = CustomUser.objects.filter(id__in=user_ids)
+
+    if not users.exists():
+        return JsonResponse({'success': False, 'message': 'لم يتم العثور على الحسابات المحددة.'}, status=404)
+
+    count = users.count()
+
+    if action == 'delete':
+        target_users = users.exclude(id=request.user.id)
+        deleted_count = target_users.count()
+        target_users.delete()
+        return JsonResponse({
+            'success': True,
+            'message': f"تم حذف {deleted_count} حساب/حسابات محددة بنجاح."
+        })
+
+    elif action == 'reset_passwords':
+        import random
+        import string
+        from apps.notifications.telegram import send_telegram_message
+        
+        reset_results = []
+        chars = string.ascii_letters + string.digits
+        
+        for u in users:
+            new_pass = "".join(random.choice(chars) for _ in range(8))
+            u.set_password(new_pass)
+            u.temp_password = new_pass
+            u.save(update_fields=['password', 'temp_password'])
+            
+            telegram_sent = False
+            if u.telegram_chat_id:
+                send_telegram_message(
+                    u.telegram_chat_id,
+                    f"<b>🔑 إعادة تعيين كلمة المرور</b>\n\nأهلاً بك {u.get_full_name() or u.username}، تم تحديث كلمة المرور الخاصة بحسابك.\n\n<b>اسم المستخدم:</b> <code>{u.username}</code>\n<b>كلمة المرور الجديدة:</b> <code>{new_pass}</code>"
+                )
+                telegram_sent = True
+
+            reset_results.append({
+                'id': u.id,
+                'username': u.username,
+                'full_name': u.get_full_name() or u.username,
+                'email': u.email,
+                'new_password': new_pass,
+                'telegram_sent': telegram_sent
+            })
+
+        return JsonResponse({
+            'success': True,
+            'message': f"تمت إعادة تعيين كلمات المرور لـ {len(reset_results)} حساب/حسابات بنجاح.",
+            'results': reset_results
+        })
+
+    elif action == 'send_telegram':
+        from apps.notifications.telegram import send_telegram_message
+        sent_count = 0
+        failed_count = 0
+        for u in users:
+            if u.telegram_chat_id:
+                pass_text = f"<b>كلمة المرور:</b> <code>{u.temp_password}</code>\n" if u.temp_password else ""
+                text = (
+                    f"<b>🔐 بيانات تسجيل الدخول لحسابك في منصة 1000 برمجة</b>\n\n"
+                    f"👤 <b>الاسم:</b> {u.get_full_name() or u.username}\n"
+                    f"🆔 <b>اسم المستخدم:</b> <code>{u.username}</code>\n"
+                    f"{pass_text}"
+                    f"📧 <b>البريد الإلكتروني:</b> <code>{u.email}</code>\n"
+                    f"🌐 <b>رابط تسجيل الدخول:</b> https://1000programmers.net/portal/login/\n"
+                )
+                ok, _ = send_telegram_message(u.telegram_chat_id, text)
+                if ok:
+                    sent_count += 1
+                else:
+                    failed_count += 1
+            else:
+                failed_count += 1
+
+        return JsonResponse({
+            'success': True,
+            'message': f"تم إرسال البيانات عبر التليغرام لـ {sent_count} حساب. (تعذر {failed_count} حسابات غير مربوطة)."
+        })
+
+    elif action == 'toggle_active':
+        active_count = 0
+        inactive_count = 0
+        for u in users:
+            if u == request.user:
+                continue
+            u.is_active = not u.is_active
+            u.save(update_fields=['is_active'])
+            if u.is_active:
+                active_count += 1
+            else:
+                inactive_count += 1
+
+        return JsonResponse({
+            'success': True,
+            'message': f"تم تغيير حالة {count} حساب/حسابات (تم تفعيل {active_count} وتجميد {inactive_count})."
+        })
+
+    return JsonResponse({'success': False, 'message': 'إجراء غير معروف.'}, status=400)
+
+
+
+@login_required
 def get_group_students_api(request, group_id):
+
     """API endpoint to fetch all registered student full names in a specific group."""
     if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
@@ -2812,4 +3197,211 @@ def delete_initiative_media_post(request, media_id):
         messages.error(request, "غير مصرح لك بحذف هذا العنصر.")
         
     return redirect('portal:initiative_media_view')
+
+
+# ==========================================
+# Telegram Integration & PWA Views
+# ==========================================
+
+@login_required
+def telegram_settings_view(request):
+    """Allows lecturers and staff to manage Telegram notification integration."""
+    from apps.notifications.telegram import generate_telegram_link_code, send_telegram_message, sync_telegram_updates
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'save_chat_id':
+            chat_id = request.POST.get('chat_id', '').strip()
+            request.user.telegram_chat_id = chat_id if chat_id else None
+            request.user.save(update_fields=['telegram_chat_id'])
+            if chat_id and not chat_id.isdigit():
+                messages.warning(request, "تنبيه هام: لقد أدخلت اسم مستخدم بدلاً من المعرف الرقمي (Chat ID). تليغرام يطلب الرقم الرقمي لإرسال الرسائل الفردية، لذا يرجى الضغط على زر 'فتح البوت وتفعيل الربط تلقائياً' والضغط على START داخل تليغرام ليتم استخراج رقمك تلقائياً.")
+            else:
+                messages.success(request, "تم حفظ معرف شات التليغرام بنجاح.")
+
+        elif action == 'sync_updates':
+            success, msg = sync_telegram_updates()
+            if success:
+                messages.success(request, msg)
+            else:
+                messages.error(request, f"فشل المزامنة: {msg}")
+            
+        elif action == 'toggle_notifications':
+            enabled = request.POST.get('enabled') == 'on' or request.POST.get('enabled') == 'true'
+            request.user.telegram_notifications_enabled = enabled
+            request.user.save(update_fields=['telegram_notifications_enabled'])
+            messages.success(request, f"تم {'تفعيل' if enabled else 'إيقاف'} إشعارات التليغرام.")
+
+            
+        elif action == 'generate_code':
+            code = generate_telegram_link_code(request.user)
+            messages.success(request, f"تم إنشاء رمز الربط الجديد: {code}")
+            
+        elif action == 'save_bot_token' and request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+            bot_token = request.POST.get('bot_token', '').strip()
+            if bot_token:
+                settings.TELEGRAM_BOT_TOKEN = bot_token
+                # Update .env file dynamically
+                env_path = settings.BASE_DIR / '.env'
+                if env_path.exists():
+                    try:
+                        content = env_path.read_text(encoding='utf-8')
+                        if 'TELEGRAM_BOT_TOKEN=' in content:
+                            import re
+                            content = re.sub(r'TELEGRAM_BOT_TOKEN=.*', f'TELEGRAM_BOT_TOKEN={bot_token}', content)
+                        else:
+                            content += f"\nTELEGRAM_BOT_TOKEN={bot_token}\n"
+                        env_path.write_text(content, encoding='utf-8')
+                    except Exception as env_err:
+                        logger.warning(f"Could not update .env file: {env_err}")
+                messages.success(request, "تم حفظ وتفعيل توكن البوت الخادمي بنجاح للنظام بالكامل!")
+            else:
+                messages.error(request, "يرجى إدخال قيمة توكن البوت.")
+                
+        return redirect('portal:telegram_settings')
+
+    bot_username = getattr(settings, 'TELEGRAM_BOT_USERNAME', 'Programmers1000_Bot')
+    bot_token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
+    is_token_configured = bool(bot_token and 'Placeholder' not in bot_token)
+    link_code = request.user.telegram_link_code or generate_telegram_link_code(request.user)
+    
+    context = {
+        'bot_username': bot_username,
+        'bot_token': bot_token if request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR] else '',
+        'is_token_configured': is_token_configured,
+        'link_code': link_code,
+        'telegram_chat_id': request.user.telegram_chat_id,
+        'notifications_enabled': request.user.telegram_notifications_enabled,
+    }
+    return render(request, 'portal/telegram_settings.html', context)
+
+
+
+def pwa_icon_view(request, size):
+    """Generates dynamic SVG branding icon for PWA installation."""
+    try:
+        s = int(size)
+    except ValueError:
+        s = 192
+    svg_code = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{s}" height="{s}" viewBox="0 0 {s} {s}">
+  <rect width="{s}" height="{s}" rx="{int(s*0.2)}" fill="#0f172a"/>
+  <circle cx="{s/2}" cy="{s/2}" r="{s*0.38}" fill="#1e293b" stroke="#3b82f6" stroke-width="{max(2, int(s*0.02))}"/>
+  <text x="50%" y="45%" text-anchor="middle" dominant-baseline="middle" fill="#3b82f6" font-size="{s*0.25}" font-family="system-ui, sans-serif" font-weight="900">1000</text>
+  <text x="50%" y="70%" text-anchor="middle" dominant-baseline="middle" fill="#10b981" font-size="{s*0.1}" font-family="system-ui, sans-serif" font-weight="bold">برمجة</text>
+</svg>'''
+    return HttpResponse(svg_code, content_type='image/svg+xml')
+
+
+def pwa_manifest_view(request):
+    """Returns dynamic Web App Manifest for PWA installation."""
+    manifest = {
+        "name": "مبادرة 1000 برمجة - المنصة التعليمية",
+        "short_name": "1000 برمجة",
+        "description": "المنصة الوطنية الاحترافية لإدارة التدريب والبرمجة وحضور المتدربين والمدربين",
+        "start_url": "/dashboard/",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#0f172a",
+        "theme_color": "#0f172a",
+        "orientation": "portrait-primary",
+        "dir": "rtl",
+        "lang": "ar",
+        "icons": [
+            {
+                "src": "/pwa/icon/192.svg",
+                "sizes": "192x192",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+            },
+            {
+                "src": "/pwa/icon/512.svg",
+                "sizes": "512x512",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+            }
+        ],
+        "categories": ["education", "productivity"]
+    }
+    return JsonResponse(manifest)
+
+
+
+def service_worker_view(request):
+    """Serves the PWA Service Worker script at root /sw.js."""
+    sw_code = """
+const CACHE_NAME = 'pwa-1000programmers-v1';
+const OFFLINE_URL = '/offline/';
+
+const ASSETS_TO_CACHE = [
+  '/',
+  '/offline/',
+  '/static/css/bootstrap.min.css',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+  'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE).catch((err) => console.log('PWA cache pre-load warning:', err));
+    })
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            return caches.delete(cache);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return caches.match(OFFLINE_URL) || caches.match('/');
+      })
+    );
+    return;
+  }
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(event.request).then((networkResponse) => {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
+        }
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+        return networkResponse;
+      }).catch(() => {
+        if (event.request.headers.get('accept').includes('text/html')) {
+          return caches.match(OFFLINE_URL);
+        }
+      });
+    })
+  );
+});
+"""
+    return HttpResponse(sw_code, content_type='application/javascript; charset=utf-8')
+
+
+def offline_view(request):
+    """Renders high-end offline fallback page when device loses connection."""
+    return render(request, 'offline.html')
+
 

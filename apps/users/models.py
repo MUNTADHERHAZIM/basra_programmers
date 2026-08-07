@@ -26,6 +26,12 @@ class CustomUser(AbstractUser):
         default='male',
         verbose_name="الجنس"
     )
+    telegram_chat_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="معرف شات التليغرام")
+    telegram_link_code = models.CharField(max_length=50, blank=True, null=True, verbose_name="رمز ربط التليغرام")
+    telegram_notifications_enabled = models.BooleanField(default=True, verbose_name="تفعيل إشعارات التليغرام")
+    temp_password = models.CharField(max_length=128, blank=True, null=True, verbose_name="كلمة المرور المؤقتة/المولدة")
+
+
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} ({self.get_role_display()})"

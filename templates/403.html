@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}403 - غير مصرح بالوصول | منصة 1000 برمجة{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-5 d-flex align-items-center justify-content-center min-vh-100" style="background: radial-gradient(circle at top right, rgba(239, 68, 68, 0.12), transparent 45%), radial-gradient(circle at bottom left, rgba(245, 158, 11, 0.12), transparent 45%);">
+    <div class="col-12 col-md-10 col-lg-8 col-xl-6 text-center">
+        
+        <!-- Glowing Floating 403 Graphic -->
+        <div class="position-relative mb-4 d-inline-block">
+            <h1 class="display-1 fw-black text-transparent bg-clip-text m-0" style="font-size: 8.5rem; letter-spacing: -3px; background: linear-gradient(135deg, #ef4444 0%, #f59e0b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 10px 20px rgba(239, 68, 68, 0.3));">
+                403
+            </h1>
+            <div class="position-absolute top-50 start-50 translate-middle w-100 h-100 rounded-circle" style="background: radial-gradient(circle, rgba(239, 68, 68, 0.2) 0%, rgba(0,0,0,0) 70%); filter: blur(30px); z-index: -1;"></div>
+        </div>
+
+        <!-- Glassmorphism Card Info -->
+        <div class="glass-card shadow-lg p-4 p-md-5 rounded-4 border border-1 border-danger-subtle backdrop-blur bg-white">
+            <div class="badge bg-danger-subtle text-danger border border-danger px-3 py-2 rounded-pill mb-3 fw-bold fs-7">
+                <i class="fas fa-user-lock me-2"></i>منطقة محمية - صلاحيات غير كافية
+            </div>
+
+            <h2 class="fw-extrabold text-slate-800 mb-3 fs-3">غير مصرح لك بالوصول لهذه الصفحة 🛡️</h2>
+            
+            <p class="text-secondary mb-4 lead fs-6 fw-medium">
+                {% if exception %}
+                    {{ exception }}
+                {% else %}
+                    عذراً، هذه الصفحة مخصصة لمدراء المبادرة والإدارة العليا فقط. لا تملك صلاحية لاستعراض هذه البيانات.
+                {% endif %}
+            </p>
+
+            <!-- Quick Action Options -->
+            <div class="d-flex flex-column flex-sm-row justify-content-center align-items-center gap-3 pt-2">
+                <a href="{% url 'portal:dashboard' %}" class="btn btn-danger btn-lg rounded-pill px-4 fw-bold shadow-sm w-100 w-sm-auto">
+                    <i class="fas fa-home me-2"></i>العودة للوحة التحكم
+                </a>
+                
+                <button onclick="window.history.back()" class="btn btn-outline-secondary btn-lg rounded-pill px-4 fw-bold w-100 w-sm-auto">
+                    <i class="fas fa-arrow-right me-2"></i>الرجوع للصفحة السابقة
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

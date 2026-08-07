@@ -1,0 +1,643 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}إدارة جميع حسابات النظام والمستخدمين | 1000 برمجة{% endblock %}
+
+{% block extra_head %}
+<style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        border-radius: 1.25rem;
+    }
+    .stat-card-gradient-1 { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; }
+    .stat-card-gradient-2 { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white; }
+    .stat-card-gradient-3 { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; }
+    .stat-card-gradient-4 { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white; }
+    
+    .table-custom tbody tr {
+        transition: all 0.2s ease-in-out;
+    }
+    .table-custom tbody tr:hover {
+        background-color: rgba(241, 245, 249, 0.8) !important;
+        transform: translateY(-1px);
+    }
+    .badge-role-admin { background-color: #ef4444; color: white; }
+    .badge-role-lecturer { background-color: #8b5cf6; color: white; }
+    .badge-role-supervisor { background-color: #f59e0b; color: white; }
+    .badge-role-trainee { background-color: #10b981; color: white; }
+
+    @media print {
+        body * { visibility: hidden; }
+        #printableCredentialsCard, #printableCredentialsCard * { visibility: visible; }
+        #printableCredentialsCard { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-lg-5">
+    
+    <!-- Top Header -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 pb-2 border-bottom">
+        <div>
+            <h2 class="fw-black text-slate-800 m-0">
+                <i class="fas fa-users-cog text-primary me-2"></i>إدارة وتوليد جميع حسابات النظام
+            </h2>
+            <p class="text-muted small mt-1 mb-0">لوحة احترافية شاملة لإدارة حسابات المدربين، الطلاب، والمسؤولين، وإعادة تعيين كلمة المرور فورياً</p>
+        </div>
+        <div class="d-flex gap-2 mt-3 mt-md-0">
+            <a href="{% url 'portal:export_accounts_excel' %}" class="btn btn-outline-success rounded-pill px-3 shadow-sm">
+                <i class="fas fa-file-excel me-1"></i>تصدير الكل لـ Excel
+            </a>
+            <a href="{% url 'portal:admin_management_hub' %}" class="btn btn-primary rounded-pill px-4 shadow-sm">
+                <i class="fas fa-plus-circle me-1"></i>توليد حسابات جديدة
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Overview Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="glass-card p-3 p-lg-4 shadow-sm stat-card-gradient-1 rounded-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-white-50 small fw-bold">إجمالي الحسابات</div>
+                        <div class="fs-2 fw-black mt-1">{{ stats.total }}</div>
+                    </div>
+                    <div class="fs-1 text-white-50"><i class="fas fa-users"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="glass-card p-3 p-lg-4 shadow-sm stat-card-gradient-2 rounded-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-white-50 small fw-bold">حسابات المتدربين</div>
+                        <div class="fs-2 fw-black mt-1">{{ stats.trainees }}</div>
+                    </div>
+                    <div class="fs-1 text-white-50"><i class="fas fa-user-graduate"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="glass-card p-3 p-lg-4 shadow-sm stat-card-gradient-3 rounded-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-white-50 small fw-bold">حسابات المدربين</div>
+                        <div class="fs-2 fw-black mt-1">{{ stats.lecturers }}</div>
+                    </div>
+                    <div class="fs-1 text-white-50"><i class="fas fa-chalkboard-teacher"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="glass-card p-3 p-lg-4 shadow-sm stat-card-gradient-4 rounded-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-white-50 small fw-bold">مربوط بالتليغرام</div>
+                        <div class="fs-2 fw-black mt-1">{{ stats.telegram_linked }}</div>
+                    </div>
+                    <div class="fs-1 text-white-50"><i class="fab fa-telegram-plane"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Smart Toolbar & Filters -->
+    <div class="glass-card p-4 shadow-sm mb-4">
+        <form method="GET" action="{% url 'portal:accounts_management' %}" class="row g-3 align-items-end">
+            <!-- Search Input -->
+            <div class="col-md-4">
+                <label class="form-label small fw-bold text-slate-700">بحث بالاسم / المستخدم / الرقم التدريبي:</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0" placeholder="ابحث باسم المستخدم أو البريد..." value="{{ search_query }}">
+                </div>
+            </div>
+
+            <!-- Role Filter -->
+            <div class="col-md-2">
+                <label class="form-label small fw-bold text-slate-700">الدور الوظيفي:</label>
+                <select name="role" class="form-select">
+                    <option value="all" {% if role_filter == 'all' %}selected{% endif %}>جميع الأدوار</option>
+                    <option value="super_admin" {% if role_filter == 'super_admin' %}selected{% endif %}>مسؤول النظام</option>
+                    <option value="director" {% if role_filter == 'director' %}selected{% endif %}>مدير المبادرة</option>
+                    <option value="lecturer" {% if role_filter == 'lecturer' %}selected{% endif %}>مدرب</option>
+                    <option value="supervisor" {% if role_filter == 'supervisor' %}selected{% endif %}>مشرف</option>
+                    <option value="trainee" {% if role_filter == 'trainee' %}selected{% endif %}>متدرب / طالب</option>
+                </select>
+            </div>
+
+            <!-- Group Filter -->
+            <div class="col-md-2">
+                <label class="form-label small fw-bold text-slate-700">الشعبة / المجموعة:</label>
+                <select name="group" class="form-select">
+                    <option value="all" {% if group_filter == 'all' %}selected{% endif %}>جميع الشعَب</option>
+                    {% for g in groups %}
+                    <option value="{{ g.id }}" {% if group_filter == g.id|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Telegram Status Filter -->
+            <div class="col-md-2">
+                <label class="form-label small fw-bold text-slate-700">ربط التليغرام:</label>
+                <select name="telegram" class="form-select">
+                    <option value="all" {% if telegram_filter == 'all' %}selected{% endif %}>الكل</option>
+                    <option value="linked" {% if telegram_filter == 'linked' %}selected{% endif %}>مربوط ✅</option>
+                    <option value="unlinked" {% if telegram_filter == 'unlinked' %}selected{% endif %}>غير مربوط ❌</option>
+                </select>
+            </div>
+
+            <!-- Submit Buttons -->
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100 rounded-3">
+                    <i class="fas fa-filter me-1"></i>تطبيق
+                </button>
+                <a href="{% url 'portal:accounts_management' %}" class="btn btn-outline-secondary rounded-3" title="إعادة تعيين">
+                    <i class="fas fa-undo"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Sticky Bulk Floating Bar -->
+    <div id="bulkActionBar" class="position-fixed bottom-0 start-50 translate-middle-x mb-4 p-3 glass-card shadow-lg border border-primary rounded-4 d-none" style="z-index: 1060; width: 90%; max-width: 950px; background: rgba(15, 23, 42, 0.95); color: white;">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center">
+                <span id="selectedCountBadge" class="badge bg-primary fs-6 px-3 py-2 rounded-pill me-3 shadow-sm">تم تحديد 0 حساب</span>
+                <span class="small text-white-50">اختر الإجراء الجماعي المطلوب تطبيقه فوراً:</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm btn-warning fw-bold rounded-pill" onclick="performBulkAction('reset_passwords')">
+                    <i class="fas fa-key me-1"></i>إعادة تعيين وتوليد الرموز
+                </button>
+                <button type="button" class="btn btn-sm btn-info text-white fw-bold rounded-pill" onclick="performBulkAction('send_telegram')">
+                    <i class="fab fa-telegram-plane me-1"></i>إرسال للتليغرام
+                </button>
+                <button type="button" class="btn btn-sm btn-light fw-bold rounded-pill text-dark" onclick="bulkPrintCredentials()">
+                    <i class="fas fa-print me-1"></i>طباعة البطاقات
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary fw-bold rounded-pill" onclick="performBulkAction('toggle_active')">
+                    <i class="fas fa-user-lock me-1"></i>تجميد / تفعيل
+                </button>
+                <button type="button" class="btn btn-sm btn-danger fw-bold rounded-pill" onclick="performBulkAction('delete')">
+                    <i class="fas fa-trash-alt me-1"></i>حذف المحدد
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Accounts Table List -->
+    <div class="glass-card shadow-sm border-0 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-custom align-middle mb-0">
+                <thead class="table-dark text-white small">
+                    <tr>
+                        <th class="ps-3 text-center" style="width: 40px;">
+                            <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                        </th>
+                        <th>المستخدم / البيانات</th>
+                        <th>الدور الوظيفي</th>
+                        <th>الشعبة / المجموعة</th>
+                        <th>حساب التليغرام</th>
+                        <th>حالة الحساب</th>
+                        <th>تاريخ الإنشاء</th>
+                        <th class="text-center pe-4">الإجراءات السريعة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users_list %}
+                    <tr>
+                        <!-- Checkbox Cell -->
+                        <td class="ps-3 text-center">
+                            <input type="checkbox" class="user-checkbox form-check-input" value="{{ u.id }}" 
+                                   data-username="{{ u.username }}" 
+                                   data-fullname="{{ u.get_full_name|default:u.username }}" 
+                                   data-email="{{ u.email|default:'' }}" 
+                                   data-role="{{ u.get_role_display }}" 
+                                   data-password="{{ u.temp_password|default:'' }}">
+                        </td>
+
+                        <!-- User Basic Info -->
+                        <td class="py-3">
+
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-container me-3">
+                                    {% if u.profile_picture %}
+                                    <img src="{{ u.profile_picture.url }}" class="rounded-circle" width="42" height="42" style="object-fit:cover;">
+                                    {% else %}
+                                    <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center fw-bold" style="width:42px; height:42px; font-size:1.1rem;">
+                                        {{ u.first_name|default:u.username|slice:":1"|upper }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-slate-800 fs-6">
+                                        {{ u.get_full_name|default:u.username }}
+                                    </div>
+                                    <div class="text-muted small dir-ltr">
+                                        <i class="fas fa-at text-slate-400 me-1"></i><b>{{ u.username }}</b> | {{ u.email }}
+                                    </div>
+                                    {% if u.trainee_profile.training_number %}
+                                    <span class="badge bg-secondary-subtle text-dark border me-1 fs-7">
+                                        {{ u.trainee_profile.training_number }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Role Badge -->
+                        <td>
+                            {% if u.role == 'super_admin' or u.role == 'director' %}
+                            <span class="badge badge-role-admin px-3 py-2 rounded-pill"><i class="fas fa-user-shield me-1"></i>مسؤول النظام</span>
+                            {% elif u.role == 'lecturer' %}
+                            <span class="badge badge-role-lecturer px-3 py-2 rounded-pill"><i class="fas fa-chalkboard-teacher me-1"></i>مدرب تقني</span>
+                            {% elif u.role == 'supervisor' %}
+                            <span class="badge badge-role-supervisor px-3 py-2 rounded-pill"><i class="fas fa-user-tie me-1"></i>مشرف إداري</span>
+                            {% else %}
+                            <span class="badge badge-role-trainee px-3 py-2 rounded-pill"><i class="fas fa-user-graduate me-1"></i>متدرب / طالب</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Group -->
+                        <td>
+                            {% if u.trainee_profile.group %}
+                            <span class="fw-bold text-primary"><i class="fas fa-layer-group me-1"></i>{{ u.trainee_profile.group.name }}</span>
+                            {% elif u.role == 'lecturer' %}
+                            <span class="text-muted small">كادر التدريب</span>
+                            {% else %}
+                            <span class="text-muted fs-7">-</span>
+                            {% endif %}
+                        </td>
+
+
+                        <!-- Telegram Status -->
+                        <td>
+                            {% if u.telegram_chat_id %}
+                            <span class="badge bg-success-subtle text-success border border-success px-3 py-2 rounded-pill">
+                                <i class="fab fa-telegram-plane me-1"></i>مربوط ({{ u.telegram_chat_id|truncatechars:12 }})
+                            </span>
+                            {% else %}
+                            <span class="badge bg-light text-muted border px-3 py-2 rounded-pill">
+                                <i class="fas fa-times-circle me-1"></i>غير مربوط
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Status Active -->
+                        <td>
+                            {% if u.is_active %}
+                            <span class="badge bg-success px-2 py-1 rounded-pill"><i class="fas fa-check me-1"></i>مفعّل</span>
+                            {% else %}
+                            <span class="badge bg-danger px-2 py-1 rounded-pill"><i class="fas fa-ban me-1"></i>مجمّد</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Join Date -->
+                        <td class="small text-muted dir-ltr">
+                            {{ u.date_joined|date:"Y-m-d H:i" }}
+                        </td>
+
+                        <!-- Action Buttons -->
+                        <td class="text-center pe-4">
+                            <div class="btn-group shadow-sm rounded-3">
+                                <!-- Reset Password Button -->
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openResetPasswordModal('{{ u.id }}', '{{ u.username }}', '{{ u.get_full_name }}')" title="إعادة تعيين كلمة المرور">
+                                    <i class="fas fa-key me-1"></i>كلمة المرور
+                                </button>
+                                
+                                <!-- Send Credentials to Telegram -->
+                                {% if u.telegram_chat_id %}
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="sendCredentialsToTelegram('{{ u.id }}', '{{ u.username }}')" title="إرسال بيانات الدخول فورياً للتليغرام">
+                                    <i class="fab fa-telegram-plane me-1"></i>إرسال للتليغرام
+                                </button>
+                                {% endif %}
+
+                                <!-- Print Credentials Slip -->
+                                <button type="button" class="btn btn-sm btn-outline-dark" onclick="printCredentials('{{ u.username }}', '{{ u.get_full_name }}', '{{ u.email }}', '{{ u.get_role_display }}', '{{ u.temp_password|default:'' }}')" title="طباعة بطاقة الدخول">
+                                    <i class="fas fa-print"></i>
+                                </button>
+
+
+
+                                <!-- Toggle Active -->
+                                <form method="POST" action="{% url 'portal:toggle_user_active_post' u.id %}" class="d-inline" onsubmit="return confirm('هل أنت تأكد من تغيير حالة تفعيل/تجميد هذا الحساب؟');">
+                                    {% csrf_token %}
+                                    {% if u.is_active %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="تجميد الحساب">
+                                        <i class="fas fa-user-slash"></i>
+                                    </button>
+                                    {% else %}
+                                    <button type="submit" class="btn btn-sm btn-outline-success" title="تفعيل الحساب">
+                                        <i class="fas fa-user-check"></i>
+                                    </button>
+                                    {% endif %}
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="fas fa-search-minus fs-1 mb-3 d-block text-slate-300"></i>
+                            لم يتم العثور على أي حسابات تطابق خيارات البحث الحالية.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-slate-800">
+                    <i class="fas fa-key text-primary me-2"></i>إعادة تعيين كلمة المرور فورياً
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="resetPasswordForm" method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="json_response" value="true">
+                <div class="modal-body py-4">
+                    <p class="text-muted small mb-3">
+                        سيتم تغيير كلمة المرور للحساب <strong id="resetTargetUsername" class="text-primary font-monospace fs-6"></strong> (<span id="resetTargetFullName"></span>).
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-slate-700">أدخل كلمة المرور الجديدة (أو اترك الخانة فارغة لتوليد كلمة مرور عشوائية):</label>
+                        <input type="text" id="newPasswordInput" name="new_password" class="form-control form-control-lg font-monospace text-center fs-5 rounded-3" placeholder="أدخل كلمة مرور مخصصة أو اترك فارغاً">
+                    </div>
+                    
+                    <div id="resetResultSuccess" class="alert alert-success d-none rounded-4 p-3 mt-3 shadow-sm border-0">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold text-success"><i class="fas fa-check-circle me-1"></i>تم تغيير كلمة المرور بنجاح!</span>
+                            <button type="button" class="btn btn-sm btn-success rounded-pill px-3" onclick="copyNewPassword()">
+                                <i class="fas fa-copy me-1"></i>نسخ كلمة المرور
+                            </button>
+                        </div>
+                        <div class="p-3 bg-white rounded-3 border text-center">
+                            <div class="text-muted small">كلمة المرور الجديدة هي:</div>
+                            <strong id="newPasswordOutput" class="fs-3 font-monospace text-primary dir-ltr d-block my-1"></strong>
+                        </div>
+                        <div id="telegramSendNotice" class="small text-muted mt-2 d-none">
+                            <i class="fab fa-telegram text-primary me-1"></i>تم إرسال كلمة المرور الجديدة للمستخدم عبر التليغرام تلقائياً.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">إغلاق</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">
+                        <i class="fas fa-save me-1"></i>تأكيد وحفظ كلمة المرور
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden Printable Credentials Slip -->
+<div id="printableCredentialsCard" class="d-none p-5 text-dark bg-white">
+    <div class="border border-3 border-dark rounded-4 p-4 text-center">
+        <h2 class="fw-black text-primary">منصة 1000 برمجة | بطاقة دخول حساب</h2>
+        <hr class="my-3">
+        <h4 id="printFullName" class="fw-bold"></h4>
+        <div class="fs-5 my-2">اسم المستخدم: <strong id="printUsername" class="font-monospace text-primary"></strong></div>
+        <div class="fs-5 my-2">البريد الإلكتروني: <strong id="printEmail"></strong></div>
+        <div class="fs-5 my-2">الدور في المنصة: <strong id="printRole"></strong></div>
+        <div id="printPasswordSection" class="fs-5 my-2 p-2 bg-light rounded-3 border d-none">
+            كلمة المرور المؤقتة: <strong id="printPassword" class="font-monospace text-danger"></strong>
+        </div>
+        <hr class="my-3">
+        <div class="small text-muted">رابط تسجيل الدخول: https://1000programmers.net/portal/login/</div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let activeResetUserId = null;
+    let lastGeneratedPassword = '';
+
+    function openResetPasswordModal(userId, username, fullName) {
+        activeResetUserId = userId;
+        document.getElementById('resetTargetUsername').innerText = username;
+        document.getElementById('resetTargetFullName').innerText = fullName || '';
+        document.getElementById('newPasswordInput').value = '';
+        document.getElementById('resetResultSuccess').classList.add('d-none');
+        document.getElementById('resetPasswordForm').action = `/manage/accounts/user/${userId}/reset-password/`;
+        
+        const modal = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
+        modal.show();
+    }
+
+    document.getElementById('resetPasswordForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const form = this;
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                lastGeneratedPassword = data.new_password;
+                document.getElementById('newPasswordOutput').innerText = data.new_password;
+                document.getElementById('resetResultSuccess').classList.remove('d-none');
+                if(data.telegram_sent) {
+                    document.getElementById('telegramSendNotice').classList.remove('d-none');
+                } else {
+                    document.getElementById('telegramSendNotice').classList.add('d-none');
+                }
+            } else {
+                alert(data.message || 'حدث خطأ أثناء تغيير كلمة المرور');
+            }
+        })
+        .catch(err => {
+            alert('حدث خطأ بالاتصال بالسيرفر');
+        });
+    });
+
+    function copyNewPassword() {
+        if(lastGeneratedPassword) {
+            navigator.clipboard.writeText(lastGeneratedPassword);
+            alert('تم نسخ كلمة المرور الجديدة للحافظة بنجاح!');
+        }
+    }
+
+    function printCredentials(username, fullName, email, role, tempPassword) {
+        document.getElementById('printUsername').innerText = username;
+        document.getElementById('printFullName').innerText = fullName || username;
+        document.getElementById('printEmail').innerText = email || '-';
+        document.getElementById('printRole').innerText = role || '-';
+        
+        const effectivePassword = tempPassword || lastGeneratedPassword;
+        const printPassSection = document.getElementById('printPasswordSection');
+        if (effectivePassword) {
+            document.getElementById('printPassword').innerText = effectivePassword;
+            printPassSection.classList.remove('d-none');
+        } else {
+            printPassSection.classList.add('d-none');
+        }
+
+        const card = document.getElementById('printableCredentialsCard');
+        card.classList.remove('d-none');
+        window.print();
+        card.classList.add('d-none');
+    }
+
+
+    function sendCredentialsToTelegram(userId, username) {
+        if(!confirm(`هل أنت تأكد من إرسال تفاصيل وبيانات الدخول للحساب ${username} عبر التليغرام؟`)) return;
+
+        fetch(`/manage/accounts/user/${userId}/send-telegram/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+        })
+        .catch(err => {
+            alert('حدث خطأ بالاتصال بالسيرفر');
+        });
+    }
+
+    // --- Bulk Selection & Operations System ---
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const userCheckboxes = document.querySelectorAll('.user-checkbox');
+    const bulkActionBar = document.getElementById('bulkActionBar');
+    const selectedCountBadge = document.getElementById('selectedCountBadge');
+
+    function updateBulkBar() {
+        const selected = document.querySelectorAll('.user-checkbox:checked');
+        const count = selected.length;
+        selectedCountBadge.innerText = `تم تحديد ${count} حساب`;
+        
+        if (count > 0) {
+            bulkActionBar.classList.remove('d-none');
+        } else {
+            bulkActionBar.classList.add('d-none');
+        }
+    }
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            userCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+            updateBulkBar();
+        });
+    }
+
+    userCheckboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            updateBulkBar();
+            if(!cb.checked && selectAllCheckbox) selectAllCheckbox.checked = false;
+        });
+    });
+
+    function getSelectedUserIds() {
+        const selected = document.querySelectorAll('.user-checkbox:checked');
+        return Array.from(selected).map(cb => cb.value);
+    }
+
+    function performBulkAction(action) {
+        const userIds = getSelectedUserIds();
+        if (userIds.length === 0) {
+            alert('يرجى تحديد حساب واحد على الأقل.');
+            return;
+        }
+
+        let confirmMsg = `هل أنت تأكد من تنفيذ الإجراء الجماعي على ${userIds.length} حساب/حسابات محددة؟`;
+        if (action === 'delete') {
+            confirmMsg = `⚠️ تحذير نهائي: هل أنت تأكد من حذف ${userIds.length} حساب/حسابات نهائياً من المنصة؟ لا يمكن التراجع عن هذا الإجراء!`;
+        } else if (action === 'reset_passwords') {
+            confirmMsg = `هل أنت تأكد من إعادة تعيين وتوليد كلمات مرور جديدة لـ ${userIds.length} حساب؟`;
+        }
+
+        if (!confirm(confirmMsg)) return;
+
+        fetch('{% url "portal:bulk_accounts_action_post" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                action: action,
+                user_ids: userIds
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.message || 'حدث خطأ أثناء تنفيذ الإجراء الجماعي');
+            }
+        })
+        .catch(err => {
+            alert('حدث خطأ في الاتصال بالسيرفر');
+        });
+    }
+
+    function bulkPrintCredentials() {
+        const selected = document.querySelectorAll('.user-checkbox:checked');
+        if (selected.length === 0) {
+            alert('يرجى تحديد حساب واحد على الأقل للطباعة.');
+            return;
+        }
+
+        const container = document.getElementById('printableCredentialsCard');
+        let html = '<div class="row g-4 p-4">';
+        
+        selected.forEach(cb => {
+            const username = cb.dataset.username;
+            const fullname = cb.dataset.fullname;
+            const email = cb.dataset.email;
+            const role = cb.dataset.role;
+            const password = cb.dataset.password || 'موجودة بالنظام';
+
+            html += `
+                <div class="col-6 mb-3">
+                    <div class="border border-2 border-dark rounded-4 p-3 text-center bg-white shadow-sm">
+                        <h4 class="fw-black text-primary fs-5 m-0">منصة 1000 برمجة</h4>
+                        <div class="small text-muted mb-2">بطاقة واعتماد حساب دخول</div>
+                        <h5 class="fw-bold text-dark mb-2">${fullname}</h5>
+                        <div class="small my-1">اسم المستخدم: <strong class="font-monospace text-primary">${username}</strong></div>
+                        <div class="small my-1">كلمة المرور: <strong class="font-monospace text-danger">${password}</strong></div>
+                        <div class="small text-muted mt-2 dir-ltr">https://1000programmers.net/portal/login/</div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+        container.classList.remove('d-none');
+        window.print();
+        container.classList.add('d-none');
+        location.reload();
+    }
+</script>
+{% endblock %}
+
+
+

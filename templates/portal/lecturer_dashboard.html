@@ -65,35 +65,56 @@
         
         <!-- Tab 1: Schedule -->
         <div x-show="activeTab === 'schedule'" x-transition>
-            <div class="glass-card p-4 border-0 mb-4">
-                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-hourglass-start me-2 text-warning"></i>المحاضرات القادمة</h5>
+            {% if not groups.exists %}
+            <div class="glass-card p-5 text-center border-0 mb-4 shadow-sm bg-white rounded-4">
+                <div class="mb-3 text-primary">
+                    <i class="fas fa-chalkboard-teacher fa-3x"></i>
+                </div>
+                <h5 class="fw-bold text-slate-800 mb-2">أهلاً بك في منصة المدربين!</h5>
+                <p class="text-muted mb-3" style="max-width: 500px; margin: 0 auto;">لم يتم إسناد أي شعبة تدريبية أو مادة إليك حتى الآن من قبل إدارة المبادرة. سيتم عرض جدولك ومحاضراتك فور إسناد الشعبة.</p>
+            </div>
+            {% else %}
+
+            <!-- Today's Lectures (Active Attendance Day) -->
+            <div class="glass-card p-4 border-0 mb-4 shadow-sm" style="border-right: 4px solid #10b981 !important; background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, #ffffff 100%);">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold m-0 text-slate-800">
+                        <i class="fas fa-calendar-check me-2 text-success"></i>محاضرات اليوم المتاحة لتسجيل الحضور
+                    </h5>
+                    <span class="badge bg-success px-3 py-2 rounded-pill font-monospace"><i class="fas fa-clock me-1"></i>تاريخ اليوم: {{ today }}</span>
+                </div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle">
+                    <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>المحاضرة</th>
-                                <th>المجموعة</th>
-                                <th>التاريخ</th>
-                                <th>الوقت</th>
-                                <th class="text-center">إجراءات الحضور</th>
+                                <th>المحاضرة والمادة</th>
+                                <th>الشعبة / المجموعة</th>
+                                <th>تاريخ المحاضرة</th>
+                                <th>وقت المحاضرة</th>
+                                <th class="text-center">تسجيل الحضور اليومي</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for lec in upcoming_lectures %}
-                            <tr>
-                                <td class="fw-bold">{{ lec.title }}</td>
-                                <td><span class="badge bg-secondary">{{ lec.group.name }}</span></td>
-                                <td>{{ lec.date }}</td>
+                            {% for lec in today_lectures %}
+                            <tr class="bg-success-subtle">
+                                <td class="fw-bold text-dark fs-6">{{ lec.title }}</td>
+                                <td><span class="badge bg-primary fs-7 px-3 py-1">{{ lec.group.name }}</span></td>
+                                <td><span class="fw-bold text-success">{{ lec.date }}</span></td>
                                 <td>{{ lec.start_time|time:"H:i" }} - {{ lec.end_time|time:"H:i" }}</td>
                                 <td class="text-center">
-                                    <a href="{% url 'portal:mark_attendance_manual' lec.id %}" class="btn btn-sm btn-primary-custom">
-                                        <i class="fas fa-user-check me-1"></i>تسجيل حضور وغياب الطلاب
+                                    <a href="{% url 'portal:mark_attendance_manual' lec.id %}" class="btn btn-sm btn-success px-3 shadow-sm rounded-pill fw-bold">
+                                        <i class="fas fa-user-check me-1"></i>تسجيل حضور وغياب الطلاب اليوم
+                                    </a>
+                                    <a href="{% url 'portal:lecture_qr_view' lec.id %}" class="btn btn-sm btn-outline-success px-3 rounded-pill ms-1 fw-bold">
+                                        <i class="fas fa-qrcode me-1"></i>رمز QR للحضور
                                     </a>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="5" class="text-center py-4 text-muted">لا توجد محاضرات قادمة مجدولة</td>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    <i class="fas fa-calendar-minus me-2 text-secondary"></i>لا توجد محاضرات مجدولة لليوم في مجموعاتك.
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -101,8 +122,46 @@
                 </div>
             </div>
 
-            <div class="glass-card p-4 border-0">
-                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-history me-2 text-primary"></i>المحاضرات المنجزة (التقييم وسجل الحضور)</h5>
+            <!-- Upcoming Scheduled Lectures (Future Dates) -->
+            <div class="glass-card p-4 border-0 mb-4 shadow-sm">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-hourglass-start me-2 text-warning"></i>المحاضرات القادمة المجدولة للأيام التالية</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>المحاضرة</th>
+                                <th>المجموعة</th>
+                                <th>التاريخ المحدد</th>
+                                <th>الوقت</th>
+                                <th class="text-center">حالة تسجيل الحضور</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lec in upcoming_lectures %}
+                            <tr>
+                                <td class="fw-bold">{{ lec.title }}</td>
+                                <td><span class="badge bg-secondary">{{ lec.group.name }}</span></td>
+                                <td><span class="badge bg-info-subtle text-info fw-bold">{{ lec.date }}</span></td>
+                                <td>{{ lec.start_time|time:"H:i" }} - {{ lec.end_time|time:"H:i" }}</td>
+                                <td class="text-center">
+                                    <span class="btn btn-sm btn-light text-muted border rounded-pill disabled" style="cursor: not-allowed;">
+                                        <i class="fas fa-lock me-1"></i>يفتح في يوم المحاضرة ({{ lec.date }})
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">لا توجد محاضرات قادمة للأيام المقبولة</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Past Completed Lectures -->
+            <div class="glass-card p-4 border-0 shadow-sm">
+                <h5 class="fw-bold mb-4 text-slate-800"><i class="fas fa-history me-2 text-primary"></i>المحاضرات السابقة المنجزة (السجلات والتقييم)</h5>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
@@ -110,7 +169,7 @@
                                 <th>المحاضرة</th>
                                 <th>المجموعة</th>
                                 <th>التاريخ</th>
-                                <th>تقييم الطلاب</th>
+                                <th>الإجراءات والتقييمات</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -120,24 +179,26 @@
                                 <td><span class="badge bg-secondary">{{ lec.group.name }}</span></td>
                                 <td>{{ lec.date }}</td>
                                 <td>
-                                    <a href="{% url 'portal:evaluate_students' lec.id %}" class="btn btn-sm btn-outline-success">
+                                    <a href="{% url 'portal:evaluate_students' lec.id %}" class="btn btn-sm btn-outline-success rounded-pill">
                                         <i class="fas fa-star me-1"></i>تقييم أداء المحاضرة
                                     </a>
-                                    <a href="{% url 'portal:mark_attendance_manual' lec.id %}" class="btn btn-sm btn-outline-primary ms-1">
-                                        <i class="fas fa-user-check me-1"></i>تسجيل الحضور اليدوي
+                                    <a href="{% url 'portal:mark_attendance_manual' lec.id %}" class="btn btn-sm btn-outline-primary rounded-pill ms-1">
+                                        <i class="fas fa-user-check me-1"></i>مراجعة سجل الحضور
                                     </a>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="4" class="text-center py-4 text-muted">لا توجد محاضرات منجزة مسبقاً</td>
+                                <td colspan="4" class="text-center py-4 text-muted">لا توجد محاضرات سابقة منجزة</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
+            {% endif %}
         </div>
+
 
         <!-- Tab 2: Students List & Evaluations -->
         <div x-show="activeTab === 'students'" x-transition style="display: none;">

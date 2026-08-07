@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}إعدادات إشعارات التليغرام | مبادرة 1000 برمجة{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-slate-800 mb-1">
+                <i class="fab fa-telegram text-primary me-2"></i>إعدادات إشعارات التليغرام
+            </h2>
+            <p class="text-muted mb-0">ربط وتفعيل الإشعارات الفورية للمدربين والكادر التدريبي مباشرة عبر التليغرام</p>
+        </div>
+        <a href="{% url 'portal:lecturer_dashboard' %}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fas fa-arrow-right me-1"></i>العودة للوحة التحكّم
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show border-0 shadow-lg rounded-4 p-3" role="alert">
+            <i class="fas {% if message.tags == 'error' %}fa-exclamation-triangle text-danger{% else %}fa-check-circle text-success{% endif %} me-2 fs-5"></i>
+            <span class="fw-bold">{{ message }}</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+
+    {% if user.role == 'super_admin' or user.role == 'director' %}
+    <!-- Admin System Bot Configuration Card -->
+    <div class="glass-card p-4 border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.03) 0%, rgba(59, 130, 246, 0.05) 100%); border-right: 4px solid #3b82f6 !important;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold m-0 text-slate-800">
+                <i class="fas fa-key text-primary me-2"></i>مفتاح وتوكن بوت التليغرام للنظام
+                <span class="badge bg-secondary-subtle text-dark border ms-2 fs-7"><i class="fas fa-user-shield me-1"></i>خاصة بمسؤولي النظام (مخفية تماماً عن المدربين والطلاب)</span>
+            </h5>
+
+            {% if is_token_configured %}
+            <span class="badge bg-success px-3 py-2 rounded-pill"><i class="fas fa-check-circle me-1"></i>التوكن مفعّل وفي الخدمة</span>
+            {% else %}
+            <span class="badge bg-danger px-3 py-2 rounded-pill"><i class="fas fa-exclamation-circle me-1"></i>التوكن غير مضاف حتى الآن</span>
+            {% endif %}
+        </div>
+        <p class="small text-muted mb-3">بصفتك مسؤول النظام، يمكنك إدخال الـ Token الخاص بـ <code>@Programmers1000_Bot</code> المستخرج من <code>@BotFather</code> هنا لتغذي المنصة بالكامل لترسل الرسائل للجميع فورياً.</p>
+        <form method="POST" action="{% url 'portal:telegram_settings' %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_bot_token">
+            <div class="input-group">
+                <input type="text" name="bot_token" class="form-control font-monospace" placeholder="ضع توكن البوت هنا (مثال: 7891234567:AAHxxxx...)" value="{{ bot_token }}">
+                <button type="submit" class="btn btn-primary px-4 fw-bold">
+                    <i class="fas fa-save me-1"></i>حفظ وتفعيل توكن البوت للنظام
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+    <div class="row g-4">
+        <!-- Connecting Card -->
+        <div class="col-lg-6">
+            <div class="glass-card p-4 h-100 border-0 shadow-sm">
+                <h5 class="fw-bold mb-3 text-slate-800">
+                    <i class="fas fa-link text-primary me-2"></i>حالة الربط والمعرّف
+                </h5>
+                <hr class="text-slate-200">
+
+                <div class="mb-4 text-center p-3 rounded-4 bg-light">
+                    {% if telegram_chat_id %}
+                    <div class="mb-3">
+                        <span class="badge bg-success fs-6 px-3 py-2 rounded-pill mb-2">
+                            <i class="fas fa-check-circle me-1"></i>الحساب مربوط بنجاح
+                        </span>
+                        <div class="text-dark fw-bold dir-ltr mt-1">Chat ID: {{ telegram_chat_id }}</div>
+                    </div>
+                    {% else %}
+                    <div class="mb-3">
+                        <span class="badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill mb-2">
+                            <i class="fas fa-exclamation-triangle me-1"></i>الحساب غير مربوط بعد
+                        </span>
+                        <p class="small text-muted mb-0">اتبع الخطوات أدناه لربط حساب التليغرام واستلام التنبيهات فوراً</p>
+                    </div>
+                    {% endif %}
+
+                    {% if bot_username %}
+                    <a href="https://t.me/{{ bot_username }}?start={{ link_code }}" target="_blank" class="btn btn-primary btn-lg rounded-pill w-100 mt-2 shadow-sm">
+                        <i class="fab fa-telegram-plane me-2 fs-5"></i>فتح البوت وتفعيل الربط تلقائياً
+                    </a>
+                    <form method="POST" action="{% url 'portal:telegram_settings' %}" class="mt-2">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="sync_updates">
+                        <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill w-100 py-2 fw-bold">
+                            <i class="fas fa-sync-alt me-1"></i>اضغط هنا بعد الضغط على START لربط وتحديث رقمك تلقائياً
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+
+
+                <form method="POST" action="{% url 'portal:telegram_settings' %}" class="mt-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save_chat_id">
+                    <label class="form-label fw-bold text-slate-700">تحديث معرف الشات يدوياً (Chat ID):</label>
+                    <div class="input-group mb-2">
+                        <input type="text" name="chat_id" class="form-control rounded-start-3" placeholder="أدخل رقم Chat ID هنا (مثال: 123456789)" value="{{ telegram_chat_id|default:'' }}">
+                        <button class="btn btn-primary px-4 fw-bold" type="submit">
+                            <i class="fas fa-save me-1"></i>حفظ المعرف
+                        </button>
+                    </div>
+                    <div class="p-2 bg-warning-subtle text-warning-emphasis rounded-3 mt-2">
+                        <small class="d-block">
+                            <i class="fas fa-exclamation-circle me-1"></i><b>ملاحظة هامة:</b> لا تضع اسم المستخدم الكتابي بالـ <code>@</code>، بل ضع <b>الرقم الرقمي</b> الخاص بك (مثال: <code>682910382</code>) المعطى من بوت <code>@userinfobot</code>، أو اضغط فقط على زر <b>فتح البوت وتفعيل الربط تلقائياً</b> 
+                        </small>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+
+
+        <!-- Testing & Status Card -->
+        <div class="col-lg-6">
+            <div class="glass-card p-4 h-100 border-0 shadow-sm">
+                <h5 class="fw-bold mb-3 text-slate-800">
+                    <i class="fas fa-vial text-success me-2"></i>اختبار وتفعيل الإشعارات
+                </h5>
+                <hr class="text-slate-200">
+
+                <form method="POST" action="{% url 'portal:telegram_settings' %}" class="mb-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_notifications">
+                    <div class="form-check form-switch p-3 bg-light rounded-3 d-flex align-items-center justify-content-between">
+                        <label class="form-check-label fw-bold text-slate-800 me-3" for="flexSwitchCheckChecked">
+                            تلقي إشعارات التليغرام الفورية:
+                        </label>
+                        <input class="form-check-input ms-0 fs-4" type="checkbox" name="enabled" id="flexSwitchCheckChecked" onchange="this.form.submit()" {% if notifications_enabled %}checked{% endif %}>
+                    </div>
+                </form>
+
+                <div class="p-3 bg-light rounded-3 mb-4">
+                    <h6 class="fw-bold text-slate-700 mb-2">إرسال إشعار تجريبي:</h6>
+                    <p class="small text-muted mb-3">يساعدك هذا الاختبار على التأكد من استلام الرسائل بشكل سليم على جهازك.</p>
+                    <form method="POST" action="{% url 'portal:telegram_settings' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="test_notification">
+                        <button type="submit" class="btn btn-success rounded-pill w-100 py-2 fw-bold shadow-sm">
+                            <i class="fas fa-paper-plane me-2"></i>إرسال إشعار تجريبي الآن
+                        </button>
+                    </form>
+                </div>
+
+
+                <div class="p-3 border rounded-3 bg-white">
+                    <h6 class="fw-bold text-primary mb-2">
+                        <i class="fas fa-bell me-1"></i>ما هي الإشعارات التي ستصلك؟
+                    </h6>
+                    <ul class="small text-secondary mb-0 pe-3">
+                        <li class="mb-1">تنبيهات المحاضرات اليومية وتذكير تسليم الحضور.</li>
+                        <li class="mb-1">إشعارات فورية عند إرسال تعميم أو رسالة من الإدارة.</li>
+                        <li class="mb-1">إشعارات عند تسليم الطلاب للواجبات والمشاريع.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

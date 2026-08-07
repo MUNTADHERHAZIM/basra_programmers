@@ -9,6 +9,12 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('profile/edit/', views.edit_profile_view, name='edit_profile'),
     
+    # Custom Error Pages Preview Routes
+    path('404/', views.custom_404_view, name='custom_404'),
+    path('403/', views.custom_403_view, name='custom_403'),
+    path('500/', views.custom_500_view, name='custom_500'),
+
+    
     # Dashboard Redirector
     path('dashboard/', views.dashboard_redirect, name='dashboard'),
     
@@ -65,8 +71,17 @@ urlpatterns = [
     path('manage/lecturers/export/', views.export_lecturers_view, name='export_lecturers_view'),
     path('manage/trainees/bulk-delete/', views.bulk_delete_trainees_post, name='bulk_delete_trainees_post'),
     path('manage/lecturers/bulk-delete/', views.bulk_delete_lecturers_post, name='bulk_delete_lecturers_post'),
+    path('manage/accounts/', views.accounts_management_view, name='accounts_management'),
     path('manage/accounts/generate-single/', views.generate_single_account_post, name='generate_single_account_post'),
     path('manage/accounts/generate-batch/', views.generate_batch_accounts_view, name='generate_batch_accounts_view'),
+    path('manage/accounts/user/<int:user_id>/reset-password/', views.reset_user_password_post, name='reset_user_password_post'),
+    path('manage/accounts/user/<int:user_id>/send-telegram/', views.send_credentials_telegram_post, name='send_credentials_telegram_post'),
+    path('manage/accounts/user/<int:user_id>/toggle-active/', views.toggle_user_active_post, name='toggle_user_active_post'),
+
+    path('manage/accounts/bulk-action/', views.bulk_accounts_action_post, name='bulk_accounts_action_post'),
+    path('manage/accounts/export-excel/', views.export_accounts_excel_view, name='export_accounts_excel'),
+
+
 
     path('manage/groups/export/', views.export_groups_view, name='export_groups_view'),
     path('manage/groups/import/', views.import_groups_view, name='import_groups_view'),
@@ -108,5 +123,18 @@ urlpatterns = [
     path('media/', views.initiative_media_view, name='initiative_media_view'),
     path('manage/media/add/', views.add_initiative_media_post, name='add_initiative_media_post'),
     path('manage/media/<int:media_id>/delete/', views.delete_initiative_media_post, name='delete_initiative_media_post'),
+
+    # Telegram Integration & PWA System
+    path('settings/telegram/', views.telegram_settings_view, name='telegram_settings'),
+    path('manifest.json', views.pwa_manifest_view, name='pwa_manifest'),
+    path('pwa/icon/<int:size>.svg', views.pwa_icon_view, name='pwa_icon'),
+    path('sw.js', views.service_worker_view, name='service_worker'),
+    path('offline/', views.offline_view, name='offline'),
+
+    # Fallback catch-all 404 page route
+    path('<path:invalid_path>/', views.custom_404_view, name='catch_all_404'),
 ]
+
+
+
 
