@@ -66,18 +66,27 @@ class Lecture(models.Model):
     title = models.CharField(max_length=200, verbose_name="عنوان المحاضرة")
     content = models.TextField(blank=True, null=True, verbose_name="محتوى المحاضرة")
     date = models.DateField(verbose_name="التاريخ")
-    start_time = models.TimeField(verbose_name="وقت البدء")
-    end_time = models.TimeField(verbose_name="وقت الانتهاء")
+    start_time = models.TimeField(blank=True, null=True, verbose_name="وقت البدء")
+    end_time = models.TimeField(blank=True, null=True, verbose_name="وقت الانتهاء")
     video_url = models.URLField(blank=True, null=True, verbose_name="رابط تسجيل المحاضرة")
-    files = models.FileField(upload_to='lectures/', blank=True, null=True, verbose_name="ملفات المحاضرة")
+    files = models.FileField(upload_to='lectures/', blank=True, null=True, verbose_name="ملفات المحاضرة (PDF / مذكرات)")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='uploaded_lectures',
+        verbose_name="تم الرفع بواسطة"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, verbose_name="تاريخ الإضافة")
 
     def __str__(self):
         return f"{self.title} - {self.group.name}"
 
     class Meta:
-        verbose_name = "المحاضرة"
-        verbose_name_plural = "المحاضرات"
-        ordering = ['date', 'start_time']
+        verbose_name = "المحاضرة والمادة العلمية"
+        verbose_name_plural = "المحاضرات والمواد العلمية"
+        ordering = ['-date', '-created_at']
 
 
 class DailyReport(models.Model):

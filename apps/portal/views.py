@@ -551,8 +551,8 @@ def calendar_view(request):
             'course': lec.group.course.title if (lec.group and lec.group.course) else "مادة عامة",
             'group_name': lec.group.name if lec.group else "عامة",
             'date': lec.date.isoformat(),
-            'start_time': lec.start_time.strftime('%H:%M'),
-            'end_time': lec.end_time.strftime('%H:%M'),
+            'start_time': lec.start_time.strftime('%H:%M') if lec.start_time else "00:00",
+            'end_time': lec.end_time.strftime('%H:%M') if lec.end_time else "23:59",
             'classroom': lec.group.classroom if lec.group else "قاعة التدريب",
             'instructor': (lec.group.instructor.get_full_name() or lec.group.instructor.username) if (lec.group and lec.group.instructor) else "غير محدد",
             'color': '#10b981',
@@ -3403,5 +3403,210 @@ self.addEventListener('fetch', (event) => {
 def offline_view(request):
     """Renders high-end offline fallback page when device loses connection."""
     return render(request, 'offline.html')
+
+
+# ==========================================
+# Lectures & Educational Materials Hub (PDFs & Media)
+# ==========================================
+
+@login_required
+def lectures_hub_view(request):
+    """
+    Dedicated view for searching, viewing, and managing lectures & course materials.
+    Accessible to Trainees, Lecturers, Supervisors, and Admins.
+    """
+    user = request.user
+    role = user.role
+    
+    # Determine default and allowed groups for the user
+    user_groups = Group.objects.all()
+    user_trainee_group = None
+    
+    if role == CustomUser.Role.TRAINEE:
+        profile = getattr(user, 'trainee_profile', None)
+        if profile and profile.group:
+            user_trainee_group = profile.group
+            lectures_qs = Lecture.objects.filter(group=profile.group)
+        else:
+            lectures_qs = Lecture.objects.none()
+    elif role == CustomUser.Role.LECTURER:
+        user_groups = Group.objects.filter(instructor=user)
+        lectures_qs = Lecture.objects.filter(group__in=user_groups)
+    elif role == CustomUser.Role.SUPERVISOR:
+        user_groups = Group.objects.filter(supervisor=user)
+        lectures_qs = Lecture.objects.filter(group__in=user_groups)
+    else:
+        user_groups = Group.objects.all()
+        lectures_qs = Lecture.objects.all()
+
+    # Search & Filters
+    search_query = request.GET.get('q', '').strip()
+    selected_group_id = request.GET.get('group', '').strip()
+    selected_course_id = request.GET.get('course', '').strip()
+    file_filter = request.GET.get('file_type', '').strip()
+
+    if search_query:
+        lectures_qs = lectures_qs.filter(
+            Q(title__icontains=search_query) |
+            Q(content__icontains=search_query) |
+            Q(group__name__icontains=search_query) |
+            Q(group__course__title__icontains=search_query)
+        )
+
+    if selected_group_id and selected_group_id.isdigit():
+        lectures_qs = lectures_qs.filter(group_id=int(selected_group_id))
+
+    if selected_course_id and selected_course_id.isdigit():
+        lectures_qs = lectures_qs.filter(group__course_id=int(selected_course_id))
+
+    if file_filter == 'pdf':
+        lectures_qs = lectures_qs.exclude(Q(files='') | Q(files__isnull=True))
+    elif file_filter == 'video':
+        lectures_qs = lectures_qs.exclude(Q(video_url='') | Q(video_url__isnull=True))
+
+    lectures = lectures_qs.select_related('group', 'group__course', 'group__instructor', 'uploaded_by').order_by('-date', '-created_at', '-id')
+
+    # Metrics calculation
+    all_available_lectures = lectures_qs.count()
+    pdf_count = lectures_qs.exclude(Q(files='') | Q(files__isnull=True)).count()
+    video_count = lectures_qs.exclude(Q(video_url='') | Q(video_url__isnull=True)).count()
+    courses_count = Course.objects.count()
+    all_groups = Group.objects.all().select_related('course')
+    all_courses = Course.objects.all()
+
+    can_upload = role in [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.LECTURER
+    ]
+
+    context = {
+        'lectures': lectures,
+        'pdf_count': pdf_count,
+        'video_count': video_count,
+        'total_lectures': all_available_lectures,
+        'courses_count': courses_count,
+        'all_groups': all_groups,
+        'user_groups': user_groups,
+        'all_courses': all_courses,
+        'search_query': search_query,
+        'selected_group_id': selected_group_id,
+        'selected_course_id': selected_course_id,
+        'file_filter': file_filter,
+        'can_upload': can_upload,
+        'user_trainee_group': user_trainee_group,
+    }
+    return render(request, 'portal/lectures_hub.html', context)
+
+
+@login_required
+@require_POST
+def upload_lecture_material_post(request):
+    """Handles uploading new lecture material / PDF file by Lecturers or Admins."""
+    user = request.user
+    if user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER, CustomUser.Role.LECTURER]:
+        messages.error(request, "غير مصرح لك برفع المحاضرات والمواد العلمية.")
+        return redirect('portal:lectures_hub')
+
+    title = request.POST.get('title', '').strip()
+    group_id = request.POST.get('group', '').strip()
+    date_val = request.POST.get('date', '').strip() or timezone.now().date().strftime('%Y-%m-%d')
+    content = request.POST.get('content', '').strip()
+    video_url = request.POST.get('video_url', '').strip()
+    start_time = request.POST.get('start_time', '').strip() or None
+    end_time = request.POST.get('end_time', '').strip() or None
+    lecture_file = request.FILES.get('files')
+
+    if not title or not group_id:
+        messages.error(request, "عنوان المحاضرة وتحديد الشعبة حقول مطلوبة.")
+        return redirect('portal:lectures_hub')
+
+    try:
+        group = Group.objects.get(id=group_id)
+        
+        if user.role == CustomUser.Role.LECTURER and group.instructor != user and not user.is_superuser:
+            messages.error(request, "لا يمكنك رفع مواد شعبة غير مخصصة لك.")
+            return redirect('portal:lectures_hub')
+
+        lecture = Lecture.objects.create(
+            group=group,
+            title=title,
+            content=content,
+            date=date_val,
+            start_time=start_time,
+            end_time=end_time,
+            video_url=video_url if video_url else None,
+            files=lecture_file,
+            uploaded_by=user
+        )
+
+        messages.success(request, f"تم رفع المحاضرة والمادة العلمية '{lecture.title}' بنجاح!")
+    except Exception as e:
+        messages.error(request, f"حدث خطأ أثناء رفع المحاضرة: {str(e)}")
+
+    return redirect('portal:lectures_hub')
+
+
+@login_required
+@require_POST
+def edit_lecture_material_post(request, lecture_id):
+    """Updates an existing lecture or uploaded PDF material."""
+    user = request.user
+    lecture = get_object_or_404(Lecture, id=lecture_id)
+
+    is_staff = user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]
+    is_owner_lecturer = user.role == CustomUser.Role.LECTURER and (lecture.uploaded_by == user or lecture.group.instructor == user)
+
+    if not (is_staff or is_owner_lecturer):
+        messages.error(request, "غير مصرح لك بتعديل هذه المحاضرة.")
+        return redirect('portal:lectures_hub')
+
+    title = request.POST.get('title', '').strip()
+    group_id = request.POST.get('group', '').strip()
+    date_val = request.POST.get('date', '').strip()
+    content = request.POST.get('content', '').strip()
+    video_url = request.POST.get('video_url', '').strip()
+    lecture_file = request.FILES.get('files')
+
+    if title:
+        lecture.title = title
+    if group_id and group_id.isdigit():
+        try:
+            lecture.group = Group.objects.get(id=int(group_id))
+        except Group.DoesNotExist:
+            pass
+    if date_val:
+        lecture.date = date_val
+    
+    lecture.content = content
+    lecture.video_url = video_url if video_url else None
+    
+    if lecture_file:
+        lecture.files = lecture_file
+
+    lecture.save()
+    messages.success(request, f"تم تحديث بيانات المحاضرة '{lecture.title}' بنجاح.")
+    return redirect('portal:lectures_hub')
+
+
+@login_required
+@require_POST
+def delete_lecture_material_post(request, lecture_id):
+    """Deletes an uploaded lecture and its files."""
+    user = request.user
+    lecture = get_object_or_404(Lecture, id=lecture_id)
+
+    is_staff = user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]
+    is_owner_lecturer = user.role == CustomUser.Role.LECTURER and (lecture.uploaded_by == user or lecture.group.instructor == user)
+
+    if not (is_staff or is_owner_lecturer):
+        messages.error(request, "غير مصرح لك بحذف هذه المحاضرة.")
+        return redirect('portal:lectures_hub')
+
+    title = lecture.title
+    lecture.delete()
+    messages.success(request, f"تم حذف المحاضرة '{title}' بنجاح.")
+    return redirect('portal:lectures_hub')
 
 

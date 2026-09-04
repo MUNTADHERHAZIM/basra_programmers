@@ -157,6 +157,11 @@
                     </a>
                     {% endif %}
 
+                    <a href="{% url 'portal:lectures_hub' %}"
+                        class="{% if request.resolver_match.url_name == 'lectures_hub' %}active{% endif %}">
+                        <i class="fas fa-book-open me-2 text-info"></i>المحاضرات والمواد العلمية (PDF)
+                    </a>
+
                     <a href="{% url 'portal:chat_view' %}"
                         class="{% if request.resolver_match.url_name == 'chat_view' %}active{% endif %}">
                         <i class="fas fa-comments me-2 text-warning"></i>منصة التواصل والدردشة

@@ -67,6 +67,12 @@ urlpatterns = [
     path('manage/lecture/<int:lecture_id>/edit/', views.edit_lecture_post, name='edit_lecture_post'),
     path('manage/lecture/<int:lecture_id>/delete/', views.delete_lecture_post, name='delete_lecture_post'),
     
+    # Dedicated Lectures & Course Materials Hub
+    path('lectures/', views.lectures_hub_view, name='lectures_hub'),
+    path('lectures/upload/', views.upload_lecture_material_post, name='upload_lecture_material'),
+    path('lectures/<int:lecture_id>/edit-material/', views.edit_lecture_material_post, name='edit_lecture_material'),
+    path('lectures/<int:lecture_id>/delete-material/', views.delete_lecture_material_post, name='delete_lecture_material'),
+    
     path('manage/lecturers/import/', views.import_lecturers_view, name='import_lecturers_view'),
     path('manage/lecturers/export/', views.export_lecturers_view, name='export_lecturers_view'),
     path('manage/trainees/bulk-delete/', views.bulk_delete_trainees_post, name='bulk_delete_trainees_post'),
