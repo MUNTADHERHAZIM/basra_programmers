@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block title %}إدارة شبكة المحافظات والفروع - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}إدارة وتوسعة شبكة المحافظات والفروع التدريبية{% endblock %}
+
+{% block content %}
+<!-- Header Bar -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-sm d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="icon-box icon-box-primary m-0">
+                    <i class="fas fa-map-marked-alt fs-3"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold m-0 text-slate-800">إدارة شبكة المحافظات ومراكز التدريب</h4>
+                    <small class="text-muted">التحكم في تفعيل أو إيقاف المحافظات، وإدارة الفروع ومراكز التدريب الميدانية</small>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-primary-custom shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#activateGovModal">
+                    <i class="fas fa-plus-circle me-1"></i> تفعيل محافظة جديدة
+                </button>
+                <button type="button" class="btn btn-outline-success shadow-sm px-3" data-bs-toggle="modal" data-bs-target="#addBranchModal">
+                    <i class="fas fa-building me-1"></i> إضافة فرع تدريب
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Governorates Grid -->
+<div class="row g-4 mb-5">
+    <div class="col-12">
+        <h5 class="fw-bold text-slate-800 mb-3">
+            <i class="fas fa-check-circle text-success me-2"></i>المحافظات المفعلة والنشطة ({{ active_governorates|length }})
+        </h5>
+    </div>
+
+    {% for gov in active_governorates %}
+    <div class="col-md-6 col-lg-4">
+        <div class="glass-card p-4 border-0 h-100 shadow-sm position-relative d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="badge bg-success px-3 py-1 rounded-pill">
+                    <i class="fas fa-circle me-1 fs-6" style="font-size: 0.55rem !important;"></i> نشطة حالياً
+                </span>
+                <span class="badge bg-secondary-subtle text-secondary fw-bold">{{ gov.code }}</span>
+            </div>
+
+            <h4 class="fw-bold text-slate-800 mb-2">{{ gov.name }}</h4>
+            <p class="text-muted small mb-3">
+                {{ gov.description|default:"المحافظة مفعلة بكامل صلاحياتها وجداولها ومجموعاتها التدريبية." }}
+            </p>
+
+            <!-- Metrics -->
+            <div class="row g-2 text-center my-2 p-2 bg-light rounded-3">
+                <div class="col-4">
+                    <small class="text-muted d-block">المتدربين</small>
+                    <strong class="text-primary fs-5">{{ gov.active_trainees_count }}</strong>
+                </div>
+                <div class="col-4 border-start border-end">
+                    <small class="text-muted d-block">الشعب</small>
+                    <strong class="text-info fs-5">{{ gov.active_groups_count }}</strong>
+                </div>
+                <div class="col-4">
+                    <small class="text-muted d-block">الفروع</small>
+                    <strong class="text-success fs-5">{{ gov.branches.count }}</strong>
+                </div>
+            </div>
+
+            <!-- Branches List -->
+            <div class="mt-3">
+                <h6 class="fw-bold text-slate-700 small mb-2"><i class="fas fa-building text-warning me-1"></i>فروع ومراكز التدريب:</h6>
+                <ul class="list-group list-group-flush small">
+                    {% for branch in gov.branches.all %}
+                    <li class="list-group-item bg-transparent px-0 py-1 d-flex justify-content-between align-items-center text-muted">
+                        <span><i class="fas fa-map-pin text-danger me-1"></i>{{ branch.name }}</span>
+                        <span class="badge bg-light text-dark border">{{ branch.code }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item bg-transparent px-0 py-1 text-muted fst-italic">لا توجد فروع مسجلة بعد</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-2 mt-auto pt-3 border-top">
+                <a href="{% url 'portal:admin_dashboard' %}?gov_id={{ gov.id }}" class="btn btn-sm btn-outline-primary flex-grow-1">
+                    <i class="fas fa-chart-line me-1"></i> لوحة المحافظة
+                </a>
+                <form method="POST" action="{% url 'portal:activate_governorate_post' %}" onsubmit="return confirm('هل أنت متأكد من إيقاف تفعيل محافظة {{ gov.name }} مؤقتاً؟');">
+                    {% csrf_token %}
+                    <input type="hidden" name="governorate_id" value="{{ gov.id }}">
+                    <input type="hidden" name="status" value="coming_soon">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="إيقاف التفعيل">
+                        <i class="fas fa-pause"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="glass-card p-5 text-center text-muted border-0">
+            <i class="fas fa-city fs-1 mb-3 text-secondary opacity-50"></i>
+            <h5>لا توجد محافظات نشطة حالياً</h5>
+            <p class="small">اضغط على زر "تفعيل محافظة جديدة" لبدء إطلاق المحافظة الأولى.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Modal: Activate New Governorate -->
+<div class="modal fade" id="activateGovModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-0 shadow-lg">
+            <form method="POST" action="{% url 'portal:activate_governorate_post' %}">
+                {% csrf_token %}
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold">
+                        <i class="fas fa-plus-circle text-primary me-2"></i>تفعيل وإطلاق محافظة جديدة
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3">
+                        اختر المحافظة من القائمة المتاحة لتفعيلها فوراً في المنصة وإتاحتها للتدريب والتسجيل:
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">المحافظة المطلوبة:</label>
+                        <select name="governorate_id" class="form-select" required>
+                            <option value="">-- اختر من المحافظات المتاحة --</option>
+                            {% for inact_gov in inactive_governorates %}
+                            <option value="{{ inact_gov.id }}">{{ inact_gov.name }} (كود: {{ inact_gov.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <input type="hidden" name="status" value="active">
+                </div>
+                <div class="modal-footer border-top bg-light-subtle">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary-custom px-4">
+                        <i class="fas fa-check me-1"></i> تفعيل المحافظة الآن
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Branch -->
+<div class="modal fade" id="addBranchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-0 shadow-lg">
+            <form method="POST" action="{% url 'portal:add_branch_post' %}">
+                {% csrf_token %}
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold">
+                        <i class="fas fa-building text-success me-2"></i>إضافة مركز تدريب / فرع
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">المحافظة التابع لها:</label>
+                        <select name="governorate_id" class="form-select" required>
+                            {% for gov in active_governorates %}
+                            <option value="{{ gov.id }}">{{ gov.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم الفرع / المركز التدريبي:</label>
+                        <input type="text" name="name" class="form-control" placeholder="مثال: مركز تدريب البصرة الجنوبي" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">كود الفرع:</label>
+                        <input type="text" name="code" class="form-control" placeholder="مثال: BR-01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">العنوان التفصيلي (اختياري):</label>
+                        <input type="text" name="address" class="form-control" placeholder="مثال: مجمع العتبة الحسينية، الطابق الثاني">
+                    </div>
+                </div>
+                <div class="modal-footer border-top bg-light-subtle">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success px-4">
+                        <i class="fas fa-save me-1"></i> حفظ الفرع
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

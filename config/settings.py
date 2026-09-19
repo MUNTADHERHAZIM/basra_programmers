@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "django_bootstrap5",
     
     # Project apps
+    "apps.locations",      # يجب أن يكون أولاً — باقي التطبيقات تعتمد عليه
     "apps.users",
     "apps.courses",
     "apps.attendance",
@@ -48,6 +49,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
+    # يجب أن يأتي بعد AuthenticationMiddleware
+    "config.middleware.GovernorateMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

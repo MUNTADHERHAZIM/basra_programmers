@@ -424,16 +424,17 @@ class ImportExportService:
         return imported_count, errors
 
     @staticmethod
-    def generate_batch_accounts(prefix, count, role, group_id=None, names_list=None):
+    def generate_batch_accounts(prefix, count, role, group_id=None, names_list=None, governorate=None):
         import random
         import string
+        from apps.locations.models import Governorate
         
         wb = openpyxl.Workbook()
         sheet = wb.active
         sheet.title = "الحسابات المولدة"
         
         sheet.views.sheetView[0].showGridLines = True
-        headers = ["الاسم الكامل", "اسم المستخدم", "البريد الإلكتروني", "كلمة المرور المؤقتة", "الدور الوظيفي", "المجموعة"]
+        headers = ["الاسم الكامل", "اسم المستخدم", "البريد الإلكتروني", "كلمة المرور المؤقتة", "الدور الوظيفي", "المحافظة", "المجموعة"]
         for col_num, header in enumerate(headers, 1):
             sheet.cell(row=1, column=col_num, value=header)
             
@@ -441,9 +442,14 @@ class ImportExportService:
         if group_id and role == User.Role.TRAINEE:
             try:
                 group = Group.objects.get(id=group_id)
+                if not governorate and group.governorate:
+                    governorate = group.governorate
             except Group.DoesNotExist:
                 pass
                 
+        if not governorate:
+            governorate = Governorate.objects.filter(status='active').first()
+
         generated_count = 0
         row_idx = 2
         
@@ -497,9 +503,12 @@ class ImportExportService:
                         user = existing_user
                         user.set_password(password)
                         user.temp_password = password
+                        if governorate and not user.governorate:
+                            user.governorate = governorate
                         if group and role == User.Role.TRAINEE:
                             profile, _ = TraineeProfile.objects.get_or_create(user=user)
                             profile.group = group
+                            if governorate: profile.governorate = governorate.name
                             profile.save()
                         user.save()
                         email = user.email
@@ -511,15 +520,15 @@ class ImportExportService:
                             first_name=first_name if first_name else full_name,
                             last_name=last_name if last_name else '',
                             role=role,
+                            governorate=governorate,
                             password=password,
                             temp_password=password
                         )
 
-                        
                         if role == User.Role.TRAINEE:
                             profile = TraineeProfile.objects.create(
                                 user=user,
-                                governorate='البصرة',
+                                governorate=governorate.name if governorate else 'البصرة',
                                 group=group
                             )
                             user.email = f"{profile.training_number.lower()}@1000programmers.org"
@@ -542,11 +551,13 @@ class ImportExportService:
                     sheet.cell(row=row_idx, column=3, value=user.email)
                     sheet.cell(row=row_idx, column=4, value=password)
                     sheet.cell(row=row_idx, column=5, value=dict(User.Role.choices).get(role, role))
-                    sheet.cell(row=row_idx, column=6, value=group.name if group else (user.trainee_profile.group.name if hasattr(user, 'trainee_profile') and user.trainee_profile.group else ''))
+                    sheet.cell(row=row_idx, column=6, value=governorate.name if governorate else '')
+                    sheet.cell(row=row_idx, column=7, value=group.name if group else (user.trainee_profile.group.name if hasattr(user, 'trainee_profile') and user.trainee_profile.group else ''))
                     row_idx += 1
                     generated_count += 1
             except Exception as e:
                 pass
+
                 
         buffer = BytesIO()
         wb.save(buffer)

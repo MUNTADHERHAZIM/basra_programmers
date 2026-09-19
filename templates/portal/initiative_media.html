@@ -5,17 +5,17 @@
 
 {% block content %}
 <!-- Hero Header -->
-<div class="glass-card p-4 p-md-5 border-0 shadow-lg rounded-4 mb-4 text-white position-relative overflow-hidden" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+<div class="glass-card p-4 p-md-5 border-0 shadow-lg rounded-4 mb-4 text-white position-relative overflow-hidden" style="background: linear-gradient(135deg, #3da790 0%, #4f74e9 100%);">
     <div class="row align-items-center position-relative" style="z-index: 2;">
         <div class="col-lg-8">
             <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold mb-3">
                 <i class="fas fa-video me-1"></i>المكتبة الإعلامية والأنشطة
             </span>
             <h2 class="fw-bold mb-2">إعلام المبادرة والوسائط المرئية</h2>
-            <p class="text-slate-300 fs-6 m-0">استعرض أحدث الفيديوهات التعليمية، المعارض والأنشطة البرمجية، والإعلانات التوجيهية الخاصة بمبادرة 1000 مبرمج بالبصرة.</p>
+            <p class="text-slate-300 fs-6 m-0">استعرض أحدث الفيديوهات التعليمية، المعارض والأنشطة البرمجية، والإعلانات التوجيهية الخاصة بمبادرة 1000 مبرمج{% if current_governorate %} بـ{{ current_governorate.name }}{% elif request.governorate %} بـ{{ request.governorate.name }}{% endif %}.</p>
         </div>
         <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
-            {% if user.role == 'super_admin' or user.role == 'director' %}
+            {% if user.role == 'super_admin' or user.role == 'director' or user.role == 'governorate_admin' or user.role == 'training_officer' %}
             <button class="btn btn-warning px-4 py-2 fw-bold text-dark rounded-3 shadow" data-bs-toggle="modal" data-bs-target="#addMediaModal">
                 <i class="fas fa-plus-circle me-1"></i>نشر فيديو / ميديا جديدة
             </button>
@@ -33,11 +33,11 @@
     }
     .custom-media-tab:hover {
         background-color: #f1f5f9 !important;
-        color: #0f172a !important;
+        color: #4fcca2 !important;
     }
 
     #all-tab.active {
-        background-color: #0f172a !important;
+        background-color: #3c8e94 !important;
         color: #ffffff !important;
         box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25) !important;
     }

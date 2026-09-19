@@ -25,33 +25,60 @@ from apps.certificates.services import CertificateService
 from apps.users.services import ImportExportService, LectureGroupImportExportService
 from apps.notifications.models import Notification, InternalMessage
 from apps.gamification.services import award_points
+from apps.locations.models import Governorate
+from apps.users.permissions import get_groups_qs_for_user, get_trainees_qs_for_user
 
 # ==========================================
 # Visitor & Authentication Views
 # ==========================================
 
 def landing(request):
-    """Public landing page of the 1000 Programmers Initiative."""
+    """Public landing page of the 1000 Programmers Initiative with multi-governorate support."""
+    gov = getattr(request, 'governorate', None)
+    is_national = getattr(request, 'is_national', True)
+
+    if gov:
+        trainees_qs = TraineeProfile.objects.filter(user__governorate=gov)
+        lecturers_qs = LecturerProfile.objects.filter(user__governorate=gov)
+        supervisors_qs = SupervisorProfile.objects.filter(user__governorate=gov)
+        groups_qs = Group.objects.filter(governorate=gov)
+        attendance_qs = Attendance.objects.filter(trainee__governorate=gov)
+    else:
+        trainees_qs = TraineeProfile.objects.all()
+        lecturers_qs = LecturerProfile.objects.all()
+        supervisors_qs = SupervisorProfile.objects.all()
+        groups_qs = Group.objects.all()
+        attendance_qs = Attendance.objects.all()
+
     stats = {
-        'trainees': TraineeProfile.objects.count(),
-        'lecturers': LecturerProfile.objects.count(),
-        'supervisors': SupervisorProfile.objects.count(),
+        'trainees': trainees_qs.count(),
+        'lecturers': lecturers_qs.count(),
+        'supervisors': supervisors_qs.count(),
         'courses': Course.objects.count(),
-        'groups': Group.objects.count(),
+        'groups': groups_qs.count(),
+        'governorates_count': Governorate.objects.filter(status='active').count(),
     }
     
     # Calculate global attendance rate
-    total_att = Attendance.objects.count()
+    total_att = attendance_qs.count()
     if total_att > 0:
-        present_att = Attendance.objects.filter(status='present').count()
+        present_att = attendance_qs.filter(status='present').count()
         stats['attendance_rate'] = round((present_att / total_att) * 100, 1)
     else:
         stats['attendance_rate'] = 100.0
 
     # Get recent announcements
     announcements = InternalMessage.objects.filter(recipient=None, group=None).order_by('-created_at')[:3]
+    active_governorates = Governorate.objects.filter(status='active').order_by('order', 'name')
     
-    return render(request, 'portal/landing.html', {'stats': stats, 'announcements': announcements})
+    return render(request, 'portal/landing.html', {
+        'stats': stats, 
+        'announcements': announcements,
+        'current_governorate': gov,
+        'is_national': is_national,
+        'active_governorates': active_governorates,
+    })
+
 
 
 def login_view(request):
@@ -85,7 +112,12 @@ def logout_view(request):
 def dashboard_redirect(request):
     """Redirects the logged-in user to their respective dashboard."""
     role = request.user.role
-    if role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
+    if role in [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+    ]:
         return redirect('portal:admin_dashboard')
     elif role == CustomUser.Role.LECTURER:
         return redirect('portal:lecturer_dashboard')
@@ -102,39 +134,93 @@ def dashboard_redirect(request):
 
 @login_required
 def admin_dashboard(request):
-    """Dashboard view for Administrator and Director roles."""
+    """Dashboard view for Administrator and Director roles — scoped to user's governorate."""
     user = request.user
-    if user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
+    allowed_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+    ]
+    if user.role not in allowed_roles:
         raise Http404("غير مصرح بالدخول.")
-        
-    # Standard metrics
+
+    # ── تحديد نطاق البيانات ──────────────────────────────────────────
+    # Super Admin → يرى كل المحافظات
+    # غيره       → محافظته فقط (عبر request.governorate من الـ Middleware)
+    gov = request.governorate  # None للـ super admin
+    is_national = request.is_national
+
+    all_governorates = Governorate.objects.all().order_by('order', 'name')
+    selected_gov = None
+
+    if is_national:
+        filter_gov_id = request.GET.get('gov_id')
+        if filter_gov_id and filter_gov_id.isdigit():
+            selected_gov = Governorate.objects.filter(id=int(filter_gov_id)).first()
+            if selected_gov:
+                trainees_qs    = TraineeProfile.objects.filter(user__governorate=selected_gov)
+                groups_qs      = Group.objects.filter(governorate=selected_gov)
+                lecturers_qs   = LecturerProfile.objects.filter(user__governorate=selected_gov)
+                supervisors_qs = SupervisorProfile.objects.filter(user__governorate=selected_gov)
+                evaluations_qs = TraineeEvaluation.objects.filter(trainee__governorate=selected_gov)
+                attendance_qs  = Attendance.objects.filter(trainee__governorate=selected_gov)
+                gov = selected_gov
+
+        if not selected_gov:
+            trainees_qs    = TraineeProfile.objects.all()
+            groups_qs      = Group.objects.all()
+            lecturers_qs   = LecturerProfile.objects.all()
+            supervisors_qs = SupervisorProfile.objects.all()
+            evaluations_qs = TraineeEvaluation.objects.all()
+            attendance_qs  = Attendance.objects.all()
+
+        governorates_summary = Governorate.objects.filter(status='active').annotate(
+            g_trainees=Count('users__trainee_profile', distinct=True),
+            g_groups=Count('groups', distinct=True),
+            g_branches=Count('branches', distinct=True),
+        ).order_by('order', 'name')
+    else:
+        # محلي: محافظة المستخدم فقط
+        trainees_qs    = TraineeProfile.objects.filter(user__governorate=gov)
+        groups_qs      = Group.objects.filter(governorate=gov)
+        lecturers_qs   = LecturerProfile.objects.filter(user__governorate=gov)
+        supervisors_qs = SupervisorProfile.objects.filter(user__governorate=gov)
+        evaluations_qs = TraineeEvaluation.objects.filter(trainee__governorate=gov)
+        attendance_qs  = Attendance.objects.filter(trainee__governorate=gov)
+        governorates_summary = None
+
+    inactive_governorates = Governorate.objects.exclude(status='active').order_by('order', 'name')
+    today = timezone.now().date()
+    lectures_qs = Lecture.objects.filter(group__in=groups_qs)
+
     stats = {
-        'trainees_count': TraineeProfile.objects.count(),
-        'lecturers_count': LecturerProfile.objects.count(),
-        'supervisors_count': SupervisorProfile.objects.count(),
-        'courses_count': Course.objects.count(),
-        'groups_count': Group.objects.count(),
-        'lectures_done': Lecture.objects.filter(date__lte=timezone.now().date()).count(),
-        'lectures_upcoming': Lecture.objects.filter(date__gt=timezone.now().date()).count(),
+        'trainees_count':    trainees_qs.count(),
+        'lecturers_count':   lecturers_qs.count(),
+        'supervisors_count': supervisors_qs.count(),
+        'courses_count':     Course.objects.count(),  # الدورات وطنية مشتركة
+        'groups_count':      groups_qs.count(),
+        'lectures_done':     lectures_qs.filter(date__lte=today).count(),
+        'lectures_upcoming': lectures_qs.filter(date__gt=today).count(),
+        'governorates_count': Governorate.objects.filter(status='active').count(),
     }
-    
-    # Detailed global attendance stats
-    total_att = Attendance.objects.count()
-    stats['attendance_present'] = Attendance.objects.filter(status='present').count()
-    stats['attendance_absent'] = Attendance.objects.filter(status='absent').count()
-    stats['attendance_late'] = Attendance.objects.filter(status='late').count()
-    stats['attendance_excused'] = Attendance.objects.filter(status='excused').count()
+
+    # إحصائيات الحضور
+    total_att = attendance_qs.count()
+    stats['attendance_present']       = attendance_qs.filter(status='present').count()
+    stats['attendance_absent']        = attendance_qs.filter(status='absent').count()
+    stats['attendance_late']          = attendance_qs.filter(status='late').count()
+    stats['attendance_excused']       = attendance_qs.filter(status='excused').count()
     stats['total_attendance_records'] = total_att
 
-    # Average grades
-    avg_grade = TraineeEvaluation.objects.aggregate(avg=Avg('average_grade'))['avg']
+    # متوسط التقييمات
+    avg_grade = evaluations_qs.aggregate(avg=Avg('average_grade'))['avg']
     stats['avg_grade'] = round(avg_grade, 2) if avg_grade else 0.0
 
-    # Real University distribution query
-    from django.db.models import Count
-    import json
+    # توزيع المدارس/الجامعات
     uni_data = (
-        TraineeProfile.objects.filter(university__isnull=False)
+        trainees_qs
+        .filter(university__isnull=False)
         .exclude(university='')
         .values('university')
         .annotate(count=Count('id'))
@@ -142,23 +228,107 @@ def admin_dashboard(request):
     )
     uni_labels = [item['university'] for item in uni_data]
     uni_counts = [item['count'] for item in uni_data]
-    
     if not uni_labels:
-        uni_labels = ['لا توجد بيانات للجامعات']
+        uni_labels = ['لا توجد بيانات']
         uni_counts = [0]
 
-    # Lists for views
-    groups = Group.objects.all().annotate(student_num=Count('trainees'))
+    groups      = groups_qs.annotate(student_num=Count('trainees'))
     announcements = InternalMessage.objects.filter(recipient=None, group=None).order_by('-created_at')[:5]
-    
+
     context = {
         'stats': stats,
         'groups': groups,
         'announcements': announcements,
-        'uni_labels_json': json.dumps(uni_labels),
+        'uni_labels_json': json.dumps(uni_labels, ensure_ascii=False),
         'uni_counts_json': json.dumps(uni_counts),
+        'current_governorate': gov,
+        'selected_gov': selected_gov,
+        'is_national': is_national,
+        'governorates_summary': governorates_summary,
+        'active_governorates': Governorate.objects.filter(status='active').order_by('order', 'name'),
+        'inactive_governorates': inactive_governorates,
     }
     return render(request, 'portal/admin_dashboard.html', context)
+
+
+
+@login_required
+@require_POST
+def activate_governorate_post(request):
+    """Allows Super Admin to activate/deactivate an Iraqi governorate on demand."""
+    if request.user.role != CustomUser.Role.SUPER_ADMIN:
+        messages.error(request, "غير مصرح لك بتفعيل المحافظات.")
+        return redirect('portal:admin_dashboard')
+    
+    gov_id = request.POST.get('governorate_id')
+    status = request.POST.get('status', 'active')
+    
+    gov = get_object_or_404(Governorate, id=gov_id)
+    gov.status = status
+    gov.save(update_fields=['status'])
+    
+    action_text = "تفعيل وتدشين" if status == 'active' else "إيقاف تفعيل"
+    messages.success(request, f"تم {action_text} محافظة {gov.name} بنجاح.")
+    
+    referer = request.META.get('HTTP_REFERER', '')
+    if 'manage/governorates' in referer:
+        return redirect('portal:governorates_management')
+    return redirect('portal:admin_dashboard')
+
+
+@login_required
+def governorates_management_view(request):
+    """Dedicated Super Admin dashboard for managing all governorates and branches."""
+    if request.user.role != CustomUser.Role.SUPER_ADMIN:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("مخصص للمسؤول الوطني العام فقط.")
+        
+    active_governorates = Governorate.objects.filter(status='active').prefetch_related('branches').order_by('order', 'name')
+    inactive_governorates = Governorate.objects.exclude(status='active').order_by('order', 'name')
+    
+    context = {
+        'active_governorates': active_governorates,
+        'inactive_governorates': inactive_governorates,
+    }
+    return render(request, 'portal/governorates_management.html', context)
+
+
+@login_required
+@require_POST
+def add_branch_post(request):
+    """Adds a new training branch/center to a governorate."""
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN]:
+        messages.error(request, "غير مصرح.")
+        return redirect('portal:admin_dashboard')
+        
+    from apps.locations.models import Branch
+    gov_id = request.POST.get('governorate_id')
+    name = request.POST.get('name', '').strip()
+    code = request.POST.get('code', '').strip()
+    address = request.POST.get('address', '').strip()
+    
+    gov = get_object_or_404(Governorate, id=gov_id)
+    try:
+        branch, created = Branch.objects.get_or_create(
+            governorate=gov,
+            code=code,
+            defaults={'name': name, 'address': address}
+        )
+        if not created:
+            branch.name = name
+            branch.address = address
+            branch.save()
+        messages.success(request, f"تم إضافة فرع '{name}' لمحافظة {gov.name} بنجاح.")
+    except Exception as e:
+        messages.error(request, f"فشل إضافة الفرع: {str(e)}")
+        
+    referer = request.META.get('HTTP_REFERER', '')
+    if 'manage/governorates' in referer:
+        return redirect('portal:governorates_management')
+    return redirect('portal:admin_dashboard')
+
+
+
 
 # ==========================================
 # Lecturer Dashboard
@@ -167,11 +337,13 @@ def admin_dashboard(request):
 @login_required
 def lecturer_dashboard(request):
     """Dashboard view for Lecturers - strictly scoped to assigned groups and dates."""
-    if request.user.role not in [CustomUser.Role.LECTURER, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.LECTURER, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR]:
         raise Http404("غير مصرح بالدخول.")
         
     if request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
         groups = Group.objects.all()
+    elif request.user.role == CustomUser.Role.GOVERNORATE_ADMIN:
+        groups = Group.objects.filter(governorate=request.user.governorate)
     else:
         groups = Group.objects.filter(instructor=request.user)
         
@@ -202,7 +374,13 @@ def lecturer_dashboard(request):
 
     # Global/management announcements for lecturers
     from apps.notifications.models import InternalMessage
-    announcements = InternalMessage.objects.filter(group__isnull=True).order_by('-created_at')[:5]
+    from django.db.models import Q
+    user_gov = request.user.governorate
+    announcements = InternalMessage.objects.filter(
+        Q(group__in=groups) |
+        Q(group__isnull=True, sender__governorate=user_gov) |
+        Q(group__isnull=True, sender__governorate__isnull=True)
+    ).order_by('-created_at')[:5]
     
     context = {
         'groups': groups,
@@ -226,15 +404,16 @@ def lecturer_dashboard(request):
 @login_required
 def supervisor_dashboard(request):
     """Dashboard view for Supervisors."""
-    if request.user.role not in [CustomUser.Role.SUPERVISOR, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPERVISOR, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR]:
         raise Http404("غير مصرح بالدخول.")
         
     if request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
-        supervisor = SupervisorProfile.objects.first().user if SupervisorProfile.objects.exists() else request.user
+        groups = Group.objects.all()
+    elif request.user.role == CustomUser.Role.GOVERNORATE_ADMIN:
+        groups = Group.objects.filter(governorate=request.user.governorate)
     else:
-        supervisor = request.user
+        groups = Group.objects.filter(supervisor=request.user)
         
-    groups = Group.objects.filter(supervisor=supervisor)
     trainees = TraineeProfile.objects.filter(group__in=groups).select_related('user')
     
     # Fetch recent logs / attendance warnings (students with > 3 absences)
@@ -264,6 +443,7 @@ def trainee_dashboard(request):
     """Dashboard view for Trainees."""
     staff_roles = [
         CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
         CustomUser.Role.DIRECTOR,
         CustomUser.Role.TRAINING_OFFICER,
         CustomUser.Role.SUPERVISOR,
@@ -274,7 +454,10 @@ def trainee_dashboard(request):
         
     is_staff_view = request.user.role in staff_roles
     if is_staff_view:
-        profile = TraineeProfile.objects.select_related('user', 'group').first()
+        if request.user.role == CustomUser.Role.GOVERNORATE_ADMIN and request.user.governorate:
+            profile = TraineeProfile.objects.filter(user__governorate=request.user.governorate).select_related('user', 'group').first()
+        else:
+            profile = TraineeProfile.objects.select_related('user', 'group').first()
         if not profile:
             messages.warning(request, "لا يوجد متدربين في النظام للاستعراض حالياً.")
             return redirect('portal:admin_dashboard')
@@ -334,12 +517,18 @@ def trainee_dashboard(request):
     # Fetch targeted and global announcements
     from django.db.models import Q
     from apps.notifications.models import InternalMessage
+    user_gov = profile.user.governorate
     if profile.group:
         announcements = InternalMessage.objects.filter(
-            Q(group=profile.group) | Q(group__isnull=True)
+            Q(group=profile.group) |
+            Q(group__isnull=True, sender__governorate=user_gov) |
+            Q(group__isnull=True, sender__governorate__isnull=True)
         ).order_by('-id')
     else:
-        announcements = InternalMessage.objects.filter(group__isnull=True).order_by('-id')
+        announcements = InternalMessage.objects.filter(
+            Q(group__isnull=True, sender__governorate=user_gov) |
+            Q(group__isnull=True, sender__governorate__isnull=True)
+        ).order_by('-id')
     
     # Fetch staff notes with author & timestamp
     from apps.users.models import TraineeNote
@@ -505,6 +694,9 @@ def calendar_view(request):
     from apps.assignments.models import Assignment
     from apps.courses.models import Group
     
+    gov = user.governorate
+    is_national = (user.role == CustomUser.Role.SUPER_ADMIN)
+    
     if user.role == CustomUser.Role.TRAINEE:
         profile = getattr(user, 'trainee_profile', None)
         user_group = profile.group if profile else None
@@ -513,9 +705,9 @@ def calendar_view(request):
             lectures = Lecture.objects.filter(group=user_group)
             assignments = Assignment.objects.filter(group=user_group)
         else:
-            groups = Group.objects.all()
-            lectures = Lecture.objects.all()
-            assignments = Assignment.objects.all()
+            groups = Group.objects.filter(governorate=gov) if gov else Group.objects.all()
+            lectures = Lecture.objects.filter(group__governorate=gov) if gov else Lecture.objects.all()
+            assignments = Assignment.objects.filter(group__governorate=gov) if gov else Assignment.objects.all()
     elif user.role == CustomUser.Role.LECTURER:
         user_groups = Group.objects.filter(instructor=user)
         if user_groups.exists():
@@ -523,9 +715,9 @@ def calendar_view(request):
             lectures = Lecture.objects.filter(group__in=user_groups)
             assignments = Assignment.objects.filter(group__in=user_groups)
         else:
-            groups = Group.objects.all()
-            lectures = Lecture.objects.all()
-            assignments = Assignment.objects.all()
+            groups = Group.objects.filter(governorate=gov) if gov else Group.objects.all()
+            lectures = Lecture.objects.filter(group__governorate=gov) if gov else Lecture.objects.all()
+            assignments = Assignment.objects.filter(group__governorate=gov) if gov else Assignment.objects.all()
     elif user.role == CustomUser.Role.SUPERVISOR:
         user_groups = Group.objects.filter(supervisor=user)
         if user_groups.exists():
@@ -533,13 +725,19 @@ def calendar_view(request):
             lectures = Lecture.objects.filter(group__in=user_groups)
             assignments = Assignment.objects.filter(group__in=user_groups)
         else:
+            groups = Group.objects.filter(governorate=gov) if gov else Group.objects.all()
+            lectures = Lecture.objects.filter(group__governorate=gov) if gov else Lecture.objects.all()
+            assignments = Assignment.objects.filter(group__governorate=gov) if gov else Assignment.objects.all()
+    else:
+        if is_national:
             groups = Group.objects.all()
             lectures = Lecture.objects.all()
             assignments = Assignment.objects.all()
-    else:
-        groups = Group.objects.all()
-        lectures = Lecture.objects.all()
-        assignments = Assignment.objects.all()
+        else:
+            groups = Group.objects.filter(governorate=gov)
+            lectures = Lecture.objects.filter(group__governorate=gov)
+            assignments = Assignment.objects.filter(group__governorate=gov)
+
         
     events = []
     # 1. Format Lectures for Calendar
@@ -857,26 +1055,33 @@ def evaluate_lecturer_view(request, lecture_id):
 @login_required
 def activity_log_view(request):
     """Unified Activity Feed & Logging Page for Admins and Directors."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         raise Http404("غير مصرح بالدخول.")
 
     # 1. Points Logs (Activities)
-    points_logs = ActivityPointsLog.objects.select_related('trainee').order_by('-created_at')[:50]
+    points_logs = ActivityPointsLog.objects.select_related('trainee').order_by('-created_at')
     
     # 2. Attendance Records
-    attendance_logs = Attendance.objects.select_related('trainee', 'lecture', 'lecture__group').order_by('-check_in_time')[:50]
+    attendance_logs = Attendance.objects.select_related('trainee', 'lecture', 'lecture__group').order_by('-check_in_time')
     
     # 3. Evaluations & Instructor Notes
-    evaluation_logs = TraineeEvaluation.objects.select_related('trainee', 'lecture', 'evaluator').order_by('-id')[:50]
+    evaluation_logs = TraineeEvaluation.objects.select_related('trainee', 'lecture', 'evaluator').order_by('-id')
     
     # 4. Homework Submissions
-    submissions_logs = AssignmentSubmission.objects.select_related('trainee', 'assignment', 'assignment__group').order_by('-submitted_at')[:50]
+    submissions_logs = AssignmentSubmission.objects.select_related('trainee', 'assignment', 'assignment__group').order_by('-submitted_at')
+
+    if request.user.role == CustomUser.Role.GOVERNORATE_ADMIN and request.user.governorate:
+        gov = request.user.governorate
+        points_logs = points_logs.filter(trainee__governorate=gov)
+        attendance_logs = attendance_logs.filter(trainee__governorate=gov)
+        evaluation_logs = evaluation_logs.filter(trainee__governorate=gov)
+        submissions_logs = submissions_logs.filter(trainee__governorate=gov)
 
     context = {
-        'points_logs': points_logs,
-        'attendance_logs': attendance_logs,
-        'evaluation_logs': evaluation_logs,
-        'submissions_logs': submissions_logs,
+        'points_logs': points_logs[:50],
+        'attendance_logs': attendance_logs[:50],
+        'evaluation_logs': evaluation_logs[:50],
+        'submissions_logs': submissions_logs[:50],
     }
     return render(request, 'portal/activity_log.html', context)
 
@@ -945,20 +1150,45 @@ def mark_attendance_manual_view(request, lecture_id):
 @login_required
 def admin_management_hub(request):
     """Unified HTML portal management dashboard for Admin to manage Lecturers, Trainees, Groups, and Lectures."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    allowed_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+    ]
+    if request.user.role not in allowed_roles:
         raise Http404("غير مصرح بالدخول.")
-        
-    lecturers = CustomUser.objects.filter(role=CustomUser.Role.LECTURER).prefetch_related('lecturer_profile')
-    trainees = TraineeProfile.objects.select_related('user', 'group').all()
-    groups = Group.objects.select_related('course', 'instructor', 'supervisor').all()
-    lectures = Lecture.objects.select_related('group', 'group__course').order_by('-date')
+
+    gov = request.governorate
+    is_national = request.is_national
+    all_governorates = Governorate.objects.all().order_by('order', 'name')
+    selected_gov = None
+
+    if is_national:
+        filter_gov_id = request.GET.get('gov_id')
+        if filter_gov_id and filter_gov_id.isdigit():
+            selected_gov = Governorate.objects.filter(id=int(filter_gov_id)).first()
+            if selected_gov:
+                gov = selected_gov
+
+    if is_national and not selected_gov:
+        lecturers = CustomUser.objects.filter(role=CustomUser.Role.LECTURER).prefetch_related('lecturer_profile')
+        trainees = TraineeProfile.objects.select_related('user', 'group').all()
+        groups = Group.objects.select_related('course', 'instructor', 'supervisor', 'governorate').all()
+        lectures = Lecture.objects.select_related('group', 'group__course').order_by('-date')
+        supervisors = CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR)
+        certificates = Certificate.objects.select_related('trainee', 'course').all()
+    else:
+        lecturers = CustomUser.objects.filter(role=CustomUser.Role.LECTURER, governorate=gov).prefetch_related('lecturer_profile')
+        trainees = TraineeProfile.objects.filter(user__governorate=gov).select_related('user', 'group')
+        groups = Group.objects.filter(governorate=gov).select_related('course', 'instructor', 'supervisor', 'governorate')
+        lectures = Lecture.objects.filter(group__governorate=gov).select_related('group', 'group__course').order_by('-date')
+        supervisors = CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR, governorate=gov)
+        certificates = Certificate.objects.filter(trainee__governorate=gov).select_related('trainee', 'course')
+
     courses = Course.objects.all()
     badges = Badge.objects.all()
-    certificates = Certificate.objects.select_related('trainee', 'course').all()
     announcements = InternalMessage.objects.filter(recipient=None, group=None).order_by('-created_at')
-    
-    # Supervisors lists to populate supervisor dropdowns
-    supervisors = CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR)
     
     # Prepare weekly training schedule data dynamically
     days_map = [
@@ -989,6 +1219,10 @@ def admin_management_hub(request):
         'certificates': certificates,
         'announcements': announcements,
         'schedule_data': schedule_data,
+        'all_governorates': all_governorates,
+        'current_governorate': gov,
+        'selected_gov': selected_gov,
+        'is_national': is_national,
     }
     return render(request, 'portal/admin_management_hub.html', context)
 
@@ -997,7 +1231,8 @@ def admin_management_hub(request):
 @require_POST
 def add_lecturer_post(request):
     """Saves a new lecturer user account from HTML form."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    allowed_roles = [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]
+    if request.user.role not in allowed_roles:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     username = request.POST.get('username')
@@ -1007,6 +1242,13 @@ def add_lecturer_post(request):
     specialty = request.POST.get('specialty', '')
     bio = request.POST.get('bio', '')
     
+    # Assign governorate
+    gov = request.user.governorate
+    if not gov and request.POST.get('governorate_id'):
+        gov = Governorate.objects.filter(id=request.POST.get('governorate_id')).first()
+    if not gov:
+        gov = Governorate.objects.filter(status='active').first()
+
     if not username:
         messages.error(request, "اسم المستخدم حقل مطلوب.")
         return redirect('portal:admin_management_hub')
@@ -1018,6 +1260,7 @@ def add_lecturer_post(request):
             first_name=first_name.strip() if first_name else '',
             last_name=last_name.strip() if last_name else '',
             role=CustomUser.Role.LECTURER,
+            governorate=gov,
             password="Password123"
         )
         LecturerProfile.objects.create(
@@ -1036,7 +1279,8 @@ def add_lecturer_post(request):
 @require_POST
 def add_trainee_post(request):
     """Saves a new trainee user account and profile from HTML form."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    allowed_roles = [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]
+    if request.user.role not in allowed_roles:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     username = request.POST.get('username')
@@ -1044,7 +1288,7 @@ def add_trainee_post(request):
     first_name = request.POST.get('first_name')
     last_name = request.POST.get('last_name')
     group_id = request.POST.get('group')
-    gov = request.POST.get('governorate', 'البصرة')
+    gov_name = request.POST.get('governorate', '')
     dist = request.POST.get('district', '')
     uni = request.POST.get('university', '')
     col = request.POST.get('college', '')
@@ -1061,18 +1305,27 @@ def add_trainee_post(request):
         if group_id:
             group = Group.objects.get(id=group_id)
             
+        gov = request.user.governorate
+        if not gov and group and group.governorate:
+            gov = group.governorate
+        if not gov and request.POST.get('governorate_id'):
+            gov = Governorate.objects.filter(id=request.POST.get('governorate_id')).first()
+        if not gov:
+            gov = Governorate.objects.filter(name=gov_name).first() if gov_name else Governorate.objects.filter(status='active').first()
+
         user = CustomUser.objects.create_user(
             username=username.strip(),
             email=email.strip() if email else f"{username.strip()}@1000programmers.iq",
             first_name=first_name.strip() if first_name else '',
             last_name=last_name.strip() if last_name else '',
             role=CustomUser.Role.TRAINEE,
+            governorate=gov,
             password="Password123"
         )
         TraineeProfile.objects.create(
             user=user,
             group=group,
-            governorate=gov,
+            governorate=gov.name if gov else gov_name,
             district=dist,
             university=uni,
             college=col,
@@ -1091,7 +1344,8 @@ def add_trainee_post(request):
 @require_POST
 def add_group_post(request):
     """Saves a new group from HTML form."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    allowed_roles = [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]
+    if request.user.role not in allowed_roles:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     schedule_type = request.POST.get('schedule_type', 'new')
@@ -1108,6 +1362,12 @@ def add_group_post(request):
     start_time = request.POST.get('start_time')
     end_time = request.POST.get('end_time')
     
+    gov = request.user.governorate
+    if not gov and request.POST.get('governorate_id'):
+        gov = Governorate.objects.filter(id=request.POST.get('governorate_id')).first()
+    if not gov:
+        gov = Governorate.objects.filter(status='active').first()
+
     try:
         # Resolve course/subject dynamically
         course = None
@@ -1130,6 +1390,7 @@ def add_group_post(request):
             if days: group.days = days.strip()
             if start_time: group.start_time = start_time
             if end_time: group.end_time = end_time
+            if gov and not group.governorate: group.governorate = gov
             group.save()
             messages.success(request, f"تم تحديث جدولة الشعبة '{group.name}' بنجاح.")
         else:
@@ -1146,6 +1407,7 @@ def add_group_post(request):
                 code = f"{clean_title}-{random.randint(100, 999)}"
                 
             group = Group.objects.create(
+                governorate=gov,
                 name=name.strip(),
                 code=code.strip(),
                 course=course,
@@ -1163,11 +1425,12 @@ def add_group_post(request):
     return redirect('portal:admin_management_hub')
 
 
+
 @login_required
 @require_POST
 def add_lecture_post(request):
     """Saves a new lecture from HTML form."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     title = request.POST.get('title')
@@ -1200,7 +1463,7 @@ def add_lecture_post(request):
 @login_required
 def export_groups_view(request):
     """Exports all groups to an Excel sheet."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         raise Http404("غير مصرح.")
     buffer = LectureGroupImportExportService.export_groups()
     response = HttpResponse(
@@ -1215,7 +1478,7 @@ def export_groups_view(request):
 @require_POST
 def import_groups_view(request):
     """Imports groups from an Excel sheet."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     if request.FILES.get('excel_file'):
@@ -1236,7 +1499,7 @@ def import_groups_view(request):
 @login_required
 def export_lectures_view(request):
     """Exports all lectures to an Excel sheet."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         raise Http404("غير مصرح.")
     buffer = LectureGroupImportExportService.export_lectures()
     response = HttpResponse(
@@ -1251,7 +1514,7 @@ def export_lectures_view(request):
 @require_POST
 def import_lectures_view(request):
     """Imports lectures from an Excel sheet."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     if request.FILES.get('excel_file'):
@@ -1273,7 +1536,7 @@ def import_lectures_view(request):
 @require_POST
 def add_course_post(request):
     """Saves a new course from HTML form."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
     title = request.POST.get('title')
     description = request.POST.get('description', '')
@@ -1295,7 +1558,7 @@ def add_course_post(request):
 @require_POST
 def edit_course_post(request, course_id):
     """Updates an existing course details."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
     course = get_object_or_404(Course, id=course_id)
     title = request.POST.get('title')
@@ -1318,7 +1581,7 @@ def edit_course_post(request, course_id):
 @require_POST
 def delete_course_post(request, course_id):
     """Deletes an existing course."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
     course = get_object_or_404(Course, id=course_id)
     try:
@@ -1334,7 +1597,7 @@ def delete_course_post(request, course_id):
 @require_POST
 def add_badge_post(request):
     """Saves a new gamified badge from HTML form."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
     title = request.POST.get('title')
     points = request.POST.get('points_required', 100)
@@ -1358,7 +1621,7 @@ def add_badge_post(request):
 @require_POST
 def award_badge_post(request):
     """Awards a specific badge to a trainee manually from HTML form."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
     trainee_id = request.POST.get('trainee')
     badge_id = request.POST.get('badge')
@@ -1392,7 +1655,7 @@ def award_badge_post(request):
 @require_POST
 def generate_certificate_post(request):
     """Generates a Graduation Certificate PDF and database entry for a student."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
     trainee_id = request.POST.get('trainee')
     course_id = request.POST.get('course')
@@ -1417,7 +1680,7 @@ def generate_certificate_post(request):
 @require_POST
 def add_announcement_post(request):
     """Saves a new global or targeted broadcast announcement from HTML form."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
     title = request.POST.get('title')
     body = request.POST.get('body')
@@ -1431,19 +1694,31 @@ def add_announcement_post(request):
             target_group = None
             users_to_notify = []
             
+            is_gov_admin = (request.user.role == CustomUser.Role.GOVERNORATE_ADMIN and request.user.governorate)
+            gov = request.user.governorate if is_gov_admin else None
+
             if target_audience == 'group' and group_id:
                 target_group = get_object_or_404(Group, id=group_id)
                 users_to_notify = CustomUser.objects.filter(role=CustomUser.Role.TRAINEE, trainee_profile__group=target_group)
                 audience_desc = f"شعبة {target_group.name}"
             elif target_audience == 'trainees':
-                users_to_notify = CustomUser.objects.filter(role=CustomUser.Role.TRAINEE)
-                audience_desc = "جميع الطلاب"
+                qs = CustomUser.objects.filter(role=CustomUser.Role.TRAINEE)
+                if gov:
+                    qs = qs.filter(governorate=gov)
+                users_to_notify = qs
+                audience_desc = f"جميع طلاب {gov.name}" if gov else "جميع الطلاب"
             elif target_audience == 'lecturers':
-                users_to_notify = CustomUser.objects.filter(role=CustomUser.Role.LECTURER)
-                audience_desc = "جميع المدربين"
+                qs = CustomUser.objects.filter(role=CustomUser.Role.LECTURER)
+                if gov:
+                    qs = qs.filter(governorate=gov)
+                users_to_notify = qs
+                audience_desc = f"جميع مدربي {gov.name}" if gov else "جميع المدربين"
             else: # all
-                users_to_notify = CustomUser.objects.filter(role__in=[CustomUser.Role.TRAINEE, CustomUser.Role.LECTURER])
-                audience_desc = "جميع منتسبي المبادرة (مدربين وطلاب)"
+                qs = CustomUser.objects.filter(role__in=[CustomUser.Role.TRAINEE, CustomUser.Role.LECTURER])
+                if gov:
+                    qs = qs.filter(governorate=gov)
+                users_to_notify = qs
+                audience_desc = f"جميع منتسبي {gov.name} (مدربين وطلاب)" if gov else "جميع منتسبي المبادرة (مدربين وطلاب)"
                 
             InternalMessage.objects.create(
                 sender=request.user,
@@ -1470,7 +1745,7 @@ def add_announcement_post(request):
 @require_POST
 def update_site_config_post(request):
     """Updates general site configuration (logo, name, subtitle) from HTML form."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
     site_name = request.POST.get('site_name')
     sub_title = request.POST.get('sub_title')
@@ -1570,7 +1845,7 @@ def edit_profile_view(request):
 def view_trainee_profile_detail(request, trainee_user_id):
     """Allows admins, directors, supervisors, and lecturers to view a specific student's profile/dashboard."""
     # Check permissions
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR, CustomUser.Role.LECTURER, CustomUser.Role.TRAINEE]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER, CustomUser.Role.SUPERVISOR, CustomUser.Role.LECTURER, CustomUser.Role.TRAINEE]:
         raise Http404("غير مصرح بالدخول.")
         
     # Trainees can only view their own profile detail
@@ -1635,12 +1910,14 @@ def view_trainee_profile_detail(request, trainee_user_id):
         'group': profile.group,
         'points_log': points_log,
         'group_leaderboard': group_leaderboard,
-        'is_viewing_as_staff': (request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR, CustomUser.Role.LECTURER]),
+        'is_viewing_as_staff': (request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER, CustomUser.Role.SUPERVISOR, CustomUser.Role.LECTURER]),
         # Fetch staff notes with author & timestamp
         'staff_notes': list(TraineeNote.objects.filter(trainee=profile).select_related('author').order_by('-created_at')),
         # Fetch targeted and global announcements
         'announcements': InternalMessage.objects.filter(
-            Q(group=profile.group) | Q(group__isnull=True)
+            Q(group=profile.group) |
+            Q(group__isnull=True, sender__governorate=trainee.governorate) |
+            Q(group__isnull=True, sender__governorate__isnull=True)
         ).order_by('-id'),
     }
     return render(request, 'portal/trainee_dashboard.html', context)
@@ -1658,7 +1935,7 @@ def mark_notifications_read(request):
 @require_POST
 def delete_announcement_post(request, message_id):
     """Deletes an announcement/InternalMessage and redirect back to dashboard."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     msg = get_object_or_404(InternalMessage, id=message_id)
@@ -1678,18 +1955,24 @@ def delete_announcement_post(request, message_id):
 @login_required
 def create_announcements_view(request):
     """Dedicated management page for creating and reviewing administrative announcements."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         raise Http404("غير مصرح بالدخول.")
         
     from apps.notifications.models import InternalMessage
     announcements = InternalMessage.objects.all().order_by('-created_at')
     
     # Query groups for dropdown selector
-    groups = Group.objects.all()
+    groups = get_groups_qs_for_user(request.user)
+    if request.user.role == CustomUser.Role.GOVERNORATE_ADMIN and request.user.governorate:
+        gov = request.user.governorate
+        announcements = announcements.filter(
+            Q(group__governorate=gov) | Q(sender__governorate=gov) | Q(sender=request.user)
+        ).distinct()
     
     context = {
         'announcements': announcements,
         'groups': groups,
+        'current_governorate': request.user.governorate if request.user.role == CustomUser.Role.GOVERNORATE_ADMIN else None,
     }
     return render(request, 'portal/create_announcements.html', context)
 
@@ -1704,11 +1987,14 @@ def notifications_unread_count_api(request):
 @login_required
 def send_notifications_view(request):
     """Dedicated management page for sending and reviewing individual/group bell notifications."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         raise Http404("غير مصرح بالدخول.")
         
     from apps.notifications.models import Notification
     
+    is_gov_admin = (request.user.role == CustomUser.Role.GOVERNORATE_ADMIN and request.user.governorate)
+    gov = request.user.governorate if is_gov_admin else None
+
     # If request is POST, handle notification sending
     if request.method == 'POST':
         target_type = request.POST.get('target_type')
@@ -1723,7 +2009,10 @@ def send_notifications_view(request):
             if target_type == 'user':
                 user_ids = request.POST.getlist('user_ids')
                 if user_ids:
-                    users_to_notify = list(CustomUser.objects.filter(id__in=user_ids))
+                    qs = CustomUser.objects.filter(id__in=user_ids)
+                    if gov:
+                        qs = qs.filter(governorate=gov)
+                    users_to_notify = list(qs)
                     if len(users_to_notify) == 1:
                         target_desc = f"المستخدم {users_to_notify[0].get_full_name() or users_to_notify[0].username}"
                     else:
@@ -1739,17 +2028,29 @@ def send_notifications_view(request):
                     ).distinct())
                     target_desc = f"منتسبي شعبة {group.name}"
             elif target_type == 'all_trainees':
-                users_to_notify = list(CustomUser.objects.filter(role=CustomUser.Role.TRAINEE))
-                target_desc = "جميع الطلاب"
+                qs = CustomUser.objects.filter(role=CustomUser.Role.TRAINEE)
+                if gov:
+                    qs = qs.filter(governorate=gov)
+                users_to_notify = list(qs)
+                target_desc = f"جميع الطلاب في {gov.name}" if gov else "جميع الطلاب"
             elif target_type == 'all_lecturers':
-                users_to_notify = list(CustomUser.objects.filter(role=CustomUser.Role.LECTURER))
-                target_desc = "جميع المدربين"
+                qs = CustomUser.objects.filter(role=CustomUser.Role.LECTURER)
+                if gov:
+                    qs = qs.filter(governorate=gov)
+                users_to_notify = list(qs)
+                target_desc = f"جميع المدربين في {gov.name}" if gov else "جميع المدربين"
             elif target_type == 'all_supervisors':
-                users_to_notify = list(CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR))
-                target_desc = "جميع المشرفين"
+                qs = CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR)
+                if gov:
+                    qs = qs.filter(governorate=gov)
+                users_to_notify = list(qs)
+                target_desc = f"جميع المشرفين في {gov.name}" if gov else "جميع المشرفين"
             elif target_type == 'all_users':
-                users_to_notify = list(CustomUser.objects.all())
-                target_desc = "جميع المستخدمين"
+                qs = CustomUser.objects.all()
+                if gov:
+                    qs = qs.filter(governorate=gov)
+                users_to_notify = list(qs)
+                target_desc = f"جميع المستخدمين في {gov.name}" if gov else "جميع المستخدمين"
                 
             if users_to_notify and title and message:
                 for u in users_to_notify:
@@ -1779,19 +2080,26 @@ def send_notifications_view(request):
             
         return redirect('portal:send_notifications_view')
 
-    # Query all sent notifications (limit to last 30 for performance)
-    sent_notifications = Notification.objects.all().select_related('user').order_by('-created_at')[:30]
+    # Query sent notifications
+    sent_notifications_qs = Notification.objects.all().select_related('user').order_by('-created_at')
+    if gov:
+        sent_notifications_qs = sent_notifications_qs.filter(user__governorate=gov)
+    sent_notifications = sent_notifications_qs[:30]
     
-    # Query all users (lecturers & trainees) for individual select
-    all_users = CustomUser.objects.filter(role__in=[CustomUser.Role.TRAINEE, CustomUser.Role.LECTURER]).order_by('role', 'username')
+    # Query users for individual select - filtered by governorate for governorate admin
+    all_users_qs = CustomUser.objects.filter(role__in=[CustomUser.Role.TRAINEE, CustomUser.Role.LECTURER]).order_by('role', 'username')
+    if gov:
+        all_users_qs = all_users_qs.filter(governorate=gov)
+    all_users = all_users_qs
     
-    # Query groups
-    groups = Group.objects.all()
+    # Query groups - filtered by governorate for governorate admin
+    groups = get_groups_qs_for_user(request.user)
     
     context = {
         'sent_notifications': sent_notifications,
         'all_users': all_users,
         'groups': groups,
+        'current_governorate': gov,
     }
     return render(request, 'portal/send_notifications.html', context)
 
@@ -1800,7 +2108,7 @@ def send_notifications_view(request):
 @require_POST
 def delete_notification_post(request, notification_id):
     """Deletes a specific notification."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     from apps.notifications.models import Notification
@@ -1822,7 +2130,7 @@ def delete_notification_post(request, notification_id):
 @require_POST
 def edit_lecturer_post(request, lecturer_id):
     """Updates an existing lecturer's details and profile."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     user = get_object_or_404(CustomUser, id=lecturer_id, role=CustomUser.Role.LECTURER)
@@ -1855,7 +2163,7 @@ def edit_lecturer_post(request, lecturer_id):
 @require_POST
 def delete_lecturer_post(request, lecturer_id):
     """Deletes a lecturer user account and profile."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     user = get_object_or_404(CustomUser, id=lecturer_id, role=CustomUser.Role.LECTURER)
@@ -1871,7 +2179,7 @@ def delete_lecturer_post(request, lecturer_id):
 @require_POST
 def edit_trainee_post(request, trainee_id):
     """Updates an existing trainee's details and profile."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     profile = get_object_or_404(TraineeProfile, id=trainee_id)
@@ -1917,7 +2225,7 @@ def edit_trainee_post(request, trainee_id):
 @require_POST
 def delete_trainee_post(request, trainee_id):
     """Deletes a trainee user account and profile."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     profile = get_object_or_404(TraineeProfile, id=trainee_id)
@@ -1933,7 +2241,7 @@ def delete_trainee_post(request, trainee_id):
 @require_POST
 def save_trainee_notes_post(request, trainee_id):
     """Allows superadmins, directors, supervisors, and lecturers to save profile notes for a trainee."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR, CustomUser.Role.LECTURER]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER, CustomUser.Role.SUPERVISOR, CustomUser.Role.LECTURER]:
         messages.error(request, "غير مصرح لك بإضافة ملاحظات.")
         return redirect('portal:admin_management_hub')
         
@@ -1962,7 +2270,7 @@ def save_trainee_notes_post(request, trainee_id):
 @require_POST
 def edit_group_post(request, group_id):
     """Updates an existing group's details."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     group = get_object_or_404(Group, id=group_id)
@@ -2012,7 +2320,7 @@ def edit_group_post(request, group_id):
 @require_POST
 def delete_group_post(request, group_id):
     """Deletes an existing group."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     group = get_object_or_404(Group, id=group_id)
@@ -2028,7 +2336,7 @@ def delete_group_post(request, group_id):
 @require_POST
 def edit_lecture_post(request, lecture_id):
     """Updates an existing lecture's details."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     lecture = get_object_or_404(Lecture, id=lecture_id)
@@ -2058,7 +2366,7 @@ def edit_lecture_post(request, lecture_id):
 @require_POST
 def delete_lecture_post(request, lecture_id):
     """Deletes an existing lecture."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     lecture = get_object_or_404(Lecture, id=lecture_id)
@@ -2074,7 +2382,7 @@ def delete_lecture_post(request, lecture_id):
 @require_POST
 def import_lecturers_view(request):
     """Handles Excel file uploads for lecturer bulk importing."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     if request.FILES.get('excel_file'):
@@ -2096,7 +2404,7 @@ def import_lecturers_view(request):
 @require_POST
 def generate_single_account_post(request):
     """Auto-generates a single user account and returns credentials via JSON."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     username = request.POST.get('username')
@@ -2105,6 +2413,12 @@ def generate_single_account_post(request):
     role = request.POST.get('role', 'trainee')
     group_id = request.POST.get('group')
     
+    gov = request.user.governorate
+    if request.user.role == CustomUser.Role.SUPER_ADMIN and request.POST.get('governorate_id'):
+        gov = Governorate.objects.filter(id=request.POST.get('governorate_id')).first()
+    if not gov:
+        gov = Governorate.objects.filter(status='active').first()
+
     if not username:
         return JsonResponse({'success': False, 'message': 'اسم المستخدم مطلوب.'}, status=400)
         
@@ -2120,23 +2434,29 @@ def generate_single_account_post(request):
     try:
         from django.db import transaction
         with transaction.atomic():
+            is_staff_val = role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR]
             user = CustomUser.objects.create_user(
                 username=username,
                 email=f"{username}@1000programmers.org",
                 first_name=first_name.strip(),
                 last_name=last_name.strip(),
                 role=role,
+                governorate=gov,
                 password=password,
-                temp_password=password
+                temp_password=password,
+                is_staff=is_staff_val
             )
 
-            
             group_name = ""
             if role == CustomUser.Role.TRAINEE:
                 group = Group.objects.get(id=group_id) if group_id else None
+                if not gov and group and group.governorate:
+                    gov = group.governorate
+                    user.governorate = gov
+                    user.save(update_fields=['governorate'])
                 profile = TraineeProfile.objects.create(
                     user=user,
-                    governorate='البصرة',
+                    governorate=gov.name if gov else 'البصرة',
                     group=group
                 )
                 user.email = f"{profile.training_number.lower()}@1000programmers.org"
@@ -2158,7 +2478,8 @@ def generate_single_account_post(request):
                 'email': user.email,
                 'password': password,
                 'role': dict(CustomUser.Role.choices).get(role, role),
-                'group': group_name
+                'group': group_name,
+                'governorate': gov.name if gov else ''
             })
     except Exception as e:
         return JsonResponse({'success': False, 'message': f"فشل التوليد: {str(e)}"}, status=500)
@@ -2167,7 +2488,8 @@ def generate_single_account_post(request):
 @login_required
 def generate_batch_accounts_view(request):
     """Generates batch accounts and exports them to an Excel spreadsheet."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    allowed_roles = [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]
+    if request.user.role not in allowed_roles:
         raise Http404("غير مصرح.")
         
     if request.method == 'POST':
@@ -2178,6 +2500,16 @@ def generate_batch_accounts_view(request):
         group_id = request.POST.get('group_id')
         names_text = request.POST.get('names_list', '')
         
+        gov = request.user.governorate
+        if not gov and request.POST.get('governorate_id'):
+            gov = Governorate.objects.filter(id=request.POST.get('governorate_id')).first()
+        if not gov and group_id:
+            g = Group.objects.filter(id=group_id).first()
+            if g and g.governorate:
+                gov = g.governorate
+        if not gov:
+            gov = Governorate.objects.filter(status='active').first()
+            
         names_list = [n.strip() for n in names_text.splitlines() if n.strip()] if names_text else None
 
         try:
@@ -2186,7 +2518,8 @@ def generate_batch_accounts_view(request):
                 count=count,
                 role=role,
                 group_id=group_id,
-                names_list=names_list
+                names_list=names_list,
+                governorate=gov
             )
             
             response = HttpResponse(
@@ -2198,22 +2531,45 @@ def generate_batch_accounts_view(request):
         except Exception as e:
             messages.error(request, f"فشل توليد الحسابات الجماعية: {str(e)}")
             
-    return redirect('portal:admin_management_hub')
+    return redirect('portal:accounts_management')
+
 
 
 @login_required
 def accounts_management_view(request):
     """
     Dedicated Admin Dashboard for viewing, searching, filtering, and managing all generated user accounts.
-    Accessible strictly to SuperAdmin and Director roles.
+    Accessible strictly to SuperAdmin, Governorate Admin, and Director roles.
     """
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    allowed_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+    ]
+    if request.user.role not in allowed_roles:
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied("غير مصرح لك بالوصول لصفحة إدارة الحسابات.")
 
+    gov = request.governorate
+    is_national = request.is_national
+    all_governorates = Governorate.objects.all().order_by('order', 'name')
+    selected_gov = None
 
     # Base Queryset
-    users_qs = CustomUser.objects.all().select_related('trainee_profile__group', 'lecturer_profile', 'supervisor_profile').order_by('-date_joined')
+    users_qs = CustomUser.objects.all().select_related('trainee_profile__group', 'lecturer_profile', 'supervisor_profile', 'governorate').order_by('-date_joined')
+    groups = Group.objects.all().order_by('name')
+
+    if is_national:
+        gov_filter = request.GET.get('governorate')
+        if gov_filter and gov_filter.isdigit():
+            selected_gov = Governorate.objects.filter(id=int(gov_filter)).first()
+            if selected_gov:
+                users_qs = users_qs.filter(governorate=selected_gov)
+                groups = groups.filter(governorate=selected_gov)
+    else:
+        users_qs = users_qs.filter(governorate=gov)
+        groups = groups.filter(governorate=gov)
 
     # Filters
     search_query = request.GET.get('q', '').strip()
@@ -2238,7 +2594,6 @@ def accounts_management_view(request):
     if group_filter != 'all' and group_filter.isdigit():
         users_qs = users_qs.filter(trainee_profile__group_id=int(group_filter))
 
-
     if status_filter == 'active':
         users_qs = users_qs.filter(is_active=True)
     elif status_filter == 'inactive':
@@ -2251,18 +2606,16 @@ def accounts_management_view(request):
         users_qs = users_qs.filter(Q(telegram_chat_id__isnull=True) | Q(telegram_chat_id__exact=''))
 
     # Calculate overall statistics
-    total_users = CustomUser.objects.count()
+    total_users = users_qs.count()
     stats = {
         'total': total_users,
-        'trainees': CustomUser.objects.filter(role=CustomUser.Role.TRAINEE).count(),
-        'lecturers': CustomUser.objects.filter(role=CustomUser.Role.LECTURER).count(),
-        'supervisors': CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR).count(),
-        'admins': CustomUser.objects.filter(role__in=[CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]).count(),
-        'active': CustomUser.objects.filter(is_active=True).count(),
-        'telegram_linked': CustomUser.objects.exclude(telegram_chat_id__isnull=True).exclude(telegram_chat_id__exact='').count(),
+        'trainees': users_qs.filter(role=CustomUser.Role.TRAINEE).count(),
+        'lecturers': users_qs.filter(role=CustomUser.Role.LECTURER).count(),
+        'supervisors': users_qs.filter(role=CustomUser.Role.SUPERVISOR).count(),
+        'admins': users_qs.filter(role__in=[CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR]).count(),
+        'active': users_qs.filter(is_active=True).count(),
+        'telegram_linked': users_qs.exclude(telegram_chat_id__isnull=True).exclude(telegram_chat_id__exact='').count(),
     }
-
-    groups = Group.objects.all().order_by('name')
 
     context = {
         'users_list': users_qs,
@@ -2274,15 +2627,20 @@ def accounts_management_view(request):
         'status_filter': status_filter,
         'telegram_filter': telegram_filter,
         'role_choices': CustomUser.Role.choices,
+        'all_governorates': all_governorates,
+        'selected_gov': selected_gov,
+        'is_national': is_national,
+        'current_governorate': gov,
     }
     return render(request, 'portal/accounts_management.html', context)
+
 
 
 @login_required
 @require_POST
 def reset_user_password_post(request, user_id):
     """Resets the password for a specific user and returns or displays the new credentials."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
 
     user = get_object_or_404(CustomUser, id=user_id)
@@ -2326,7 +2684,7 @@ def reset_user_password_post(request, user_id):
 @require_POST
 def send_credentials_telegram_post(request, user_id):
     """Sends account login credentials directly to the user's Telegram."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
 
     user = get_object_or_404(CustomUser, id=user_id)
@@ -2354,7 +2712,7 @@ def send_credentials_telegram_post(request, user_id):
 @require_POST
 def toggle_user_active_post(request, user_id):
     """Toggles the is_active status of a specific user account (Activate/Deactivate)."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
 
     user = get_object_or_404(CustomUser, id=user_id)
@@ -2381,7 +2739,7 @@ def toggle_user_active_post(request, user_id):
 @login_required
 def export_accounts_excel_view(request):
     """Exports the filtered accounts list to an Excel spreadsheet."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         raise Http404("غير مصرح.")
 
     import openpyxl
@@ -2393,6 +2751,8 @@ def export_accounts_excel_view(request):
     ws.append(headers)
 
     users_qs = CustomUser.objects.all().select_related('trainee_profile__group').order_by('-date_joined')
+    if request.user.role == CustomUser.Role.GOVERNORATE_ADMIN and request.user.governorate:
+        users_qs = users_qs.filter(governorate=request.user.governorate)
     role_map = dict(CustomUser.Role.choices)
 
     for idx, u in enumerate(users_qs, start=1):
@@ -2453,7 +2813,7 @@ def bulk_accounts_action_post(request):
     Performs bulk actions (Delete, Reset Passwords, Send Telegram Credentials, Toggle Active)
     on a selected list of user IDs.
     """
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح لك بإجراء العمليات الجماعية.'}, status=403)
 
     import json
@@ -2613,7 +2973,7 @@ def get_group_students_api(request, group_id):
 @login_required
 def export_lecturers_view(request):
     """Generates and downloads a lecturers spreadsheet."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         raise Http404("غير مصرح.")
         
     buffer = ImportExportService.export_lecturers_to_excel()
@@ -2630,7 +2990,7 @@ def export_lecturers_view(request):
 @require_POST
 def bulk_delete_trainees_post(request):
     """Handles bulk deletion of trainees - selected or all."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     delete_all = request.POST.get('delete_all') == 'true'
@@ -2656,7 +3016,7 @@ def bulk_delete_trainees_post(request):
 @require_POST
 def bulk_delete_lecturers_post(request):
     """Handles bulk deletion of lecturers - selected or all."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     delete_all = request.POST.get('delete_all') == 'true'
@@ -2737,13 +3097,17 @@ def submit_daily_report_view(request):
 
 @login_required
 def daily_reports_list_view(request):
-    """View daily reports list for SuperAdmins, Directors, Supervisors, and Lecturers."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR, CustomUser.Role.LECTURER]:
+    """View daily reports list for SuperAdmins, GovernorateAdmins, Directors, Supervisors, and Lecturers."""
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR, CustomUser.Role.LECTURER]:
         raise Http404("غير مصرح بالدخول.")
         
     from apps.courses.models import DailyReport
     if request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
         reports = DailyReport.objects.select_related('instructor', 'group', 'lecture', 'reviewed_by').all()
+    elif request.user.role == CustomUser.Role.GOVERNORATE_ADMIN:
+        reports = DailyReport.objects.select_related('instructor', 'group', 'lecture', 'reviewed_by').filter(
+            group__governorate=request.user.governorate
+        )
     elif request.user.role == CustomUser.Role.SUPERVISOR:
         reports = DailyReport.objects.select_related('instructor', 'group', 'lecture', 'reviewed_by').filter(
             Q(group__supervisor=request.user) | Q(instructor=request.user)
@@ -2762,8 +3126,8 @@ def daily_reports_list_view(request):
 @login_required
 @require_POST
 def review_daily_report_post(request, report_id=None):
-    """Allows Admin/Supervisor to add feedback and change status on a Daily Report."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR]:
+    """Allows Admin/GovernorateAdmin/Supervisor to add feedback and change status on a Daily Report."""
+    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR]:
         return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
         
     target_report_id = report_id or request.POST.get('report_id')
@@ -2890,18 +3254,42 @@ def chat_view(request):
     user = request.user
     from apps.courses.models import Course
     
-    # 1. Fetch available channels (General initiative channel, Course chats, Group chats)
+    gov = user.governorate
+    is_national = (user.role == CustomUser.Role.SUPER_ADMIN)
+    
+    # 1. Fetch available channels (Governorate/General initiative channel, Course chats, Group chats)
     channels = []
-    # General initiative channel
-    channels.append({
-        'id': 'general',
-        'type': 'group',
-        'group_id': None,
-        'name': 'القناة العامة لمبادرة 1000 مبرمج',
-        'icon': 'fa-globe-asia text-warning',
-        'category': 'عامة',
-        'subtitle': 'مناقشات وتوجيهات عامة لجميع أعضاء المبادرة',
-    })
+    
+    if is_national:
+        channels.append({
+            'id': 'general',
+            'type': 'group',
+            'group_id': None,
+            'name': 'القناة العامة الوطنية للمبادرة',
+            'icon': 'fa-globe-asia text-warning',
+            'category': 'عامة',
+            'subtitle': 'مناقشات وتوجيهات الإدارة الوطنية العامة لجميع المحافظات',
+        })
+    elif gov:
+        channels.append({
+            'id': 'general',
+            'type': 'group',
+            'group_id': None,
+            'name': f'القناة العامة — محافظة {gov.name}',
+            'icon': 'fa-city text-success',
+            'category': 'عامة',
+            'subtitle': f'مناقشات وتوجيهات منتسبي محافظة {gov.name}',
+        })
+    else:
+        channels.append({
+            'id': 'general',
+            'type': 'group',
+            'group_id': None,
+            'name': 'القناة العامة للمبادرة',
+            'icon': 'fa-comments text-primary',
+            'category': 'عامة',
+            'subtitle': 'مناقشات وتوجيهات عامة',
+        })
     
     # Course-specific channels (كروبات وتواصل خاص لكل مادة دراسية)
     from apps.courses.models import Course
@@ -2917,16 +3305,13 @@ def chat_view(request):
             'subtitle': f"مجتمع ومناقشات مادة {c.title}",
         })
 
-    # Group-specific channels (كروبات الشعب الدراسية)
-    all_groups = list(Group.objects.all())
-    if not all_groups:
-        c_default = Course.objects.first()
-        if not c_default:
-            c_default = Course.objects.create(title="أساسيات البرمجة", description="منهج المبادرة العام")
-        
-        g1 = Group.objects.create(name="الشعبة A", code="GRP-A", course=c_default, classroom="قاعة 1", days="الأحد، الثلاثاء", start_time="16:00", end_time="18:00")
-        g2 = Group.objects.create(name="الشعبة B", code="GRP-B", course=c_default, classroom="قاعة 2", days="الاثنين، الأربعاء", start_time="16:00", end_time="18:00")
-        all_groups = [g1, g2]
+    # Group-specific channels (كروبات الشعب الدراسية لمحافظة المستخدم حصراً)
+    if is_national:
+        all_groups = list(Group.objects.all())
+    elif gov:
+        all_groups = list(Group.objects.filter(governorate=gov))
+    else:
+        all_groups = list(Group.objects.all())
 
     if user.role == CustomUser.Role.TRAINEE:
         trainee_prof = getattr(user, 'trainee_profile', None)
@@ -2960,21 +3345,24 @@ def chat_view(request):
                 'subtitle': f"قناة وتواصل شعبة {g.name}",
             })
             
-    # 2. Fetch direct message contacts (Users)
-    if user.role == CustomUser.Role.TRAINEE:
+    # 2. Fetch direct message contacts (Users) strictly scoped to user's governorate
+    if is_national:
+        group_members = CustomUser.objects.exclude(id=user.id).order_by('first_name', 'username')[:100]
+    elif user.role == CustomUser.Role.TRAINEE:
         trainee_prof = getattr(user, 'trainee_profile', None)
         if trainee_prof and trainee_prof.group:
             group_members = CustomUser.objects.filter(
                 Q(trainee_profile__group=trainee_prof.group) |
                 Q(id=trainee_prof.group.instructor_id) |
-                Q(role__in=[CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR])
+                Q(role__in=[CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR], governorate=gov)
             ).exclude(id=user.id).distinct()
         else:
             group_members = CustomUser.objects.filter(
-                role__in=[CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR, CustomUser.Role.SUPER_ADMIN]
+                role__in=[CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR, CustomUser.Role.GOVERNORATE_ADMIN],
+                governorate=gov
             ).exclude(id=user.id).distinct()
     else:
-        group_members = CustomUser.objects.exclude(id=user.id).order_by('first_name', 'username')[:100]
+        group_members = CustomUser.objects.filter(governorate=gov).exclude(id=user.id).order_by('first_name', 'username')[:100]
 
     contacts = []
     for c_user in group_members:
@@ -2992,6 +3380,7 @@ def chat_view(request):
         'contacts': contacts,
     }
     return render(request, 'portal/chat.html', context)
+
 
 
 @login_required

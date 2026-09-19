@@ -1,40 +1,74 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
+
 class CustomUser(AbstractUser):
     class Role(models.TextChoices):
-        SUPER_ADMIN = 'super_admin', 'مسؤول النظام (Super Admin)'
-        DIRECTOR = 'director', 'مدير المبادرة'
-        TRAINING_OFFICER = 'training_officer', 'مسؤول التدريب'
-        SUPERVISOR = 'supervisor', 'المشرف'
-        LECTURER = 'lecturer', 'المحاضر'
-        TRAINEE = 'trainee', 'المتدرب'
-        VISITOR = 'visitor', 'الزائر'
+        SUPER_ADMIN        = 'super_admin',        'مسؤول النظام (Super Admin)'
+        GOVERNORATE_ADMIN  = 'governorate_admin',  'مسؤول المحافظة'
+        DIRECTOR           = 'director',           'مدير المبادرة'
+        TRAINING_OFFICER   = 'training_officer',   'مسؤول التدريب'
+        SUPERVISOR         = 'supervisor',          'المشرف'
+        LECTURER           = 'lecturer',            'المحاضر'
+        TRAINEE            = 'trainee',             'المتدرب'
+        VISITOR            = 'visitor',             'الزائر'
 
+    # ---- الدور الوظيفي ----
     role = models.CharField(
         max_length=20,
         choices=Role.choices,
         default=Role.VISITOR,
         verbose_name="الدور الوظيفي"
     )
+
+    # ---- ربط المستخدم بمحافظة ----
+    # NULL مسموح للـ super_admin الذي يرى كل المحافظات
+    governorate = models.ForeignKey(
+        'locations.Governorate',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users',
+        verbose_name="المحافظة",
+        help_text="اتركه فارغاً للمسؤول الوطني (Super Admin) فقط"
+    )
+
     phone_number = models.CharField(max_length=15, blank=True, null=True, verbose_name="رقم الهاتف")
-    national_id = models.CharField(max_length=20, blank=True, null=True, verbose_name="الرقم الوطني")
-    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True, verbose_name="الصورة الشخصية")
-    gender = models.CharField(
+    national_id  = models.CharField(max_length=20, blank=True, null=True, verbose_name="الرقم الوطني")
+    avatar       = models.ImageField(upload_to='avatars/', blank=True, null=True, verbose_name="الصورة الشخصية")
+    gender       = models.CharField(
         max_length=10,
         choices=[('male', 'ذكر'), ('female', 'أنثى')],
         default='male',
         verbose_name="الجنس"
     )
-    telegram_chat_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="معرف شات التليغرام")
-    telegram_link_code = models.CharField(max_length=50, blank=True, null=True, verbose_name="رمز ربط التليغرام")
+    telegram_chat_id              = models.CharField(max_length=50, blank=True, null=True, verbose_name="معرف شات التليغرام")
+    telegram_link_code            = models.CharField(max_length=50, blank=True, null=True, verbose_name="رمز ربط التليغرام")
     telegram_notifications_enabled = models.BooleanField(default=True, verbose_name="تفعيل إشعارات التليغرام")
-    temp_password = models.CharField(max_length=128, blank=True, null=True, verbose_name="كلمة المرور المؤقتة/المولدة")
+    temp_password                 = models.CharField(max_length=128, blank=True, null=True, verbose_name="كلمة المرور المؤقتة/المولدة")
 
+    # ---- خصائص الصلاحيات ----
+    @property
+    def is_super_admin(self):
+        return self.role == self.Role.SUPER_ADMIN
 
+    @property
+    def is_governorate_admin(self):
+        return self.role == self.Role.GOVERNORATE_ADMIN
+
+    @property
+    def is_national_level(self):
+        """يملك صلاحيات وطنية (يرى جميع المحافظات)"""
+        return self.role == self.Role.SUPER_ADMIN
+
+    @property
+    def can_manage_governorate(self):
+        """يستطيع إدارة محافظته"""
+        return self.role in (self.Role.SUPER_ADMIN, self.Role.GOVERNORATE_ADMIN, self.Role.DIRECTOR)
 
     def __str__(self):
-        return f"{self.get_full_name() or self.username} ({self.get_role_display()})"
+        gov = f" — {self.governorate.name}" if self.governorate else " — وطني"
+        return f"{self.get_full_name() or self.username} ({self.get_role_display()}){gov}"
 
     class Meta:
         verbose_name = "المستخدم"
@@ -43,24 +77,35 @@ class CustomUser(AbstractUser):
 
 class TraineeProfile(models.Model):
     class Status(models.TextChoices):
-        ACTIVE = 'active', 'نشط'
+        ACTIVE    = 'active',    'نشط'
         SUSPENDED = 'suspended', 'موقف'
         GRADUATED = 'graduated', 'خريج'
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='trainee_profile')
-    governorate = models.CharField(max_length=50, verbose_name="المحافظة")
-    district = models.CharField(max_length=50, verbose_name="القضاء")
-    university = models.CharField(max_length=100, blank=True, null=True, verbose_name="المدرسة")
-    college = models.CharField(max_length=100, blank=True, null=True, verbose_name="الصف الدراسي")
-    department = models.CharField(max_length=100, blank=True, null=True, verbose_name="الفرع / الشعبة بالمدرسة")
+
+    # ---- الفرع الذي ينتمي إليه المتدرب ----
+    branch = models.ForeignKey(
+        'locations.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='trainees',
+        verbose_name="الفرع / مركز التدريب"
+    )
+
+    governorate = models.CharField(max_length=50, verbose_name="المحافظة (السكن)")
+    district    = models.CharField(max_length=50, verbose_name="القضاء")
+    university  = models.CharField(max_length=100, blank=True, null=True, verbose_name="المدرسة")
+    college     = models.CharField(max_length=100, blank=True, null=True, verbose_name="الصف الدراسي")
+    department  = models.CharField(max_length=100, blank=True, null=True, verbose_name="الفرع / الشعبة بالمدرسة")
     academic_stage = models.CharField(max_length=20, blank=True, null=True, verbose_name="المرحلة الدراسية (ابتدائي/متوسط/إعدادي)")
-    specialty = models.CharField(max_length=100, blank=True, null=True, verbose_name="المسار والاهتمام البرمجي")
+    specialty   = models.CharField(max_length=100, blank=True, null=True, verbose_name="المسار والاهتمام البرمجي")
     registration_date = models.DateField(auto_now_add=True, verbose_name="تاريخ التسجيل")
-    status = models.CharField(max_length=15, choices=Status.choices, default=Status.ACTIVE, verbose_name="حالة الحساب")
-    points = models.IntegerField(default=0, verbose_name="نقاط الطالب")
-    
-    group = models.ForeignKey('courses.Group', on_delete=models.SET_NULL, null=True, blank=True, related_name='trainees', verbose_name="المجموعة")
-    notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات")
+    status      = models.CharField(max_length=15, choices=Status.choices, default=Status.ACTIVE, verbose_name="حالة الحساب")
+    points      = models.IntegerField(default=0, verbose_name="نقاط الطالب")
+
+    group       = models.ForeignKey('courses.Group', on_delete=models.SET_NULL, null=True, blank=True, related_name='trainees', verbose_name="المجموعة")
+    notes       = models.TextField(blank=True, null=True, verbose_name="ملاحظات")
     custom_training_number = models.CharField(max_length=50, blank=True, null=True, verbose_name="الرقم التدريبي الخاص")
 
     def __str__(self):
@@ -68,11 +113,13 @@ class TraineeProfile(models.Model):
 
     @property
     def training_number(self):
+        """رقم تدريبي فريد يشمل كود المحافظة: BAS-1000-0001"""
         if self.custom_training_number:
             return self.custom_training_number
-        return f"IT-1000-{self.id:04d}" if self.id else "IT-1000-0000"
+        gov_code = self.user.governorate.code if self.user.governorate else "IRQ"
+        return f"{gov_code}-1000-{self.id:04d}" if self.id else f"{gov_code}-1000-0000"
 
-    # Quick dynamic attributes computed from foreign keys
+    # خصائص ديناميكية من المفاتيح الخارجية
     @property
     def attendance_percentage(self):
         from apps.attendance.models import Attendance
@@ -104,9 +151,19 @@ class TraineeProfile(models.Model):
 
 
 class LecturerProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='lecturer_profile')
+    user      = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='lecturer_profile')
     specialty = models.CharField(max_length=100, verbose_name="الاختصاص")
-    bio = models.TextField(blank=True, null=True, verbose_name="السيرة الذاتية")
+    bio       = models.TextField(blank=True, null=True, verbose_name="السيرة الذاتية")
+
+    # ---- الفرع الذي يعمل فيه المحاضر ----
+    branch = models.ForeignKey(
+        'locations.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lecturers',
+        verbose_name="الفرع / مركز التدريب"
+    )
 
     def __str__(self):
         return f"ملف المحاضر: {self.user.get_full_name() or self.user.username}"
@@ -117,7 +174,7 @@ class LecturerProfile(models.Model):
 
 
 class SupervisorProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='supervisor_profile')
+    user       = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='supervisor_profile')
     department = models.CharField(max_length=100, blank=True, null=True, verbose_name="القسم المسؤول عنه")
 
     def __str__(self):
@@ -129,9 +186,9 @@ class SupervisorProfile(models.Model):
 
 
 class TraineeNote(models.Model):
-    trainee = models.ForeignKey(TraineeProfile, on_delete=models.CASCADE, related_name='staff_notes', verbose_name="المتدرب")
-    author = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_notes', verbose_name="مضيف الملاحظة")
-    note = models.TextField(verbose_name="نص الملاحظة والتوجيه")
+    trainee    = models.ForeignKey(TraineeProfile, on_delete=models.CASCADE, related_name='staff_notes', verbose_name="المتدرب")
+    author     = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_notes', verbose_name="مضيف الملاحظة")
+    note       = models.TextField(verbose_name="نص الملاحظة والتوجيه")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإضافة")
 
     class Meta:

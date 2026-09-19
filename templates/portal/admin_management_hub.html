@@ -1552,8 +1552,23 @@
                                         <option value="trainee">متدرب</option>
                                         <option value="lecturer">مدرب / محاضر</option>
                                         <option value="supervisor">مشرف متابع</option>
+                                        {% if request.user.role == 'super_admin' %}
+                                        <option value="governorate_admin">مسؤول المحافظة (Governorate Admin)</option>
+                                        {% endif %}
                                     </select>
                                 </div>
+                                {% if is_national or request.user.role == 'super_admin' %}
+                                <div class="col-md-12">
+                                    <label class="form-label text-dark fw-bold">المحافظة التابع لها الحساب</label>
+                                    <select name="governorate_id" class="form-select" required>
+                                        {% for gov in all_governorates %}
+                                        <option value="{{ gov.id }}" {% if gov.id == current_governorate.id or gov.status == 'active' %}selected{% endif %}>
+                                            {{ gov.name }} ({{ gov.code }}) - {% if gov.status == 'active' %}نشطة ✅{% else %}غير مفعلة (قريباً){% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endif %}
                                 <div class="col-md-6">
                                     <label class="form-label text-dark fw-bold">الاسم الأول</label>
                                     <input type="text" name="first_name" class="form-control" placeholder="الاسم الأول">

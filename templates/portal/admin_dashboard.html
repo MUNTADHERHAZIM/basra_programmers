@@ -4,8 +4,160 @@
 {% block header_title %}لوحة الإحصائيات العامة للمبادرة{% endblock %}
 
 {% block content %}
+<!-- Governorate Scope Banner & Filter -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="glass-card p-3 border-0 d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="icon-box icon-box-primary m-0">
+                    <i class="fas fa-map-marked-alt fs-4"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold m-0 text-slate-800">
+                        {% if is_national and not selected_gov %}
+                            <i class="fas fa-globe-asia text-primary me-1"></i> لوحة المتابعة الوطنية — كافة المحافظات
+                        {% elif current_governorate %}
+                            <i class="fas fa-city text-success me-1"></i> لوحة إدارة: محافظة {{ current_governorate.name }}
+                        {% else %}
+                            لوحة إدارة المبادرة
+                        {% endif %}
+                    </h5>
+                    <small class="text-muted">
+                        {% if is_national and not selected_gov %}
+                            عرض شامل ومجمّع لإحصائيات ونشاطات المنصة في جميع محافظات العراق
+                        {% elif current_governorate %}
+                            عرض البيانات الحصرية والمعزولة لمحافظة {{ current_governorate.name }} (كود: {{ current_governorate.code }})
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+
+            {% if is_national %}
+            <!-- National Admin Filter Switcher -->
+            <div class="d-flex align-items-center gap-2">
+                <form method="GET" action="{% url 'portal:admin_dashboard' %}" class="d-flex align-items-center gap-2 m-0">
+                    <label class="small text-muted fw-bold text-nowrap"><i class="fas fa-filter text-success me-1"></i>تصفية المحافظة:</label>
+                    <select name="gov_id" class="form-select form-select-sm fw-bold border-success-subtle shadow-sm" style="min-width: 190px;" onchange="this.form.submit()">
+                        <option value="">🌐 كافة المحافظات (وطني)</option>
+                        {% for gov_item in active_governorates %}
+                        <option value="{{ gov_item.id }}" {% if selected_gov.id == gov_item.id %}selected{% endif %}>
+                            📍 محافظة {{ gov_item.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% if selected_gov %}
+                    <a href="{% url 'portal:admin_dashboard' %}" class="btn btn-sm btn-outline-secondary" title="إلغاء التصفية والعودة للوطني">
+                        <i class="fas fa-times"></i>
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+{% if is_national and not selected_gov %}
+<!-- National Active Governorates Grid -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="glass-card p-4 border-0 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                    <h5 class="fw-bold m-0 text-slate-800">
+                        <i class="fas fa-city text-success me-2"></i>المحافظات المفعلة في المبادرة
+                    </h5>
+                    <small class="text-muted">المحافظات النشطة حالياً في التدريب والتسجيل</small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-success-subtle text-success rounded-pill px-3 py-2 fw-bold">
+                        {{ governorates_summary|length }} محافظة مفعلة
+                    </span>
+                    {% if user.role == 'super_admin' and inactive_governorates %}
+                    <button type="button" class="btn btn-sm btn-primary-custom" data-bs-toggle="modal" data-bs-target="#activateGovModal">
+                        <i class="fas fa-plus-circle me-1"></i> تفعيل وإضافة محافظة جديدة
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="row g-3">
+                {% for gov_stat in governorates_summary %}
+                <div class="col-12 col-md-6 col-lg-3">
+                    <a href="{% url 'portal:admin_dashboard' %}?gov_id={{ gov_stat.id }}" class="text-decoration-none">
+                        <div class="p-3 rounded-3 border bg-white shadow-sm border-success-subtle h-100 transition-hover">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">
+                                    <i class="fas fa-check-circle me-1"></i> نشطة
+                                </span>
+                                <span class="badge bg-secondary-subtle text-secondary fw-bold">{{ gov_stat.code }}</span>
+                            </div>
+                            <h5 class="fw-bold text-slate-800 mb-2">{{ gov_stat.name }}</h5>
+                            <div class="d-flex justify-content-between text-muted small border-top pt-2 mt-2">
+                                <span><i class="fas fa-user-graduate me-1 text-primary"></i><strong>{{ gov_stat.g_trainees }}</strong> متدرب</span>
+                                <span><i class="fas fa-users-cog me-1 text-info"></i><strong>{{ gov_stat.g_groups }}</strong> شعبة</span>
+                                <span><i class="fas fa-building me-1 text-warning"></i><strong>{{ gov_stat.g_branches }}</strong> فروع</span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center py-4 text-muted">
+                    <i class="fas fa-city fs-1 mb-2 d-block text-secondary opacity-50"></i>
+                    لا توجد محافظات نشطة حالياً. قم بتفعيل أول محافظة للبدء.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Activating New Governorate -->
+{% if user.role == 'super_admin' and inactive_governorates %}
+<div class="modal fade" id="activateGovModal" tabindex="-1" aria-labelledby="activateGovModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-0 shadow-lg">
+            <form method="POST" action="{% url 'portal:activate_governorate_post' %}">
+                {% csrf_token %}
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold" id="activateGovModalLabel">
+                        <i class="fas fa-map-marked-alt text-primary me-2"></i>تفعيل وإطلاق محافظة جديدة
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3">
+                        اختر المحافظة التي ترغب بتدشينها وتفعيلها في المنصة. ستظهر المحافظة فوراً في القوائم ولوحة التحكم وتتيح تسجيل الطلاب وتوليد الحسابات.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اختر المحافظة:</label>
+                        <select name="governorate_id" class="form-select" required>
+                            <option value="">-- اختر من المحافظات المتاحة --</option>
+                            {% for inact_gov in inactive_governorates %}
+                            <option value="{{ inact_gov.id }}">{{ inact_gov.name }} (كود: {{ inact_gov.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <input type="hidden" name="status" value="active">
+                </div>
+                <div class="modal-footer border-top bg-light-subtle">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary-custom px-4">
+                        <i class="fas fa-check me-1"></i> تفعيل المحافظة الآن
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+
 <!-- Top Metrics Grid -->
 <div class="row g-4 mb-4">
+
     <!-- Trainees -->
     <div class="col-md-4 col-xl-2">
         <div class="glass-card p-3 border-0 d-flex align-items-center justify-content-between">

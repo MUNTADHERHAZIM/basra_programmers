@@ -22,8 +22,8 @@
                         <select name="target_type" id="targetType" class="form-select py-2" onchange="toggleTargets(); updatePreview();" required>
                             <option value="user">مستخدم فردي محدد (طالب أو مدرب)</option>
                             <option value="group">طلاب شعبة/مجموعة معينة</option>
-                            <option value="all_trainees">جميع المتدربين (الطلاب)</option>
-                            <option value="all_lecturers">جميع المدربين (المحاضرين)</option>
+                            <option value="all_trainees">جميع المتدربين ({% if current_governorate %}{{ current_governorate.name }}{% elif request.governorate %}{{ request.governorate.name }}{% else %}الكل{% endif %})</option>
+                            <option value="all_lecturers">جميع المدربين ({% if current_governorate %}{{ current_governorate.name }}{% elif request.governorate %}{{ request.governorate.name }}{% else %}الكل{% endif %})</option>
                         </select>
                     </div>
 
