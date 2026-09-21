@@ -264,6 +264,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>رمز المجموعة</th>
+                            <th>المحافظة</th>
                             <th>اسم المجموعة</th>
                             <th>المدرب</th>
                             <th>المشرف</th>
@@ -277,6 +278,11 @@
                         {% for group in groups %}
                         <tr>
                             <td><span class="badge bg-secondary">{{ group.code }}</span></td>
+                            <td>
+                                <span class="badge bg-primary-subtle text-primary border rounded-pill px-2 py-1">
+                                    <i class="fas fa-map-marker-alt me-1"></i>{{ group.governorate.name|default:"عام" }}
+                                </span>
+                            </td>
                             <td class="fw-bold">{{ group.name }}</td>
                             <td>
                                 {% if group.instructor %}
@@ -309,7 +315,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-4 text-muted">لا توجد مجموعات مسجلة حالياً</td>
+                            <td colspan="9" class="text-center py-4 text-muted">لا توجد مجموعات مسجلة حالياً</td>
                         </tr>
                         {% endfor %}
                     </tbody>

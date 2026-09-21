@@ -262,16 +262,7 @@
                     </div>
                     {% endif %}
 
-                    <!-- Video Link Button -->
-                    {% if lecture.video_url %}
-                    <div class="mb-3">
-                        <a href="{{ lecture.video_url }}" target="_blank" class="btn btn-outline-info btn-sm w-100 fw-bold">
-                            <i class="fab fa-youtube text-danger me-1"></i> مشاهدة تسجيل/فيديو المحاضرة
-                        </a>
-                    </div>
-                    {% endif %}
-
-                    <!-- Footer Actions for Instructor / Admin -->
+                       <!-- Footer Actions for Instructor / Admin -->
                     {% if can_upload %}
                     {% if user.role != 'trainee' %}
                     <div class="border-top pt-2 mt-auto d-flex justify-content-between align-items-center">
@@ -287,86 +278,8 @@
                             <button type="button" class="btn btn-sm btn-light text-danger border" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#deleteLectureModal{{ lecture.id }}">
-                                <i class="fas fa-trash-alt"></i>
+                                <i class="fas fa-trash-alt"></i> حذف
                             </button>
-                        </div>
-                    </div>
-
-                    <!-- Modal Edit -->
-                    <div class="modal fade" id="editLectureModal{{ lecture.id }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content rounded-4 shadow">
-                                <div class="modal-header bg-primary text-white">
-                                    <h5 class="modal-title fw-bold">تعديل المحاضرة والمادة العلمية</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                </div>
-                                <form method="POST" action="{% url 'portal:edit_lecture_material' lecture.id %}" enctype="multipart/form-data">
-                                    {% csrf_token %}
-                                    <div class="modal-body p-4">
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">عنوان المحاضرة</label>
-                                            <input type="text" name="title" value="{{ lecture.title }}" class="form-control" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">الشعبة / المجموعة</label>
-                                            <select name="group" class="form-select" required>
-                                                {% for grp in user_groups %}
-                                                <option value="{{ grp.id }}" {% if grp.id == lecture.group.id %}selected{% endif %}>
-                                                    {{ grp.name }} ({{ grp.course.title }})
-                                                </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">التاريخ</label>
-                                            <input type="date" name="date" value="{{ lecture.date|date:'Y-m-d' }}" class="form-control" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">وصف ومحاور المحاضرة</label>
-                                            <textarea name="content" class="form-control" rows="3">{{ lecture.content }}</textarea>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">تحديث ملف PDF المرفق</label>
-                                            <input type="file" name="files" class="form-control" accept=".pdf,.doc,.docx,.ppt,.pptx">
-                                            {% if lecture.files %}
-                                            <small class="text-muted">الملف الحالي: <a href="{{ lecture.files.url }}" target="_blank">عرض الملف</a></small>
-                                            {% endif %}
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">رابط تسجيل/فيديو المحاضرة</label>
-                                            <input type="url" name="video_url" value="{{ lecture.video_url|default:'' }}" class="form-control" placeholder="https://youtube.com/...">
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer bg-light">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                                        <button type="submit" class="btn btn-primary fw-bold">حفظ التغييرات</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Modal Delete -->
-                    <div class="modal fade" id="deleteLectureModal{{ lecture.id }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content rounded-4">
-                                <div class="modal-header bg-danger text-white">
-                                    <h5 class="modal-title fw-bold">تأكيد حذف المحاضرة</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body p-4 text-center">
-                                    <i class="fas fa-exclamation-triangle text-danger fs-1 mb-3"></i>
-                                    <h5>هل أنت تأكد من حذف "{{ lecture.title }}"؟</h5>
-                                    <p class="text-muted small">سيتم حذف الملفات المرفقة وبيانات هذه المحاضرة نهائياً.</p>
-                                </div>
-                                <div class="modal-footer bg-light">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                                    <form method="POST" action="{% url 'portal:delete_lecture_material' lecture.id %}">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-danger fw-bold">حذف الآن</button>
-                                    </form>
-                                </div>
-                            </div>
                         </div>
                     </div>
                     {% endif %}
@@ -376,6 +289,94 @@
         </div>
         {% endfor %}
     </div>
+
+    <!-- Modals for Edit & Delete (Rendered outside transformed card containers) -->
+    {% if can_upload and user.role != 'trainee' %}
+    {% for lecture in lectures %}
+    <!-- Modal Edit -->
+    <div class="modal fade" id="editLectureModal{{ lecture.id }}" tabindex="-1" aria-labelledby="editLectureModalLabel{{ lecture.id }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 shadow border-0">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="editLectureModalLabel{{ lecture.id }}">
+                        <i class="fas fa-edit me-2"></i>تعديل المحاضرة والمادة العلمية
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{% url 'portal:edit_lecture_material' lecture.id %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">عنوان المحاضرة</label>
+                            <input type="text" name="title" value="{{ lecture.title }}" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">الشعبة / المجموعة</label>
+                            <select name="group" class="form-select" required>
+                                {% for grp in user_groups %}
+                                <option value="{{ grp.id }}" {% if grp.id == lecture.group.id %}selected{% endif %}>
+                                    {{ grp.name }} ({{ grp.course.title }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">التاريخ</label>
+                            <input type="date" name="date" value="{{ lecture.date|date:'Y-m-d' }}" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">وصف ومحاور المحاضرة</label>
+                            <textarea name="content" class="form-control" rows="3">{{ lecture.content|default:'' }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">تحديث ملف PDF المرفق</label>
+                            <input type="file" name="files" class="form-control" accept=".pdf,.doc,.docx,.ppt,.pptx">
+                            {% if lecture.files %}
+                            <small class="text-muted d-block mt-1">الملف الحالي: <a href="{{ lecture.files.url }}" target="_blank" class="fw-bold">عرض الملف المرفوع</a></small>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">رابط تسجيل/فيديو المحاضرة</label>
+                            <input type="url" name="video_url" value="{{ lecture.video_url|default:'' }}" class="form-control" placeholder="https://youtube.com/...">
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary fw-bold px-4">حفظ التغييرات</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Delete -->
+    <div class="modal fade" id="deleteLectureModal{{ lecture.id }}" tabindex="-1" aria-labelledby="deleteLectureModalLabel{{ lecture.id }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold" id="deleteLectureModalLabel{{ lecture.id }}">
+                        <i class="fas fa-trash-alt me-2"></i>تأكيد حذف المحاضرة
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <i class="fas fa-exclamation-triangle text-danger fs-1 mb-3"></i>
+                    <h5 class="fw-bold">هل أنت متأكد من حذف "{{ lecture.title }}"؟</h5>
+                    <p class="text-muted small">سيتم حذف الملفات المرفقة وبيانات هذه المحاضرة نهائياً من الشعبة.</p>
+                </div>
+                <div class="modal-footer bg-light justify-content-between">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <form method="POST" action="{% url 'portal:delete_lecture_material' lecture.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger fw-bold px-4">نعم، احذف المحاضرة</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
     {% else %}
     <!-- Empty State -->
     <div class="card border-0 shadow-sm rounded-4 p-5 text-center my-4 bg-white">
@@ -386,7 +387,7 @@
                 لم يتم رفع محاضرات مطابقة للبحث أو تابعة لشعبتك الدراسية بعد. سيقوم المحاضرون بإضافة ملفات PDF والمواد قريباً.
             </p>
             {% if can_upload %}
-            <button class="btn btn-primary fw-bold px-4 py-2" data-bs-toggle="modal" data-bs-target="#uploadLectureModal">
+            <button class="btn btn-primary fw-bold px-4 py-2 rounded-pill" data-bs-toggle="modal" data-bs-target="#uploadLectureModal">
                 <i class="fas fa-plus-circle me-2"></i>إضافة أول محاضرة ومادة علمية
             </button>
             {% endif %}
@@ -476,15 +477,31 @@
                     <i class="fas fa-file-pdf text-danger fs-4 me-2"></i>
                     <h5 class="modal-title fw-bold m-0" id="pdfViewerTitle">معاينة ملف PDF المحاضرة</h5>
                 </div>
-                <div>
-                    <a id="pdfDownloadBtn" href="#" download class="btn btn-outline-light btn-sm me-2 fw-bold">
+                <div class="d-flex align-items-center gap-2">
+                    <a id="pdfOpenNewTabBtn" href="#" target="_blank" class="btn btn-outline-info btn-sm fw-bold">
+                        <i class="fas fa-external-link-alt me-1"></i>فتح في نافذة كاملة
+                    </a>
+                    <a id="pdfDownloadBtn" href="#" download class="btn btn-outline-light btn-sm fw-bold">
                         <i class="fas fa-download me-1"></i>تحميل الملف
                     </a>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
             </div>
-            <div class="modal-body pdf-modal-body">
-                <iframe id="pdfIframe" src="" class="pdf-iframe" title="PDF Viewer"></iframe>
+            <div class="modal-body pdf-modal-body position-relative">
+                <iframe id="pdfIframe" src="" class="pdf-iframe" title="PDF Viewer" allowfullscreen></iframe>
+                <div id="pdfFallbackNotice" class="position-absolute top-50 start-50 translate-middle text-center text-white d-none p-4 rounded-4" style="background: rgba(15, 23, 42, 0.9); max-width: 450px; width: 90%;">
+                    <i class="fas fa-file-pdf text-danger fs-1 mb-3"></i>
+                    <h5 class="fw-bold mb-2">استعراض ملف المحاضرة</h5>
+                    <p class="small text-slate-300 mb-3">إذا لم يظهر الملف التفاعلي داخل متصفحك، يمكنك فتحه مباشرة أو تحميله:</p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a id="pdfFallbackOpenBtn" href="#" target="_blank" class="btn btn-primary btn-sm fw-bold px-3">
+                            <i class="fas fa-external-link-alt me-1"></i>فتح PDF
+                        </a>
+                        <a id="pdfFallbackDownloadBtn" href="#" download class="btn btn-success btn-sm fw-bold px-3">
+                            <i class="fas fa-download me-1"></i>تحميل الآن
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -502,10 +519,20 @@
                 var iframe = document.getElementById('pdfIframe');
                 var titleEl = document.getElementById('pdfViewerTitle');
                 var downloadBtn = document.getElementById('pdfDownloadBtn');
+                var openNewTabBtn = document.getElementById('pdfOpenNewTabBtn');
+                var fallbackNotice = document.getElementById('pdfFallbackNotice');
+                var fallbackOpenBtn = document.getElementById('pdfFallbackOpenBtn');
+                var fallbackDownloadBtn = document.getElementById('pdfFallbackDownloadBtn');
 
                 if (titleEl) titleEl.textContent = pdfTitle || 'معاينة ملف PDF المحاضرة';
                 if (downloadBtn) downloadBtn.setAttribute('href', pdfUrl);
-                if (iframe) iframe.src = pdfUrl;
+                if (openNewTabBtn) openNewTabBtn.setAttribute('href', pdfUrl);
+                if (fallbackOpenBtn) fallbackOpenBtn.setAttribute('href', pdfUrl);
+                if (fallbackDownloadBtn) fallbackDownloadBtn.setAttribute('href', pdfUrl);
+                
+                if (iframe) {
+                    iframe.src = pdfUrl;
+                }
             });
 
             pdfModal.addEventListener('hidden.bs.modal', function () {

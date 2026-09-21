@@ -24,9 +24,13 @@
         transform: translateY(-1px);
     }
     .badge-role-admin { background-color: #ef4444; color: white; }
+    .badge-role-gov-admin { background-color: #0284c7; color: white; }
+    .badge-role-director { background-color: #dc2626; color: white; }
+    .badge-role-officer { background-color: #0891b2; color: white; }
     .badge-role-lecturer { background-color: #8b5cf6; color: white; }
     .badge-role-supervisor { background-color: #f59e0b; color: white; }
     .badge-role-trainee { background-color: #10b981; color: white; }
+    .badge-role-visitor { background-color: #64748b; color: white; }
 
     @media print {
         body * { visibility: hidden; }
@@ -122,13 +126,28 @@
                 <label class="form-label small fw-bold text-slate-700">الدور الوظيفي:</label>
                 <select name="role" class="form-select">
                     <option value="all" {% if role_filter == 'all' %}selected{% endif %}>جميع الأدوار</option>
-                    <option value="super_admin" {% if role_filter == 'super_admin' %}selected{% endif %}>مسؤول النظام</option>
+                    <option value="super_admin" {% if role_filter == 'super_admin' %}selected{% endif %}>مسؤول النظام (Super Admin)</option>
+                    <option value="governorate_admin" {% if role_filter == 'governorate_admin' %}selected{% endif %}>مسؤول المحافظة</option>
                     <option value="director" {% if role_filter == 'director' %}selected{% endif %}>مدير المبادرة</option>
-                    <option value="lecturer" {% if role_filter == 'lecturer' %}selected{% endif %}>مدرب</option>
-                    <option value="supervisor" {% if role_filter == 'supervisor' %}selected{% endif %}>مشرف</option>
+                    <option value="training_officer" {% if role_filter == 'training_officer' %}selected{% endif %}>مسؤول التدريب</option>
+                    <option value="lecturer" {% if role_filter == 'lecturer' %}selected{% endif %}>مدرب تقني</option>
+                    <option value="supervisor" {% if role_filter == 'supervisor' %}selected{% endif %}>مشرف إداري</option>
                     <option value="trainee" {% if role_filter == 'trainee' %}selected{% endif %}>متدرب / طالب</option>
                 </select>
             </div>
+
+            {% if is_national %}
+            <!-- Governorate Filter -->
+            <div class="col-md-2">
+                <label class="form-label small fw-bold text-slate-700">المحافظة:</label>
+                <select name="governorate" class="form-select">
+                    <option value="">جميع المحافظات</option>
+                    {% for g in all_governorates %}
+                    <option value="{{ g.id }}" {% if selected_gov and selected_gov.id == g.id %}selected{% endif %}>{{ g.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
 
             <!-- Group Filter -->
             <div class="col-md-2">
@@ -201,6 +220,7 @@
                         </th>
                         <th>المستخدم / البيانات</th>
                         <th>الدور الوظيفي</th>
+                        <th class="text-center">المحافظة</th>
                         <th>الشعبة / المجموعة</th>
                         <th>حساب التليغرام</th>
                         <th>حالة الحساب</th>
@@ -252,14 +272,39 @@
 
                         <!-- Role Badge -->
                         <td>
-                            {% if u.role == 'super_admin' or u.role == 'director' %}
+                            {% if u.role == 'super_admin' %}
                             <span class="badge badge-role-admin px-3 py-2 rounded-pill"><i class="fas fa-user-shield me-1"></i>مسؤول النظام</span>
+                            {% elif u.role == 'governorate_admin' %}
+                            <span class="badge badge-role-gov-admin px-3 py-2 rounded-pill"><i class="fas fa-city me-1"></i>مسؤول المحافظة</span>
+                            {% elif u.role == 'director' %}
+                            <span class="badge badge-role-director px-3 py-2 rounded-pill"><i class="fas fa-user-tie me-1"></i>مدير المبادرة</span>
+                            {% elif u.role == 'training_officer' %}
+                            <span class="badge badge-role-officer px-3 py-2 rounded-pill"><i class="fas fa-user-cog me-1"></i>مسؤول التدريب</span>
                             {% elif u.role == 'lecturer' %}
                             <span class="badge badge-role-lecturer px-3 py-2 rounded-pill"><i class="fas fa-chalkboard-teacher me-1"></i>مدرب تقني</span>
                             {% elif u.role == 'supervisor' %}
-                            <span class="badge badge-role-supervisor px-3 py-2 rounded-pill"><i class="fas fa-user-tie me-1"></i>مشرف إداري</span>
+                            <span class="badge badge-role-supervisor px-3 py-2 rounded-pill"><i class="fas fa-user-check me-1"></i>مشرف إداري</span>
+                            {% elif u.role == 'visitor' %}
+                            <span class="badge badge-role-visitor px-3 py-2 rounded-pill"><i class="fas fa-user me-1"></i>زائر</span>
                             {% else %}
                             <span class="badge badge-role-trainee px-3 py-2 rounded-pill"><i class="fas fa-user-graduate me-1"></i>متدرب / طالب</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Governorate Badge -->
+                        <td class="text-center">
+                            {% if u.governorate %}
+                            <span class="badge bg-primary-subtle text-primary border rounded-pill px-2 py-1">
+                                <i class="fas fa-map-marker-alt me-1"></i>{{ u.governorate.name }}
+                            </span>
+                            {% elif u.trainee_profile.group.governorate %}
+                            <span class="badge bg-info-subtle text-info border rounded-pill px-2 py-1">
+                                <i class="fas fa-map-marker-alt me-1"></i>{{ u.trainee_profile.group.governorate.name }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-muted border rounded-pill px-2 py-1">
+                                <i class="fas fa-globe me-1"></i>عام / وطني
+                            </span>
                             {% endif %}
                         </td>
 

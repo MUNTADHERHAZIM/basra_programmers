@@ -644,8 +644,14 @@ def mark_attendance_post(request):
 @login_required
 def import_trainees_view(request):
     """Handles Excel file uploads for student bulk importing."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
-        raise Http404("غير مصرح.")
+    if request.user.role not in [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+    ]:
+        messages.error(request, "غير مصرح لك باستيراد المتدربين.")
+        return redirect('portal:admin_management_hub')
         
     if request.method == 'POST' and request.FILES.get('excel_file'):
         excel_file = request.FILES['excel_file']
@@ -661,17 +667,26 @@ def import_trainees_view(request):
         except Exception as e:
             messages.error(request, f"فشل في قراءة ملف الإكسل: {str(e)}")
             
-    return redirect('portal:dashboard')
+    redirect_url = request.META.get('HTTP_REFERER') or 'portal:admin_management_hub'
+    return redirect(redirect_url)
 
 
 @login_required
 def export_trainees_view(request):
     """Generates and downloads student progress spreadsheets."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER, CustomUser.Role.SUPERVISOR]:
-        raise Http404("غير مصرح.")
+    if request.user.role not in [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.SUPERVISOR
+    ]:
+        messages.error(request, "غير مصرح لك بتصدير بيانات المتدربين.")
+        return redirect('portal:admin_management_hub')
         
     group_id = request.GET.get('group_id')
-    buffer = ImportExportService.export_to_excel(group_id)
+    gov = request.user.governorate if request.user.role == CustomUser.Role.GOVERNORATE_ADMIN else None
+    buffer = ImportExportService.export_to_excel(group_id, governorate=gov)
     
     response = HttpResponse(
         buffer.getvalue(),
@@ -843,13 +858,23 @@ def verify_certificate(request, token):
 
 @login_required
 def create_assignment_view(request, group_id):
-    """Allows instructors to publish a new assignment."""
-    if request.user.role not in [CustomUser.Role.LECTURER, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
-        raise Http404()
+    """Allows instructors and staff to publish a new assignment."""
+    allowed_roles = [
+        CustomUser.Role.LECTURER,
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.SUPERVISOR,
+    ]
+    if request.user.role not in allowed_roles:
+        messages.error(request, "غير مصرح لك بنشر الواجبات الدراسية.")
+        return redirect('portal:dashboard')
         
-    group = Group.objects.filter(id=group_id, instructor=request.user).first()
+    group = Group.objects.filter(id=group_id).first()
     if not group:
-        group = get_object_or_404(Group, id=group_id)
+        messages.error(request, f"المجموعة التدريبية رقم #{group_id} غير موجودة.")
+        return redirect('portal:dashboard')
         
     if request.method == 'POST':
         title = request.POST.get('title')
@@ -865,7 +890,9 @@ def create_assignment_view(request, group_id):
             file=file
         )
         messages.success(request, "تم نشر الواجب الدراسي بنجاح.")
-        return redirect('portal:lecturer_dashboard')
+        if request.user.role == CustomUser.Role.LECTURER:
+            return redirect('portal:lecturer_dashboard')
+        return redirect('portal:admin_dashboard')
         
     return render(request, 'portal/create_assignment.html', {'group': group})
 
@@ -3103,17 +3130,17 @@ def daily_reports_list_view(request):
         
     from apps.courses.models import DailyReport
     if request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
-        reports = DailyReport.objects.select_related('instructor', 'group', 'lecture', 'reviewed_by').all()
+        reports = DailyReport.objects.select_related('instructor', 'group__governorate', 'lecture', 'reviewed_by').all()
     elif request.user.role == CustomUser.Role.GOVERNORATE_ADMIN:
-        reports = DailyReport.objects.select_related('instructor', 'group', 'lecture', 'reviewed_by').filter(
+        reports = DailyReport.objects.select_related('instructor', 'group__governorate', 'lecture', 'reviewed_by').filter(
             group__governorate=request.user.governorate
         )
     elif request.user.role == CustomUser.Role.SUPERVISOR:
-        reports = DailyReport.objects.select_related('instructor', 'group', 'lecture', 'reviewed_by').filter(
+        reports = DailyReport.objects.select_related('instructor', 'group__governorate', 'lecture', 'reviewed_by').filter(
             Q(group__supervisor=request.user) | Q(instructor=request.user)
         )
     else:
-        reports = DailyReport.objects.select_related('instructor', 'group', 'lecture', 'reviewed_by').filter(
+        reports = DailyReport.objects.select_related('instructor', 'group__governorate', 'lecture', 'reviewed_by').filter(
             instructor=request.user
         )
         
@@ -3253,14 +3280,32 @@ def chat_view(request):
     """Main Communication Platform / Real-time Messaging Hub view."""
     user = request.user
     from apps.courses.models import Course
+    from apps.locations.models import Governorate
     
     gov = user.governorate
+    if not gov and hasattr(user, 'trainee_profile') and user.trainee_profile and user.trainee_profile.group:
+        gov = user.trainee_profile.group.governorate
+    if not gov and user.role == CustomUser.Role.LECTURER:
+        first_group = user.instructor_groups.first()
+        if first_group:
+            gov = first_group.governorate
+    if not gov and user.role == CustomUser.Role.SUPERVISOR:
+        first_group = user.supervisor_groups.first()
+        if first_group:
+            gov = first_group.governorate
+            
     is_national = (user.role == CustomUser.Role.SUPER_ADMIN)
+    selected_gov_id = request.GET.get('governorate')  # matches the form field name in chat.html
+    all_governorates = Governorate.objects.filter(status='active')
     
+    active_gov = gov
+    if is_national and selected_gov_id and selected_gov_id.isdigit():
+        active_gov = Governorate.objects.filter(id=int(selected_gov_id)).first()
+
     # 1. Fetch available channels (Governorate/General initiative channel, Course chats, Group chats)
     channels = []
     
-    if is_national:
+    if is_national and not active_gov:
         channels.append({
             'id': 'general',
             'type': 'group',
@@ -3270,15 +3315,15 @@ def chat_view(request):
             'category': 'عامة',
             'subtitle': 'مناقشات وتوجيهات الإدارة الوطنية العامة لجميع المحافظات',
         })
-    elif gov:
+    elif active_gov:
         channels.append({
-            'id': 'general',
+            'id': f'general_{active_gov.id}',
             'type': 'group',
             'group_id': None,
-            'name': f'القناة العامة — محافظة {gov.name}',
+            'name': f'القناة العامة — محافظة {active_gov.name}',
             'icon': 'fa-city text-success',
             'category': 'عامة',
-            'subtitle': f'مناقشات وتوجيهات منتسبي محافظة {gov.name}',
+            'subtitle': f'مناقشات وتوجيهات منتسبي محافظة {active_gov.name}',
         })
     else:
         channels.append({
@@ -3291,27 +3336,37 @@ def chat_view(request):
             'subtitle': 'مناقشات وتوجيهات عامة',
         })
     
-    # Course-specific channels (كروبات وتواصل خاص لكل مادة دراسية)
-    from apps.courses.models import Course
-    courses_qs = Course.objects.all()
+    # Course-specific channels (كروبات وتواصل المواد الدراسية الخاصة بالمحافظة فقط)
+    if is_national and not active_gov:
+        courses_qs = Course.objects.all()
+    elif active_gov:
+        courses_qs = Course.objects.filter(groups__governorate=active_gov).distinct()
+    elif user.role == CustomUser.Role.TRAINEE and getattr(user, 'trainee_profile', None) and getattr(user, 'trainee_profile').group:
+        courses_qs = Course.objects.filter(id=user.trainee_profile.group.course_id)
+    else:
+        courses_qs = Course.objects.none()
+
     for c in courses_qs:
+        gov_suffix = f" ({active_gov.name})" if active_gov else ""
         channels.append({
             'id': f"course_{c.id}",
             'type': 'course',
             'course_id': c.id,
-            'name': f"كروب مادة: {c.title}",
+            'name': f"مادة: {c.title}{gov_suffix}",
             'icon': 'fa-book-open text-primary',
             'category': 'مواد دراسية',
-            'subtitle': f"مجتمع ومناقشات مادة {c.title}",
+            'subtitle': f"مجتمع ومناقشات مادة {c.title}{gov_suffix}",
         })
 
     # Group-specific channels (كروبات الشعب الدراسية لمحافظة المستخدم حصراً)
-    if is_national:
-        all_groups = list(Group.objects.all())
-    elif gov:
-        all_groups = list(Group.objects.filter(governorate=gov))
+    if is_national and not active_gov:
+        all_groups = list(Group.objects.all().select_related('governorate', 'course'))
+    elif active_gov:
+        all_groups = list(Group.objects.filter(governorate=active_gov).select_related('governorate', 'course'))
+    elif user.role == CustomUser.Role.TRAINEE and getattr(user, 'trainee_profile', None) and getattr(user, 'trainee_profile').group:
+        all_groups = [user.trainee_profile.group]
     else:
-        all_groups = list(Group.objects.all())
+        all_groups = []
 
     if user.role == CustomUser.Role.TRAINEE:
         trainee_prof = getattr(user, 'trainee_profile', None)
@@ -3324,30 +3379,34 @@ def chat_view(request):
             
         for g in ordered_groups:
             is_my_group = (user_group and g.id == user_group.id)
+            gov_name = f" [{g.governorate.name}]" if g.governorate else ""
             channels.append({
                 'id': f"group_{g.id}",
                 'type': 'group',
                 'group_id': g.id,
-                'name': f"كروب شعبة: {g.name}",
+                'name': f"شعبة: {g.name}{gov_name}",
                 'icon': 'fa-users text-info' if not is_my_group else 'fa-users text-success',
                 'category': 'شعب دراسية',
-                'subtitle': f"قناة شعبتك الخاصة ({g.name})" if is_my_group else f"قناة وتواصل شعبة {g.name}",
+                'subtitle': f"قناة شعبتك الخاصة ({g.name})" if is_my_group else f"قناة وتواصل شعبة {g.name}{gov_name}",
             })
     else: # Lecturers / Admins / Supervisors
         for g in all_groups:
+            gov_name = f" [{g.governorate.name}]" if g.governorate else ""
             channels.append({
                 'id': f"group_{g.id}",
                 'type': 'group',
                 'group_id': g.id,
-                'name': f"كروب شعبة: {g.name}",
+                'name': f"شعبة: {g.name}{gov_name}",
                 'icon': 'fa-users text-info',
                 'category': 'شعب دراسية',
-                'subtitle': f"قناة وتواصل شعبة {g.name}",
+                'subtitle': f"قناة وتواصل شعبة {g.name}{gov_name}",
             })
             
     # 2. Fetch direct message contacts (Users) strictly scoped to user's governorate
-    if is_national:
-        group_members = CustomUser.objects.exclude(id=user.id).order_by('first_name', 'username')[:100]
+    if is_national and not active_gov:
+        group_members = CustomUser.objects.exclude(id=user.id).select_related('governorate').order_by('first_name', 'username')[:120]
+    elif active_gov:
+        group_members = CustomUser.objects.filter(governorate=active_gov).exclude(id=user.id).select_related('governorate').order_by('first_name', 'username')[:100]
     elif user.role == CustomUser.Role.TRAINEE:
         trainee_prof = getattr(user, 'trainee_profile', None)
         if trainee_prof and trainee_prof.group:
@@ -3355,14 +3414,14 @@ def chat_view(request):
                 Q(trainee_profile__group=trainee_prof.group) |
                 Q(id=trainee_prof.group.instructor_id) |
                 Q(role__in=[CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.SUPERVISOR], governorate=gov)
-            ).exclude(id=user.id).distinct()
+            ).exclude(id=user.id).select_related('governorate').distinct()
         else:
             group_members = CustomUser.objects.filter(
                 role__in=[CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR, CustomUser.Role.GOVERNORATE_ADMIN],
                 governorate=gov
-            ).exclude(id=user.id).distinct()
+            ).exclude(id=user.id).select_related('governorate').distinct()
     else:
-        group_members = CustomUser.objects.filter(governorate=gov).exclude(id=user.id).order_by('first_name', 'username')[:100]
+        group_members = CustomUser.objects.filter(governorate=gov).exclude(id=user.id).select_related('governorate').order_by('first_name', 'username')[:100]
 
     contacts = []
     for c_user in group_members:
@@ -3371,6 +3430,7 @@ def chat_view(request):
             'user_id': c_user.id,
             'name': c_user.get_full_name() or c_user.username,
             'role_display': c_user.get_role_display(),
+            'governorate': c_user.governorate.name if c_user.governorate else 'عام',
             'avatar_url': c_user.avatar.url if c_user.avatar else None,
             'unread_count': unread_count,
         })
@@ -3378,6 +3438,10 @@ def chat_view(request):
     context = {
         'channels': channels,
         'contacts': contacts,
+        'all_governorates': all_governorates,
+        'selected_gov_id': selected_gov_id,
+        'active_gov': active_gov,
+        'is_national': is_national,
     }
     return render(request, 'portal/chat.html', context)
 
@@ -3390,20 +3454,32 @@ def chat_fetch_messages_api(request):
     target_id = str(request.GET.get('target_id', ''))
     user = request.user
     
+    gov = user.governorate
+    if not gov and hasattr(user, 'trainee_profile') and user.trainee_profile and user.trainee_profile.group:
+        gov = user.trainee_profile.group.governorate
+    is_national = (user.role == CustomUser.Role.SUPER_ADMIN)
+    
     if target_type == 'course' or target_id.startswith('course_'):
         c_id = int(target_id.replace('course_', ''))
-        messages_qs = InternalMessage.objects.filter(course_id=c_id).select_related('sender')
+        messages_qs = InternalMessage.objects.filter(course_id=c_id).select_related('sender', 'sender__governorate')
+        if not is_national and gov:
+            messages_qs = messages_qs.filter(Q(sender__governorate=gov) | Q(sender__role=CustomUser.Role.SUPER_ADMIN))
     elif target_type == 'group':
-        if target_id and target_id != 'general' and target_id != 'None':
+        if target_id and target_id.startswith('group_'):
             g_id = int(target_id.replace('group_', ''))
-            messages_qs = InternalMessage.objects.filter(group_id=g_id).select_related('sender')
+            messages_qs = InternalMessage.objects.filter(group_id=g_id).select_related('sender', 'sender__governorate')
+        elif target_id.startswith('general_'):
+            gov_id = int(target_id.replace('general_', ''))
+            messages_qs = InternalMessage.objects.filter(recipient=None, group=None, course=None, sender__governorate_id=gov_id).select_related('sender', 'sender__governorate')
         else:
-            messages_qs = InternalMessage.objects.filter(recipient=None, group=None, course=None).select_related('sender')
+            messages_qs = InternalMessage.objects.filter(recipient=None, group=None, course=None).select_related('sender', 'sender__governorate')
+            if not is_national and gov:
+                messages_qs = messages_qs.filter(Q(sender__governorate=gov) | Q(sender__role=CustomUser.Role.SUPER_ADMIN))
     elif target_type == 'direct' and target_id:
         recipient_id = int(target_id)
         messages_qs = InternalMessage.objects.filter(
             (Q(sender=user, recipient_id=recipient_id) | Q(sender_id=recipient_id, recipient=user))
-        ).select_related('sender')
+        ).select_related('sender', 'sender__governorate')
         
         InternalMessage.objects.filter(sender_id=recipient_id, recipient=user, is_read=False).update(is_read=True)
     else:
@@ -3413,11 +3489,13 @@ def chat_fetch_messages_api(request):
     
     data = []
     for m in messages_qs:
+        sender_gov_name = m.sender.governorate.name if m.sender.governorate else 'عام'
         data.append({
             'id': m.id,
             'sender_id': m.sender_id,
             'sender_name': m.sender.get_full_name() or m.sender.username,
             'sender_role': m.sender.get_role_display(),
+            'sender_gov': sender_gov_name,
             'sender_avatar': m.sender.avatar.url if m.sender.avatar else None,
             'content': m.content or '',
             'image_url': m.image.url if m.image else None,
@@ -3455,15 +3533,28 @@ def chat_send_message_api(request):
         c_id = int(target_id.replace('course_', ''))
         msg_kwargs['course_id'] = c_id
     elif target_type == 'group':
-        if target_id and target_id != 'general' and target_id != 'None':
-            g_id = int(target_id.replace('group_', ''))
-            msg_kwargs['group_id'] = g_id
+        if target_id and target_id.startswith('group_'):
+            # Specific group channel e.g. 'group_5'
+            try:
+                g_id = int(target_id.replace('group_', ''))
+                msg_kwargs['group_id'] = g_id
+            except ValueError:
+                return JsonResponse({'success': False, 'message': 'معرف الشعبة غير صالح.'}, status=400)
+        elif target_id and target_id.startswith('general_'):
+            # Governorate general channel e.g. 'general_3' - stored as broadcast with no group
+            msg_kwargs['group'] = None
+            msg_kwargs['recipient'] = None
+            msg_kwargs['course'] = None
         else:
+            # Plain 'general' - national broadcast
             msg_kwargs['group'] = None
             msg_kwargs['recipient'] = None
             msg_kwargs['course'] = None
     elif target_type == 'direct' and target_id:
-        msg_kwargs['recipient_id'] = int(target_id)
+        try:
+            msg_kwargs['recipient_id'] = int(target_id)
+        except ValueError:
+            return JsonResponse({'success': False, 'message': 'معرف المستخدم غير صالح.'}, status=400)
     else:
         return JsonResponse({'success': False, 'message': 'وجهة إرسال غير صالحة.'}, status=400)
 
@@ -3816,14 +3907,19 @@ def lectures_hub_view(request):
         if profile and profile.group:
             user_trainee_group = profile.group
             lectures_qs = Lecture.objects.filter(group=profile.group)
+        elif user.governorate:
+            lectures_qs = Lecture.objects.filter(group__governorate=user.governorate)
         else:
-            lectures_qs = Lecture.objects.none()
+            lectures_qs = Lecture.objects.all()
     elif role == CustomUser.Role.LECTURER:
         user_groups = Group.objects.filter(instructor=user)
         lectures_qs = Lecture.objects.filter(group__in=user_groups)
     elif role == CustomUser.Role.SUPERVISOR:
         user_groups = Group.objects.filter(supervisor=user)
         lectures_qs = Lecture.objects.filter(group__in=user_groups)
+    elif role == CustomUser.Role.GOVERNORATE_ADMIN:
+        user_groups = Group.objects.filter(governorate=user.governorate) if user.governorate else Group.objects.all()
+        lectures_qs = Lecture.objects.filter(group__governorate=user.governorate) if user.governorate else Lecture.objects.all()
     else:
         user_groups = Group.objects.all()
         lectures_qs = Lecture.objects.all()
@@ -3860,14 +3956,16 @@ def lectures_hub_view(request):
     pdf_count = lectures_qs.exclude(Q(files='') | Q(files__isnull=True)).count()
     video_count = lectures_qs.exclude(Q(video_url='') | Q(video_url__isnull=True)).count()
     courses_count = Course.objects.count()
-    all_groups = Group.objects.all().select_related('course')
+    all_groups = user_groups.select_related('course') if role in [CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR, CustomUser.Role.GOVERNORATE_ADMIN] else Group.objects.all().select_related('course')
     all_courses = Course.objects.all()
 
     can_upload = role in [
         CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
         CustomUser.Role.DIRECTOR,
         CustomUser.Role.TRAINING_OFFICER,
-        CustomUser.Role.LECTURER
+        CustomUser.Role.LECTURER,
+        CustomUser.Role.SUPERVISOR,
     ]
 
     context = {
@@ -3894,7 +3992,15 @@ def lectures_hub_view(request):
 def upload_lecture_material_post(request):
     """Handles uploading new lecture material / PDF file by Lecturers or Admins."""
     user = request.user
-    if user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER, CustomUser.Role.LECTURER]:
+    allowed_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.LECTURER,
+        CustomUser.Role.SUPERVISOR,
+    ]
+    if user.role not in allowed_roles:
         messages.error(request, "غير مصرح لك برفع المحاضرات والمواد العلمية.")
         return redirect('portal:lectures_hub')
 
@@ -3944,7 +4050,13 @@ def edit_lecture_material_post(request, lecture_id):
     user = request.user
     lecture = get_object_or_404(Lecture, id=lecture_id)
 
-    is_staff = user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]
+    is_staff = user.role in [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.SUPERVISOR,
+    ]
     is_owner_lecturer = user.role == CustomUser.Role.LECTURER and (lecture.uploaded_by == user or lecture.group.instructor == user)
 
     if not (is_staff or is_owner_lecturer):
@@ -3986,7 +4098,13 @@ def delete_lecture_material_post(request, lecture_id):
     user = request.user
     lecture = get_object_or_404(Lecture, id=lecture_id)
 
-    is_staff = user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]
+    is_staff = user.role in [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.SUPERVISOR,
+    ]
     is_owner_lecturer = user.role == CustomUser.Role.LECTURER and (lecture.uploaded_by == user or lecture.group.instructor == user)
 
     if not (is_staff or is_owner_lecturer):

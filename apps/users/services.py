@@ -288,6 +288,18 @@ class ImportExportService:
                     if spec: profile.specialty = str(spec).strip()
                     if resolved_group: profile.group = resolved_group
                     profile.save()
+
+                    # Ensure CustomUser governorate is set correctly
+                    if resolved_group and resolved_group.governorate:
+                        if user.governorate != resolved_group.governorate:
+                            user.governorate = resolved_group.governorate
+                            user.save(update_fields=['governorate'])
+                    elif gov:
+                        from apps.locations.models import Governorate
+                        gov_obj = Governorate.objects.filter(name__icontains=str(gov).strip()).first()
+                        if gov_obj and not user.governorate:
+                            user.governorate = gov_obj
+                            user.save(update_fields=['governorate'])
                     
                     # Update email to use training number if it was generated/placeholder
                     if not email_val or '@' not in str(email_val):
@@ -565,9 +577,10 @@ class ImportExportService:
         return buffer, generated_count
 
     @staticmethod
-    def export_to_excel(group_id=None):
+    def export_to_excel(group_id=None, governorate=None):
         """Exports trainees data to a formatted Excel spreadsheet."""
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from django.db.models import Q
         
         wb = openpyxl.Workbook()
         sheet = wb.active
@@ -601,6 +614,13 @@ class ImportExportService:
         trainees_qs = TraineeProfile.objects.select_related('user', 'group').all()
         if group_id:
             trainees_qs = trainees_qs.filter(group_id=group_id)
+        if governorate:
+            gov_name = governorate.name if hasattr(governorate, 'name') else str(governorate)
+            trainees_qs = trainees_qs.filter(
+                Q(user__governorate=governorate) | 
+                Q(group__governorate=governorate) | 
+                Q(governorate__icontains=gov_name)
+            )
         
         for row_idx, t in enumerate(trainees_qs, 2):
             sheet.cell(row=row_idx, column=1, value=t.training_number)

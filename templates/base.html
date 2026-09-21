@@ -205,6 +205,10 @@
                         <i class="fas fa-calendar-alt me-2"></i>جدول المبادرة
                     </a>
 
+                    <a href="javascript:void(0)" onclick="triggerPwaInstall()" class="text-primary fw-bold bg-primary-subtle rounded-3 mt-2">
+                        <i class="fas fa-download me-2 text-primary"></i>تثبيت التطبيق على جهازك
+                    </a>
+
                     <hr class="text-secondary my-2">
                     <a href="{% url 'portal:logout' %}" class="text-danger">
                         <i class="fas fa-sign-out-alt me-2"></i>تسجيل الخروج
@@ -294,11 +298,8 @@
                                     <div
                                         class="dropdown-item py-2 px-3 border-bottom d-flex flex-column text-wrap {% if not notif.is_read %}bg-light fw-bold{% endif %}">
                                         <span class="text-primary" style="font-size: 0.85rem;">{{ notif.title }}</span>
-                                        <small class="text-muted mt-1" style="font-size: 0.75rem;">{{
-                                            notif.message|safe}}</small>
-                                        <span class="text-muted font-monospace mt-1"
-                                            style="font-size: 0.65rem; text-align: left;">{{notif.created_at|date:"Y-m-d
-                                            H:i" }}</span>
+                                        <small class="text-muted mt-1" style="font-size: 0.75rem;">{{ notif.message|safe}}</small>
+                                        <span class="text-muted font-monospace mt-1" style="font-size: 0.65rem; text-align: left;">{{notif.created_at|date:"Y-m-d H:i" }}</span>
                                     </div>
                                 </li>
                                 {% empty %}
@@ -349,6 +350,13 @@
                                     </a>
                                 </li>
                                 {% endif %}
+
+                                <li>
+                                    <a class="dropdown-item py-2 rounded-2 fw-bold text-primary"
+                                        href="javascript:void(0)" onclick="triggerPwaInstall()">
+                                        <i class="fas fa-mobile-alt text-primary me-2"></i>تثبيت التطبيق على هاتفك (PWA)
+                                    </a>
+                                </li>
 
 
                                 <li>
@@ -531,7 +539,7 @@
             e.preventDefault();
             deferredPrompt = e;
             const installBanner = document.getElementById('pwa-install-banner');
-            if (installBanner && !localStorage.getItem('pwa_prompt_dismissed')) {
+            if (installBanner && !sessionStorage.getItem('pwa_prompt_dismissed')) {
                 installBanner.classList.remove('d-none');
             }
         });
@@ -540,9 +548,8 @@
             const installBanner = document.getElementById('pwa-install-banner');
             if (installBanner) {
                 installBanner.classList.add('d-none');
-                installBanner.style.display = 'none';
             }
-            localStorage.setItem('pwa_prompt_dismissed', 'true');
+            sessionStorage.setItem('pwa_prompt_dismissed', 'true');
         }
 
         function installPwaApp() {
@@ -555,6 +562,26 @@
                     }
                     deferredPrompt = null;
                 });
+            } else {
+                triggerPwaInstall();
+            }
+        }
+
+        function triggerPwaInstall() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted PWA install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            } else {
+                const modalEl = document.getElementById('pwaInstallGuideModal');
+                if (modalEl) {
+                    const modal = new bootstrap.Modal(modalEl);
+                    modal.show();
+                }
             }
         }
     </script>
@@ -574,6 +601,68 @@
             <div class="d-flex align-items-center gap-2">
                 <button id="pwa-install-btn" onclick="installPwaApp()" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm">تثبيت التطبيق</button>
                 <button id="pwa-close-btn" onclick="dismissPwaBanner()" class="btn btn-sm btn-outline-light rounded-circle ms-1 d-flex align-items-center justify-content-center" style="width:32px; height:32px; padding:0;" aria-label="إغلاق">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PWA Installation Guide Modal -->
+    <div class="modal fade" id="pwaInstallGuideModal" tabindex="-1" aria-labelledby="pwaInstallGuideModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white p-3">
+                    <h5 class="modal-title fw-bold" id="pwaInstallGuideModalLabel">
+                        <i class="fas fa-mobile-alt me-2"></i>تثبيت التطبيق على هاتفك أو حاسوبك
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-slate-800">
+                    <div class="text-center mb-4">
+                        <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 60px; height: 60px;">
+                            <i class="fas fa-cloud-download-alt fs-2"></i>
+                        </div>
+                        <h5 class="fw-bold text-slate-900">تطبيق الويب التقدمي (PWA)</h5>
+                        <p class="text-muted small">يعمل التطبيق بكفاءة على جميع الأجهزة دون الحاجة لمتجر التطبيقات!</p>
+                    </div>
+
+                    <!-- Android / Chrome Instructions -->
+                    <div class="p-3 bg-light rounded-3 mb-3 border">
+                        <h6 class="fw-bold text-primary mb-2">
+                            <i class="fab fa-android text-success me-1"></i> أجهزة أندرويد (Google Chrome):
+                        </h6>
+                        <ol class="small m-0 ps-3 text-secondary" style="line-height: 1.7;">
+                            <li>اضغط على قائمة النقاط الثلاث <i class="fas fa-ellipsis-v"></i> أعلى المتصفح.</li>
+                            <li>اختر <strong>"تثبيت التطبيق"</strong> أو <strong>"الإضافة إلى الشاشة الرئيسية"</strong>.</li>
+                            <li>اضغط <strong>تثبيت</strong> ليظهر التطبيق في شاشتك الرئيسية فوراً.</li>
+                        </ol>
+                    </div>
+
+                    <!-- iPhone / Safari Instructions -->
+                    <div class="p-3 bg-light rounded-3 mb-3 border">
+                        <h6 class="fw-bold text-dark mb-2">
+                            <i class="fab fa-apple text-dark me-1"></i> أجهزة آيفون (Safari):
+                        </h6>
+                        <ol class="small m-0 ps-3 text-secondary" style="line-height: 1.7;">
+                            <li>اضغط على زر المشاركة <i class="fas fa-share-square text-primary"></i> أسفل الشاشة.</li>
+                            <li>مرر لأسفل واختر <strong>"إضافة إلى الشاشة الرئيسية" (Add to Home Screen)</strong>.</li>
+                            <li>اضغط على <strong>"إضافة" (Add)</strong> في أعلى الزاوية.</li>
+                        </ol>
+                    </div>
+
+                    <!-- PC / Chrome Instructions -->
+                    <div class="p-3 bg-light rounded-3 border">
+                        <h6 class="fw-bold text-info mb-2">
+                            <i class="fas fa-desktop text-info me-1"></i> أجهزة الكمبيوتر (Chrome / Edge):
+                        </h6>
+                        <p class="small m-0 text-secondary">
+                            اضغط على أيقونة التثبيت <i class="fas fa-laptop-medical text-primary"></i> في شريط العنوان أعلى المتصفح، ثم اختر <strong>تثبيت</strong>.
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-primary fw-bold px-4 w-100 rounded-pill" data-bs-dismiss="modal">
+                        فهمت ذلك!
+                    </button>
+                </div>
             </div>
         </div>
     </div>

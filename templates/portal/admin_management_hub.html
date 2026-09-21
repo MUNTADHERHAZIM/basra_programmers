@@ -426,6 +426,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>اسم الشعبة</th>
+                                <th>المحافظة</th>
                                 <th>الدورة</th>
                                 <th>المحاضر</th>
                                 <th>المشرف المتابع</th>
@@ -437,6 +438,11 @@
                             {% for group in groups %}
                             <tr>
                                 <td class="fw-bold text-dark">{{ group.name }}</td>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary border rounded-pill px-2 py-1">
+                                        <i class="fas fa-map-marker-alt me-1"></i>{{ group.governorate.name|default:"عام" }}
+                                    </span>
+                                </td>
                                 <td>{{ group.course.title }}</td>
                                 <td>
                                     {% if group.instructor %}
@@ -482,7 +488,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="6" class="text-center py-4 text-muted">لا توجد شعب مسجلة حالياً.</td>
+                                <td colspan="7" class="text-center py-4 text-muted">لا توجد شعب مسجلة حالياً.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -565,6 +571,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>عنوان المحاضرة</th>
+                                <th>المحافظة</th>
                                 <th>الشعبة / المجموعة</th>
                                 <th>التاريخ</th>
                                 <th>التوقيت</th>
@@ -576,6 +583,11 @@
                             {% for lec in lectures %}
                             <tr>
                                 <td class="fw-bold text-dark">{{ lec.title }}</td>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary border rounded-pill px-2 py-1">
+                                        <i class="fas fa-map-marker-alt me-1"></i>{{ lec.group.governorate.name|default:"عام" }}
+                                    </span>
+                                </td>
                                 <td><span class="badge bg-secondary">{{ lec.group.name }}</span></td>
                                 <td>{{ lec.date }}</td>
                                 <td>{{ lec.start_time|time:"H:i" }} - {{ lec.end_time|time:"H:i" }}</td>
@@ -729,6 +741,7 @@
                                            title="تحديد/إلغاء تحديد الكل">
                                 </th>
                                 <th>الاسم الكامل</th>
+                                <th>المحافظة</th>
                                 <th>اسم المستخدم</th>
                                 <th>البريد الإلكتروني</th>
                                 <th>التخصص</th>
@@ -754,6 +767,11 @@
                                            ">
                                 </td>
                                 <td class="fw-bold text-dark">{{ lec.get_full_name|default:lec.username }}</td>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary border rounded-pill px-2 py-1">
+                                        <i class="fas fa-map-marker-alt me-1"></i>{{ lec.governorate.name|default:"عام" }}
+                                    </span>
+                                </td>
                                 <td class="text-muted">{{ lec.username }}</td>
                                 <td>{{ lec.email }}</td>
                                 <td><span class="badge bg-success-subtle text-success">{{ lec.lecturer_profile.first.specialty|default:"مدرس تقني" }}</span></td>
@@ -941,6 +959,7 @@
                                 </th>
                                 <th>الرقم التدريبي</th>
                                 <th>الاسم الكامل</th>
+                                <th>المحافظة</th>
                                 <th>الشعبة</th>
                                 <th>المدرسة والصف</th>
                                 <th>الجنس</th>
@@ -975,6 +994,11 @@
                                         <i class="fas fa-external-link-alt me-1 small" style="font-size: 0.75rem;"></i>
                                         {{ trainee.user.get_full_name|default:trainee.user.username }}
                                     </a>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary border rounded-pill px-2 py-1">
+                                        <i class="fas fa-map-marker-alt me-1"></i>{% if trainee.group.governorate %}{{ trainee.group.governorate.name }}{% elif trainee.user.governorate %}{{ trainee.user.governorate.name }}{% else %}عام{% endif %}
+                                    </span>
                                 </td>
                                 <td>
                                     <span class="badge bg-secondary">

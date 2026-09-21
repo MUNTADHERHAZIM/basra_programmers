@@ -13,8 +13,28 @@
             <div class="p-3 border-bottom bg-light">
                 <div class="d-flex align-items-center justify-content-between mb-2">
                     <h6 class="fw-bold m-0 text-slate-800"><i class="fas fa-comments text-success me-2"></i>منصة التواصل</h6>
+                    {% if active_gov %}
+                    <span class="badge bg-primary-subtle text-primary rounded-pill px-2" style="font-size: 0.75rem;"><i class="fas fa-map-marker-alt me-1"></i>{{ active_gov.name }}</span>
+                    {% else %}
                     <span class="badge bg-success-subtle text-success rounded-pill px-3">نشط</span>
+                    {% endif %}
                 </div>
+
+                {% if is_national and all_governorates %}
+                <!-- Super Admin Governorate Switcher -->
+                <form method="GET" action="{% url 'portal:chat_view' %}" class="mb-2">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0 text-primary"><i class="fas fa-filter"></i></span>
+                        <select name="governorate" class="form-select border-start-0" onchange="this.form.submit()">
+                            <option value="">-- جميع المحافظات (عرض شامل) --</option>
+                            {% for g in all_governorates %}
+                            <option value="{{ g.id }}" {% if selected_gov_id == g.id|stringformat:"s" %}selected{% endif %}>محافظة {{ g.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+                {% endif %}
+
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
                     <input type="text" id="contact-search" class="form-control border-start-0 ps-0" placeholder="بحث عن قناة أو متدرب أو مدرب..." onkeyup="filterContacts()">
@@ -81,7 +101,12 @@
                             </div>
                             <div class="flex-grow-1 overflow-hidden">
                                 <h6 class="m-0 fw-bold text-dark text-truncate" style="font-size: 0.9rem;">{{ contact.name }}</h6>
-                                <span class="badge bg-secondary-subtle text-secondary font-monospace" style="font-size: 0.7rem;">{{ contact.role_display }}</span>
+                                <div class="d-flex align-items-center gap-1 mt-1">
+                                    <span class="badge bg-secondary-subtle text-secondary font-monospace" style="font-size: 0.68rem;">{{ contact.role_display }}</span>
+                                    {% if contact.governorate %}
+                                    <span class="badge bg-primary-subtle text-primary border rounded-pill" style="font-size: 0.65rem;"><i class="fas fa-map-marker-alt me-1"></i>{{ contact.governorate }}</span>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                     </a>
@@ -158,112 +183,130 @@
 
 {% block extra_js %}
 <script>
+// ─── State ────────────────────────────────────────────────────────────────────
 let currentTargetType = 'group';
-let currentTargetId = 'general';
+let currentTargetId   = 'general';
 let selectedAttachmentFile = null;
-let pollTimer = null;
+let pollTimer  = null;
+let isSending  = false;
+const CSRF_TOKEN = '{{ csrf_token }}';
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Initial fetch for general channel
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    // Sync initial state with the first rendered channel item
+    const firstChannel = document.querySelector('.chat-target-item');
+    if (firstChannel) {
+        currentTargetType = firstChannel.getAttribute('data-target-type') || 'group';
+        currentTargetId   = firstChannel.getAttribute('data-target-id')   || 'general';
+        firstChannel.classList.add('active-target', 'bg-success-subtle');
+        updateChatHeader(firstChannel);
+    }
     fetchMessages();
-    
-    // Auto poll every 4 seconds for new messages
-    pollTimer = setInterval(fetchMessages, 4000);
+    pollTimer = setInterval(fetchMessages, 5000);
 });
 
+// ─── Switch Channel / Contact ─────────────────────────────────────────────────
 function switchChatTarget(element) {
-    document.querySelectorAll('.chat-target-item').forEach(el => {
-        el.classList.remove('active-target', 'bg-success-subtle');
-    });
+    document.querySelectorAll('.chat-target-item').forEach(el =>
+        el.classList.remove('active-target', 'bg-success-subtle')
+    );
     element.classList.add('active-target', 'bg-success-subtle');
 
     currentTargetType = element.getAttribute('data-target-type');
-    currentTargetId = element.getAttribute('data-target-id');
-    const name = element.getAttribute('data-name');
-    const subtitle = element.getAttribute('data-subtitle');
-    const icon = element.getAttribute('data-icon');
-    const avatar = element.getAttribute('data-avatar');
+    currentTargetId   = element.getAttribute('data-target-id');
 
-    // Update Header
-    document.getElementById('active-chat-title').innerText = name;
+    updateChatHeader(element);
+    fetchMessages();
+}
+
+function updateChatHeader(element) {
+    const name     = element.getAttribute('data-name')     || '';
+    const subtitle = element.getAttribute('data-subtitle') || '';
+    const icon     = element.getAttribute('data-icon')     || 'fa-comments';
+    const avatar   = element.getAttribute('data-avatar')   || '';
+
+    document.getElementById('active-chat-title').innerText    = name;
     document.getElementById('active-chat-subtitle').innerText = subtitle;
 
     const avatarContainer = document.getElementById('active-chat-avatar-container');
     if (currentTargetType === 'direct' && avatar) {
-        avatarContainer.innerHTML = `<img src="${avatar}" class="rounded-circle border" width="44" height="44" style="object-fit: cover;">`;
+        avatarContainer.innerHTML = `<img src="${avatar}" class="rounded-circle border" width="44" height="44" style="object-fit:cover;">`;
     } else if (currentTargetType === 'direct') {
-        avatarContainer.innerHTML = `<div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold border" style="width: 44px; height: 44px;">${name.charAt(0).toUpperCase()}</div>`;
+        avatarContainer.innerHTML = `<div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold border" style="width:44px;height:44px;">${name.charAt(0).toUpperCase()}</div>`;
     } else {
-        avatarContainer.innerHTML = `<div class="rounded-circle bg-light d-flex align-items-center justify-content-center border" style="width: 44px; height: 44px;"><i class="fas ${icon || 'fa-users'} text-warning fs-5"></i></div>`;
+        avatarContainer.innerHTML = `<div class="rounded-circle bg-light d-flex align-items-center justify-content-center border" style="width:44px;height:44px;"><i class="fas ${icon} fs-5"></i></div>`;
     }
-
-    fetchMessages();
 }
 
+// ─── Fetch Messages (polling) ─────────────────────────────────────────────────
 function fetchMessages() {
-    const container = document.getElementById('chat-messages-container');
-    
-    fetch(`{% url 'portal:chat_fetch_messages_api' %}?target_type=${currentTargetType}&target_id=${currentTargetId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                renderMessages(data.messages);
-            }
-        })
-        .catch(err => console.error("Error fetching messages:", err));
+    const url = `{% url 'portal:chat_fetch_messages_api' %}?target_type=${encodeURIComponent(currentTargetType)}&target_id=${encodeURIComponent(currentTargetId)}`;
+    fetch(url)
+        .then(r => r.json())
+        .then(data => { if (data.success) renderMessages(data.messages); })
+        .catch(err => console.warn('[Chat] fetch error:', err));
 }
 
+// ─── Render Messages ──────────────────────────────────────────────────────────
 function renderMessages(messages) {
     const container = document.getElementById('chat-messages-container');
+    const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 60;
+
     if (!messages || messages.length === 0) {
         container.innerHTML = `
             <div class="text-center py-5 text-muted">
                 <i class="fas fa-comments fs-1 text-secondary opacity-50 mb-3 d-block"></i>
                 <p class="m-0 fw-bold">لا يوجد رسائل سابقة في هذه المحادثة</p>
-                <small>كن أول من يبدأ بالنقاش والإجابة على الاستفسارات البرمجية!</small>
+                <small>كن أول من يبدأ بالنقاش!</small>
             </div>`;
         return;
     }
 
     let html = '';
     messages.forEach(msg => {
-        const isMe = msg.is_me;
-        const alignClass = isMe ? 'justify-content-end' : 'justify-content-start';
-        const bubbleBg = isMe ? 'bg-success text-white' : 'bg-white text-dark shadow-sm border';
-        const subTextColor = isMe ? 'text-white-50' : 'text-muted';
-        
+        const isMe         = msg.is_me;
+        const alignClass   = isMe ? 'justify-content-end'               : 'justify-content-start';
+        const bubbleBg     = isMe ? 'bg-success text-white'             : 'bg-white text-dark shadow-sm border';
+        const subTextColor = isMe ? 'text-white-50'                     : 'text-muted';
+
         let mediaHtml = '';
         if (msg.image_url) {
-            mediaHtml += `<div class="my-2"><a href="${msg.image_url}" target="_blank"><img src="${msg.image_url}" class="img-fluid rounded-3 border" style="max-height: 220px;" alt="Image"></a></div>`;
+            mediaHtml += `<div class="my-2"><a href="${msg.image_url}" target="_blank"><img src="${msg.image_url}" class="img-fluid rounded-3 border" style="max-height:220px;" alt="صورة"></a></div>`;
         }
         if (msg.file_url) {
-            mediaHtml += `
-                <div class="my-2 p-2 bg-light-subtle rounded border d-flex align-items-center gap-2 text-truncate">
-                    <i class="fas fa-file-download fs-4"></i>
-                    <a href="${msg.file_url}" target="_blank" class="text-reset text-decoration-none fw-bold small text-truncate">${msg.file_name || 'ملف مرفق'}</a>
-                </div>`;
+            mediaHtml += `<div class="my-2 p-2 bg-light-subtle rounded border d-flex align-items-center gap-2"><i class="fas fa-file-download fs-4"></i><a href="${msg.file_url}" target="_blank" class="text-reset text-decoration-none fw-bold small text-truncate">${msg.file_name || 'ملف مرفق'}</a></div>`;
         }
 
         let avatarHtml = '';
         if (!isMe) {
-            if (msg.sender_avatar) {
-                avatarHtml = `<img src="${msg.sender_avatar}" class="rounded-circle border me-2" width="34" height="34" style="object-fit: cover;">`;
-            } else {
-                avatarHtml = `<div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold" style="width: 34px; height: 34px; font-size: 0.8rem;">${msg.sender_name.charAt(0)}</div>`;
-            }
+            avatarHtml = msg.sender_avatar
+                ? `<img src="${msg.sender_avatar}" class="rounded-circle border me-2" width="34" height="34" style="object-fit:cover;">`
+                : `<div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold" style="width:34px;height:34px;font-size:.8rem;">${(msg.sender_name||'?').charAt(0).toUpperCase()}</div>`;
         }
 
         const canDelete = isMe || {% if user.role == 'super_admin' or user.role == 'director' %}true{% else %}false{% endif %};
-        const deleteBtn = canDelete ? `<button onclick="deleteChatMessage(${msg.id})" class="btn btn-link ${isMe ? 'text-white-50' : 'text-danger'} p-0 ms-2 text-decoration-none" title="حذف الرسالة" style="font-size: 0.75rem;"><i class="fas fa-trash-alt"></i></button>` : '';
+        const deleteBtn = canDelete
+            ? `<button onclick="deleteChatMessage(${msg.id})" class="btn btn-link ${isMe?'text-white-50':'text-danger'} p-0 ms-2" title="حذف الرسالة" style="font-size:.75rem;"><i class="fas fa-trash-alt"></i></button>`
+            : '';
+
+        const govBadge = (!isMe && msg.sender_gov)
+            ? `<span class="badge bg-info-subtle text-info font-monospace ms-1" style="font-size:.65rem;"><i class="fas fa-map-marker-alt me-1"></i>${msg.sender_gov}</span>`
+            : '';
+
+        const senderHeader = !isMe
+            ? `<div class="fw-bold mb-1" style="font-size:.8rem;color:#1e293b;">${msg.sender_name} <span class="badge bg-primary-subtle text-primary font-monospace" style="font-size:.65rem;">${msg.sender_role}</span>${govBadge}</div>`
+            : '';
+
+        const safeContent = (msg.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
 
         html += `
             <div class="d-flex ${alignClass} mb-3" id="msg-bubble-${msg.id}">
                 ${avatarHtml}
-                <div class="card border-0 rounded-4 px-3 py-2 ${bubbleBg}" style="max-width: 75%; font-size: 0.95rem;">
-                    ${!isMe ? `<div class="fw-bold mb-1" style="font-size: 0.8rem; color: #1e293b;">${msg.sender_name} <span class="badge bg-primary-subtle text-primary font-monospace" style="font-size: 0.65rem;">${msg.sender_role}</span></div>` : ''}
-                    <div>${msg.content}</div>
+                <div class="card border-0 rounded-4 px-3 py-2 ${bubbleBg}" style="max-width:75%;font-size:.95rem;">
+                    ${senderHeader}
+                    <div>${safeContent}</div>
                     ${mediaHtml}
-                    <div class="d-flex align-items-center justify-content-between mt-1 ${subTextColor}" style="font-size: 0.65rem;">
+                    <div class="d-flex align-items-center justify-content-between mt-1 ${subTextColor}" style="font-size:.65rem;">
                         <span>${msg.created_at}</span>
                         ${deleteBtn}
                     </div>
@@ -272,36 +315,35 @@ function renderMessages(messages) {
     });
 
     container.innerHTML = html;
-    container.scrollTop = container.scrollHeight;
+    if (wasAtBottom) container.scrollTop = container.scrollHeight;
 }
 
+// ─── Delete Message ───────────────────────────────────────────────────────────
 function deleteChatMessage(msgId) {
     if (!confirm('هل أنت متأكد من حذف هذه الرسالة نهائياً؟')) return;
-    fetch(`/chat/message/${msgId}/delete/`, {
+    fetch(`{% url 'portal:chat_delete_message_api' 0 %}`.replace('/0/', `/${msgId}/`), {
         method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
-        }
+        headers: { 'X-CSRFToken': CSRF_TOKEN }
     })
-    .then(response => response.json())
+    .then(r => r.json())
     .then(data => {
         if (data.success) {
             const bubble = document.getElementById(`msg-bubble-${msgId}`);
             if (bubble) bubble.remove();
         } else {
-            alert(data.message || 'تعذر حذف الرسالة');
+            showToast(data.message || 'تعذر حذف الرسالة', 'danger');
         }
     })
-    .catch(err => alert('حدث خطأ أثناء حذف الرسالة'));
+    .catch(() => showToast('حدث خطأ أثناء حذف الرسالة', 'danger'));
 }
 
+// ─── File Attachment ──────────────────────────────────────────────────────────
 function handleFileSelect(event) {
     const file = event.target.files[0];
-    if (file) {
-        selectedAttachmentFile = file;
-        document.getElementById('attachment-file-name').innerText = file.name;
-        document.getElementById('attachment-preview-bar').classList.remove('d-none');
-    }
+    if (!file) return;
+    selectedAttachmentFile = file;
+    document.getElementById('attachment-file-name').innerText = file.name;
+    document.getElementById('attachment-preview-bar').classList.remove('d-none');
 }
 
 function clearAttachment() {
@@ -310,57 +352,94 @@ function clearAttachment() {
     document.getElementById('attachment-preview-bar').classList.add('d-none');
 }
 
+// ─── Send Message ─────────────────────────────────────────────────────────────
 function sendMessage(event) {
     event.preventDefault();
-    const input = document.getElementById('chat-content-input');
+    if (isSending) return;
+
+    const input   = document.getElementById('chat-content-input');
+    const sendBtn = document.querySelector('#chat-form button[type="submit"]');
     const content = input.value.trim();
 
-    if (!content && !selectedAttachmentFile) return;
+    if (!content && !selectedAttachmentFile) {
+        showToast('الرجاء كتابة رسالة أو إرفاق ملف أولاً', 'warning');
+        return;
+    }
+
+    // Lock UI
+    isSending = true;
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>إرسال...'; }
 
     const formData = new FormData();
     formData.append('target_type', currentTargetType);
-    formData.append('target_id', currentTargetId);
-    formData.append('content', content);
-
+    formData.append('target_id',   currentTargetId);
+    formData.append('content',     content);
     if (selectedAttachmentFile) {
-        if (selectedAttachmentFile.type.startsWith('image/')) {
-            formData.append('image', selectedAttachmentFile);
-        } else {
-            formData.append('file', selectedAttachmentFile);
-        }
+        const key = selectedAttachmentFile.type.startsWith('image/') ? 'image' : 'file';
+        formData.append(key, selectedAttachmentFile);
     }
 
     input.value = '';
     clearAttachment();
 
     fetch("{% url 'portal:chat_send_message_api' %}", {
-        method: "POST",
-        headers: {
-            "X-CSRFToken": "{{ csrf_token }}"
-        },
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
         body: formData
     })
-    .then(response => response.json())
+    .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+    })
     .then(data => {
         if (data.success) {
-            fetchMessages();
+            fetchMessages();  // refresh so the new message appears with server ID
         } else {
-            alert(data.message || "حدث خطأ أثناء إرسال الرسالة.");
+            showToast(data.message || 'حدث خطأ أثناء إرسال الرسالة.', 'danger');
         }
     })
-    .catch(err => console.error("Error sending message:", err));
+    .catch(err => {
+        console.error('[Chat] send error:', err);
+        showToast('تعذر الاتصال بالخادم. تحقق من الاتصال وأعد المحاولة.', 'danger');
+    })
+    .finally(() => {
+        isSending = false;
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = 'إرسال <i class="fas fa-paper-plane ms-1"></i>'; }
+    });
 }
 
+// ─── Search / Filter Contacts ─────────────────────────────────────────────────
 function filterContacts() {
     const q = document.getElementById('contact-search').value.toLowerCase();
     document.querySelectorAll('.chat-target-item').forEach(item => {
-        const name = item.getAttribute('data-name').toLowerCase();
-        if (name.includes(q)) {
-            item.classList.remove('d-none');
-        } else {
-            item.classList.add('d-none');
-        }
+        const name = (item.getAttribute('data-name') || '').toLowerCase();
+        item.classList.toggle('d-none', !name.includes(q));
     });
+}
+
+// ─── Toast Notification ───────────────────────────────────────────────────────
+function showToast(message, type = 'info') {
+    const container = document.getElementById('chat-toast-container') || (() => {
+        const el = document.createElement('div');
+        el.id = 'chat-toast-container';
+        el.className = 'position-fixed top-0 end-0 p-3';
+        el.style.zIndex = '9999';
+        document.body.appendChild(el);
+        return el;
+    })();
+    const id   = 'toast-' + Date.now();
+    const html = `
+        <div id="${id}" class="toast align-items-center text-bg-${type} border-0 shadow" role="alert">
+            <div class="d-flex">
+                <div class="toast-body fw-bold">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>`;
+    container.insertAdjacentHTML('beforeend', html);
+    const toastEl = new bootstrap.Toast(document.getElementById(id), { delay: 4000 });
+    toastEl.show();
+    document.getElementById(id).addEventListener('hidden.bs.toast', () => document.getElementById(id)?.remove());
 }
 </script>
 {% endblock %}
+
