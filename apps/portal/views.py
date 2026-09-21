@@ -3470,7 +3470,9 @@ def chat_fetch_messages_api(request):
             messages_qs = InternalMessage.objects.filter(group_id=g_id).select_related('sender', 'sender__governorate')
         elif target_id.startswith('general_'):
             gov_id = int(target_id.replace('general_', ''))
-            messages_qs = InternalMessage.objects.filter(recipient=None, group=None, course=None, sender__governorate_id=gov_id).select_related('sender', 'sender__governorate')
+            messages_qs = InternalMessage.objects.filter(recipient=None, group=None, course=None).filter(
+                Q(sender__governorate_id=gov_id) | Q(sender__role=CustomUser.Role.SUPER_ADMIN)
+            ).select_related('sender', 'sender__governorate')
         else:
             messages_qs = InternalMessage.objects.filter(recipient=None, group=None, course=None).select_related('sender', 'sender__governorate')
             if not is_national and gov:
@@ -3810,7 +3812,7 @@ def pwa_manifest_view(request):
 def service_worker_view(request):
     """Serves the PWA Service Worker script at root /sw.js."""
     sw_code = """
-const CACHE_NAME = 'pwa-1000programmers-v1';
+const CACHE_NAME = 'pwa-1000programmers-v2';
 const OFFLINE_URL = '/offline/';
 
 const ASSETS_TO_CACHE = [
@@ -3846,32 +3848,81 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // 1. Only handle GET requests (never intercept POST, PUT, DELETE)
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // 2. Only handle HTTP/HTTPS requests (ignore chrome-extension, data, blob)
+  if (!event.request.url.startsWith('http://') && !event.request.url.startsWith('https://')) {
+    return;
+  }
+
+  const url = new URL(event.request.url);
+
+  // 3. Completely bypass caching for dynamic APIs, chat endpoints, and admin
+  if (
+    url.pathname.includes('/chat/') ||
+    url.pathname.includes('/api/') ||
+    url.pathname.startsWith('/admin/') ||
+    url.pathname.includes('/ajax/')
+  ) {
+    return;
+  }
+
+  // 4. Handle navigation requests (HTML pages)
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match(OFFLINE_URL) || caches.match('/');
+      fetch(event.request).catch(async () => {
+        try {
+          const cache = await caches.open(CACHE_NAME);
+          const offlineMatch = await cache.match(OFFLINE_URL);
+          if (offlineMatch) return offlineMatch;
+          const rootMatch = await cache.match('/');
+          if (rootMatch) return rootMatch;
+        } catch (e) {}
+        return new Response('Offline - No connection', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
       })
     );
     return;
   }
+
+  // 5. Handle static assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
       return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type === 'opaque') {
           return networkResponse;
         }
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-        return networkResponse;
-      }).catch(() => {
-        if (event.request.headers.get('accept').includes('text/html')) {
-          return caches.match(OFFLINE_URL);
+        if (
+          url.pathname.startsWith('/static/') ||
+          url.hostname.includes('cdnjs.cloudflare.com') ||
+          url.hostname.includes('cdn.jsdelivr.net') ||
+          url.hostname.includes('fonts.googleapis.com') ||
+          url.hostname.includes('fonts.gstatic.com')
+        ) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache).catch(() => {});
+          });
         }
+        return networkResponse;
+      }).catch(async () => {
+        const acceptHeader = event.request.headers.get('accept') || '';
+        if (acceptHeader.includes('text/html')) {
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            const offlineMatch = await cache.match(OFFLINE_URL);
+            if (offlineMatch) return offlineMatch;
+          } catch (e) {}
+        }
+        return new Response('', { status: 408, statusText: 'Offline' });
       });
     })
   );
