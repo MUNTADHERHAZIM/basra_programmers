@@ -9,6 +9,35 @@
         <div class="glass-card p-4 border-0 shadow-lg">
             <h5 class="fw-bold mb-3 text-slate-800"><i class="fas fa-list-ul me-2 text-success"></i>سجل المتابعة الموحد</h5>
             <p class="text-muted small mb-4">يعرض هذا السجل كافة الحركات والنشاطات التي تتم على المنصة من قبل الطلاب والمدربين، بما في ذلك تسجيل الحضور، والتقييمات التفصيلية، وتسليم الواجبات، وربح النقاط.</p>
+
+            {% if is_national %}
+            <!-- فلتر المحافظات للـ Super Admin -->
+            <form method="GET" class="mb-4">
+                <div class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label fw-bold small text-muted">فلترة حسب المحافظة</label>
+                        <select name="gov_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="">🌍 جميع المحافظات</option>
+                            {% for gov in all_governorates %}
+                            <option value="{{ gov.id }}" {% if selected_gov.id == gov.id %}selected{% endif %}>{{ gov.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% if selected_gov %}
+                    <div class="col-auto">
+                        <a href="{% url 'portal:activity_log' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>إلغاء الفلتر
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if selected_gov %}
+                <div class="mt-2">
+                    <span class="badge bg-primary-custom py-2 px-3"><i class="fas fa-map-marker-alt me-1"></i>تعرض بيانات محافظة: {{ selected_gov.name }}</span>
+                </div>
+                {% endif %}
+            </form>
+            {% endif %}
             
             <!-- Navigation Tabs (Bootstrap Pills + Alpine) -->
             <ul class="nav nav-pills gap-2 mb-4 bg-light p-2 rounded-3" style="max-width: max-content;">

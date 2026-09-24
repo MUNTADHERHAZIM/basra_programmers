@@ -23,6 +23,7 @@ urlpatterns = [
     path('dashboard/lecturer/', views.lecturer_dashboard, name='lecturer_dashboard'),
     path('dashboard/supervisor/', views.supervisor_dashboard, name='supervisor_dashboard'),
     path('dashboard/trainee/', views.trainee_dashboard, name='trainee_dashboard'),
+    path('learning/instructions/', views.learning_instructions_view, name='learning_instructions'),
     path('manage/governorates/', views.governorates_management_view, name='governorates_management'),
     path('manage/governorate/activate/', views.activate_governorate_post, name='activate_governorate_post'),
     path('manage/branch/add/', views.add_branch_post, name='add_branch_post'),
@@ -144,7 +145,6 @@ urlpatterns = [
     # Fallback catch-all 404 page route
     path('<path:invalid_path>/', views.custom_404_view, name='catch_all_404'),
 ]
-
 
 
 

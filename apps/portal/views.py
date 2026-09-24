@@ -26,6 +26,7 @@ from apps.users.services import ImportExportService, LectureGroupImportExportSer
 from apps.notifications.models import Notification, InternalMessage
 from apps.gamification.services import award_points
 from apps.locations.models import Governorate
+from apps.portal.models import LearningInstruction
 from apps.users.permissions import get_groups_qs_for_user, get_trainees_qs_for_user
 
 # ==========================================
@@ -127,6 +128,28 @@ def dashboard_redirect(request):
         return redirect('portal:trainee_dashboard')
     else:
         return redirect('portal:landing')
+
+
+def learning_instructions_view(request):
+    """دليل مبسط للمتدربين والمدربين مع الدروس التي تنشرها الإدارة."""
+    trainer_roles = {CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR}
+    staff_roles = {
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+    }
+    is_trainer = request.user.is_authenticated and request.user.role in trainer_roles
+    instructions = LearningInstruction.objects.filter(is_published=True)
+    if request.user.is_authenticated and request.user.role not in staff_roles:
+        audience = LearningInstruction.Audience.TRAINERS if is_trainer else LearningInstruction.Audience.TRAINEES
+        instructions = instructions.filter(
+            Q(audience=LearningInstruction.Audience.ALL) | Q(audience=audience)
+        )
+    return render(request, 'portal/learning_instructions.html', {
+        'instructions': instructions,
+        'is_trainer': is_trainer,
+    })
 
 # ==========================================
 # Admin / Director Dashboard
@@ -1097,18 +1120,40 @@ def activity_log_view(request):
     # 4. Homework Submissions
     submissions_logs = AssignmentSubmission.objects.select_related('trainee', 'assignment', 'assignment__group').order_by('-submitted_at')
 
-    if request.user.role == CustomUser.Role.GOVERNORATE_ADMIN and request.user.governorate:
-        gov = request.user.governorate
-        points_logs = points_logs.filter(trainee__governorate=gov)
-        attendance_logs = attendance_logs.filter(trainee__governorate=gov)
-        evaluation_logs = evaluation_logs.filter(trainee__governorate=gov)
-        submissions_logs = submissions_logs.filter(trainee__governorate=gov)
+    is_national = request.is_national
+    gov = request.governorate
+    selected_gov = None
+    all_governorates = Governorate.objects.all().order_by('order', 'name')
+
+    if is_national:
+        # Super Admin: يمكنه الفلترة بمحافظة محددة عبر ?gov_id=
+        filter_gov_id = request.GET.get('gov_id')
+        if filter_gov_id and filter_gov_id.isdigit():
+            selected_gov = Governorate.objects.filter(id=int(filter_gov_id)).first()
+            if selected_gov:
+                gov = selected_gov
+                points_logs = points_logs.filter(trainee__governorate=gov)
+                attendance_logs = attendance_logs.filter(trainee__governorate=gov)
+                evaluation_logs = evaluation_logs.filter(trainee__governorate=gov)
+                submissions_logs = submissions_logs.filter(trainee__governorate=gov)
+        # إذا لم يختر محافظة → يرى كل البيانات (الوضع الافتراضي للـ Super Admin)
+    else:
+        # غير وطني: فلتر بمحافظة المستخدم دائماً
+        if gov:
+            points_logs = points_logs.filter(trainee__governorate=gov)
+            attendance_logs = attendance_logs.filter(trainee__governorate=gov)
+            evaluation_logs = evaluation_logs.filter(trainee__governorate=gov)
+            submissions_logs = submissions_logs.filter(trainee__governorate=gov)
 
     context = {
         'points_logs': points_logs[:50],
         'attendance_logs': attendance_logs[:50],
         'evaluation_logs': evaluation_logs[:50],
         'submissions_logs': submissions_logs[:50],
+        'all_governorates': all_governorates,
+        'selected_gov': selected_gov,
+        'is_national': is_national,
+        'current_governorate': gov,
     }
     return render(request, 'portal/activity_log.html', context)
 
@@ -1198,6 +1243,8 @@ def admin_management_hub(request):
             if selected_gov:
                 gov = selected_gov
 
+    # إذا كان Super Admin ولم يختر محافظة → يرى كل البيانات
+    # إذا اختار محافظة (selected_gov) → يرى بيانات تلك المحافظة فقط
     if is_national and not selected_gov:
         lecturers = CustomUser.objects.filter(role=CustomUser.Role.LECTURER).prefetch_related('lecturer_profile')
         trainees = TraineeProfile.objects.select_related('user', 'group').all()
@@ -1205,7 +1252,16 @@ def admin_management_hub(request):
         lectures = Lecture.objects.select_related('group', 'group__course').order_by('-date')
         supervisors = CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR)
         certificates = Certificate.objects.select_related('trainee', 'course').all()
+    elif is_national and selected_gov:
+        # Super Admin اختار محافظة محددة → فلترة بها فقط
+        lecturers = CustomUser.objects.filter(role=CustomUser.Role.LECTURER, governorate=selected_gov).prefetch_related('lecturer_profile')
+        trainees = TraineeProfile.objects.filter(user__governorate=selected_gov).select_related('user', 'group')
+        groups = Group.objects.filter(governorate=selected_gov).select_related('course', 'instructor', 'supervisor', 'governorate')
+        lectures = Lecture.objects.filter(group__governorate=selected_gov).select_related('group', 'group__course').order_by('-date')
+        supervisors = CustomUser.objects.filter(role=CustomUser.Role.SUPERVISOR, governorate=selected_gov)
+        certificates = Certificate.objects.filter(trainee__governorate=selected_gov).select_related('trainee', 'course')
     else:
+        # مستخدم غير وطني → محافظته فقط
         lecturers = CustomUser.objects.filter(role=CustomUser.Role.LECTURER, governorate=gov).prefetch_related('lecturer_profile')
         trainees = TraineeProfile.objects.filter(user__governorate=gov).select_related('user', 'group')
         groups = Group.objects.filter(governorate=gov).select_related('course', 'instructor', 'supervisor', 'governorate')
@@ -2214,6 +2270,7 @@ def edit_trainee_post(request, trainee_id):
     first_name = request.POST.get('first_name')
     last_name = request.POST.get('last_name')
     email = request.POST.get('email')
+    gender = request.POST.get('gender')
     group_id = request.POST.get('group')
     gov = request.POST.get('governorate')
     dist = request.POST.get('district')
@@ -2229,6 +2286,7 @@ def edit_trainee_post(request, trainee_id):
             if first_name: user.first_name = first_name.strip()
             if last_name: user.last_name = last_name.strip()
             if email: user.email = email.strip()
+            if gender in ['male', 'female']: user.gender = gender
             user.save()
             
             group = Group.objects.get(id=group_id) if group_id else None
@@ -4166,5 +4224,4 @@ def delete_lecture_material_post(request, lecture_id):
     lecture.delete()
     messages.success(request, f"تم حذف المحاضرة '{title}' بنجاح.")
     return redirect('portal:lectures_hub')
-
 

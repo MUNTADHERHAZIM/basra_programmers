@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}دليل الاستخدام والتعلّم - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}دليل الاستخدام والتعلّم{% endblock %}
+{% block content %}
+<style>
+    .learning-hero { background: linear-gradient(135deg, #0f766e, #2563eb); }
+    .learning-step { border: 0; border-top: 5px solid var(--step-color); }
+    .learning-step .step-icon { background: color-mix(in srgb, var(--step-color) 15%, white); color: var(--step-color); }
+    .learning-video { background: linear-gradient(145deg, #fff7ed, #eff6ff); }
+    .learning-video video { max-height: 360px; width: 100%; background: #0f172a; }
+</style>
+<section class="learning-hero text-white rounded-4 p-4 p-md-5 mb-4 shadow-lg">
+    <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+            <span class="badge bg-warning text-dark rounded-pill px-3 py-2 mb-3"><i class="fas fa-sparkles me-1"></i>نتعلم معاً</span>
+            <h1 class="fw-bold mb-3">أهلاً بك في دليلنا السهل! 👋</h1>
+            <p class="fs-5 mb-0 opacity-90">خطوات صغيرة وواضحة تساعدك على استخدام المنصة والتعلّم بثقة. هذه الصفحة متاحة للجميع دون تسجيل دخول.</p>
+        </div>
+        <div class="col-lg-4 text-center"><i class="fas fa-rocket fa-6x opacity-75"></i></div>
+    </div>
+</section>
+<div class="row g-4 mb-5">
+    <div class="col-md-4"><div class="glass-card learning-step h-100 p-4" style="--step-color:#f59e0b"><div class="step-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:58px;height:58px"><i class="fas fa-sign-in-alt fa-xl"></i></div><h4 class="fw-bold">1. ادخل بهدوء</h4><p class="text-muted mb-0">استخدم اسم المستخدم وكلمة المرور، وإذا احتجت مساعدة أخبر المدرب أو الإدارة.</p></div></div>
+    <div class="col-md-4"><div class="glass-card learning-step h-100 p-4" style="--step-color:#10b981"><div class="step-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:58px;height:58px"><i class="fas fa-book-open fa-xl"></i></div><h4 class="fw-bold">2. تعلّم وطبّق</h4><p class="text-muted mb-0">شاهد الدرس، اقرأ المادة، ثم جرّب بنفسك. الخطأ خطوة جميلة نحو التعلّم.</p></div></div>
+    <div class="col-md-4"><div class="glass-card learning-step h-100 p-4" style="--step-color:#3b82f6"><div class="step-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:58px;height:58px"><i class="fas fa-comments fa-xl"></i></div><h4 class="fw-bold">3. اسأل وشارك</h4><p class="text-muted mb-0">استخدم الدردشة واسأل مدربك، وشارك إنجازك مع زملائك بأدب وتشجيع.</p></div></div>
+</div>
+<h2 class="fw-bold mb-1"><i class="fas fa-video text-danger me-2"></i>دروس الفيديو</h2>
+<p class="text-muted mb-3">فيديوهات قصيرة تضيفها الإدارة لتساعدك خطوة بخطوة.</p>
+<div class="row g-4">
+    {% for instruction in instructions %}
+    <div class="col-lg-6"><article class="glass-card learning-video h-100 p-3">
+        {% if instruction.video_file %}<video class="rounded-3 mb-3" controls preload="metadata"><source src="{{ instruction.video_file.url }}">متصفحك لا يدعم تشغيل الفيديو.</video>
+        {% elif instruction.video_url %}<a href="{{ instruction.video_url }}" target="_blank" rel="noopener" class="btn btn-danger w-100 mb-3 py-3"><i class="fas fa-play-circle me-2"></i>تشغيل الفيديو التعليمي</a>{% endif %}
+        <div class="d-flex gap-3 align-items-start"><div class="icon-box icon-box-primary flex-shrink-0"><i class="fas {{ instruction.icon }}"></i></div><div><h4 class="fw-bold mb-2">{{ instruction.title }}</h4><p class="text-primary fw-bold mb-2">{{ instruction.summary }}</p><p class="text-muted mb-0">{{ instruction.content|linebreaksbr }}</p></div></div>
+    </article></div>
+    {% empty %}<div class="col-12"><div class="glass-card text-center p-5"><i class="fas fa-video-slash fa-3x text-muted mb-3"></i><h4 class="fw-bold">ستظهر الدروس هنا قريباً</h4><p class="text-muted mb-0">يعمل فريق الإدارة على إعداد فيديوهات تعليمية ممتعة لك.</p></div></div>{% endfor %}
+</div>
+<div class="alert alert-info border-0 rounded-4 mt-4 shadow-sm"><i class="fas fa-heart text-danger me-2"></i><strong>تذكّر:</strong> لا تشارك كلمة المرور مع أي شخص، واطلب المساعدة من مدربك عند الحاجة.</div>
+{% endblock %}

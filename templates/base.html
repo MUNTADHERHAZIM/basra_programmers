@@ -188,6 +188,11 @@
                         <i class="fas fa-book-open me-2 text-info"></i>المحاضرات والمواد العلمية (PDF)
                     </a>
 
+                    <a href="{% url 'portal:learning_instructions' %}"
+                        class="{% if request.resolver_match.url_name == 'learning_instructions' %}active{% endif %}">
+                        <i class="fas fa-hands-helping me-2 text-warning"></i>دليل الاستخدام والتعلّم
+                    </a>
+
                     <a href="{% url 'portal:chat_view' %}"
                         class="{% if request.resolver_match.url_name == 'chat_view' %}active{% endif %}">
                         <i class="fas fa-comments me-2 text-warning"></i>منصة التواصل والدردشة

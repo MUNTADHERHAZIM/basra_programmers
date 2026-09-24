@@ -7,6 +7,58 @@ from .models import Certificate
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import arabic_reshaper
+from bidi.algorithm import get_display
+
+_FONTS_REGISTERED = False
+
+def register_arabic_fonts():
+    global _FONTS_REGISTERED
+    if _FONTS_REGISTERED:
+        return 'Amiri-Bold', 'Amiri'
+    
+    regular_font_name = 'Helvetica'
+    bold_font_name = 'Helvetica-Bold'
+    
+    # 1. Check project static/fonts directory
+    base_dir = getattr(settings, 'BASE_DIR', os.getcwd())
+    font_paths = [
+        (os.path.join(base_dir, 'static', 'fonts', 'Amiri-Regular.ttf'), os.path.join(base_dir, 'static', 'fonts', 'Amiri-Bold.ttf')),
+        (os.path.join(base_dir, 'staticfiles', 'fonts', 'Amiri-Regular.ttf'), os.path.join(base_dir, 'staticfiles', 'fonts', 'Amiri-Bold.ttf')),
+        ('C:/Windows/Fonts/arial.ttf', 'C:/Windows/Fonts/arialbd.ttf'),
+        ('C:/Windows/Fonts/tahoma.ttf', 'C:/Windows/Fonts/tahomabd.ttf'),
+        ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
+    ]
+    
+    for reg_path, bold_path in font_paths:
+        if os.path.exists(reg_path) and os.path.exists(bold_path):
+            try:
+                pdfmetrics.registerFont(TTFont('ArabicRegular', reg_path))
+                pdfmetrics.registerFont(TTFont('ArabicBold', bold_path))
+                regular_font_name = 'ArabicRegular'
+                bold_font_name = 'ArabicBold'
+                _FONTS_REGISTERED = True
+                break
+            except Exception:
+                continue
+
+    return bold_font_name, regular_font_name
+
+
+def ar_text(text):
+    """Helper to reshape Arabic text and reverse direction for proper RTL rendering."""
+    if not text:
+        return ""
+    try:
+        # Reshape Arabic characters (connecting forms)
+        reshaped = arabic_reshaper.reshape(str(text))
+        # Convert to RTL display order
+        return get_display(reshaped)
+    except Exception:
+        return str(text)
+
 
 class CertificateService:
     @staticmethod
@@ -15,6 +67,8 @@ class CertificateService:
             cert = Certificate.objects.get(id=certificate_id)
         except Certificate.DoesNotExist:
             return None
+
+        bold_font, regular_font = register_arabic_fonts()
 
         # Build public verification URL
         verify_url = f"{domain}/portal/verify/{cert.verification_token}/"
@@ -46,34 +100,35 @@ class CertificateService:
 
         # Header Titles
         p.setFillColor(colors.HexColor("#1e3a8a"))
-        p.setFont("Helvetica-Bold", 24)
-        p.drawCentredString(width / 2, height - 80, "العتبة الحسينية المقدسة")
+        p.setFont(bold_font, 24)
+        p.drawCentredString(width / 2, height - 80, ar_text("العتبة الحسينية المقدسة"))
         
         p.setFillColor(colors.HexColor("#10b981")) # Green Accent
-        p.setFont("Helvetica-Bold", 18)
-        p.drawCentredString(width / 2, height - 110, "مبادرة 1000 مبرمج في البصرة")
+        p.setFont(bold_font, 18)
+        p.drawCentredString(width / 2, height - 110, ar_text("مبادرة 1000 مبرمج"))
 
         # Certificate Body
         p.setFillColor(colors.HexColor("#0f172a"))
-        p.setFont("Helvetica", 16)
-        p.drawCentredString(width / 2, height - 170, "تشهد إدارة المبادرة بأن المتدرب:")
+        p.setFont(regular_font, 16)
+        p.drawCentredString(width / 2, height - 170, ar_text("تشهد إدارة المبادرة بأن المتدرب:"))
         
         p.setFillColor(colors.HexColor("#d97706")) # Trainee Name in Gold
-        p.setFont("Helvetica-Bold", 26)
+        p.setFont(bold_font, 26)
         trainee_name = cert.trainee.get_full_name() or cert.trainee.username
-        p.drawCentredString(width / 2, height - 220, trainee_name)
+        p.drawCentredString(width / 2, height - 220, ar_text(trainee_name))
 
         p.setFillColor(colors.HexColor("#0f172a"))
-        p.setFont("Helvetica", 16)
-        p.drawCentredString(width / 2, height - 260, "قد أكمل بنجاح الدورة التدريبية المتخصصة بعنوان:")
+        p.setFont(regular_font, 16)
+        p.drawCentredString(width / 2, height - 260, ar_text("قد أكمل بنجاح الدورة التدريبية المتخصصة بعنوان:"))
         
         p.setFillColor(colors.HexColor("#1e3a8a")) # Course Title in Navy
-        p.setFont("Helvetica-Bold", 20)
-        p.drawCentredString(width / 2, height - 300, cert.course.title)
+        p.setFont(bold_font, 20)
+        p.drawCentredString(width / 2, height - 300, ar_text(cert.course.title))
 
         p.setFillColor(colors.HexColor("#0f172a"))
-        p.setFont("Helvetica", 14)
-        p.drawCentredString(width / 2, height - 340, f"والتي أقيمت بـ {cert.course.hours} ساعة تدريبية مكثفة.")
+        p.setFont(regular_font, 14)
+        hours_text = f"والتي أقيمت بـ {cert.course.hours} ساعة تدريبية مكثفة."
+        p.drawCentredString(width / 2, height - 340, ar_text(hours_text))
 
         # Draw QR code on bottom left
         from reportlab.lib.utils import ImageReader
@@ -82,16 +137,17 @@ class CertificateService:
         
         # QR Code Label
         p.setFillColor(colors.HexColor("#475569"))
-        p.setFont("Helvetica", 8)
-        p.drawString(50, 35, "امسح للتحقق من الشهادة")
-        p.drawString(50, 25, f"رقم: {cert.certificate_number}")
+        p.setFont(regular_font, 9)
+        p.drawString(50, 36, ar_text("امسح للتحقق من الشهادة"))
+        p.setFont(regular_font, 8)
+        p.drawString(50, 24, f"No: {cert.certificate_number}")
 
         # Signature on bottom right
         p.setFillColor(colors.HexColor("#0f172a"))
-        p.setFont("Helvetica-Bold", 12)
-        p.drawRightString(width - 50, 90, "توقيع إدارة المبادرة")
-        p.setFont("Helvetica", 10)
-        p.drawRightString(width - 50, 70, "العتبة الحسينية المقدسة")
+        p.setFont(bold_font, 13)
+        p.drawRightString(width - 50, 90, ar_text("توقيع إدارة المبادرة"))
+        p.setFont(regular_font, 11)
+        p.drawRightString(width - 50, 70, ar_text("العتبة الحسينية المقدسة"))
         
         # Draw signature line
         p.setStrokeColor(colors.HexColor("#94a3b8"))

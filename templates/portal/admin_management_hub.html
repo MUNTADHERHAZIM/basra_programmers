@@ -49,6 +49,7 @@
     editTraineeDept: '',
     editTraineeStage: '',
     editTraineeSpec: '',
+    editTraineeGender: 'male',
     generatedUsername: '',
     generatedEmail: '',
     generatedPassword: '',
@@ -113,6 +114,33 @@
     <div class="col-lg-3">
         <div class="glass-card p-4 border-0 mb-4 shadow">
             <h5 class="fw-bold mb-4 text-success"><i class="fas fa-tasks me-2"></i>أقسام الإدارة</h5>
+
+            {% if is_national %}
+            <!-- فلتر المحافظات للـ Super Admin -->
+            <div class="mb-3 p-3 rounded-3 border" style="background: linear-gradient(135deg, #f0fdf4, #ecfdf5);">
+                <label class="form-label fw-bold small text-success mb-1"><i class="fas fa-map-marker-alt me-1"></i>فلترة حسب المحافظة</label>
+                <form method="GET" id="govFilterForm">
+                    <select name="gov_id" class="form-select form-select-sm" onchange="document.getElementById('govFilterForm').submit()">
+                        <option value="">🌍 جميع المحافظات</option>
+                        {% for gov_option in all_governorates %}
+                        <option value="{{ gov_option.id }}" {% if selected_gov.id == gov_option.id %}selected{% endif %}>{{ gov_option.name }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+                {% if selected_gov %}
+                <div class="mt-2 d-flex align-items-center justify-content-between">
+                    <span class="badge bg-success py-1 px-2 small"><i class="fas fa-filter me-1"></i>{{ selected_gov.name }}</span>
+                    <a href="{% url 'portal:admin_management_hub' %}" class="text-muted small text-decoration-none"><i class="fas fa-times"></i> إلغاء</a>
+                </div>
+                {% endif %}
+            </div>
+            {% elif current_governorate %}
+            <!-- عرض اسم المحافظة للمستخدمين غير الوطنيين -->
+            <div class="mb-3 p-2 rounded-3 text-center" style="background: rgba(16,185,129,0.1);">
+                <span class="badge bg-success py-1 px-3"><i class="fas fa-map-marker-alt me-1"></i>{{ current_governorate.name }}</span>
+            </div>
+            {% endif %}
+
             <ul class="nav flex-column gap-2">
                 <li class="nav-item">
                     <button class="btn w-100 text-start px-3 py-2 rounded-3 border-0 fw-bold" 
@@ -1033,6 +1061,7 @@
                                             editTraineeDept = '{{ trainee.department|default:''|escapejs }}';
                                             editTraineeStage = '{{ trainee.academic_stage|default:''|escapejs }}';
                                             editTraineeSpec = '{{ trainee.specialty|default:''|escapejs }}';
+                                            editTraineeGender = '{{ trainee.user.gender|default:'male' }}';
                                             showEditTraineeModal = true;
                                         ">
                                             <i class="fas fa-edit"></i> تعديل
@@ -1938,7 +1967,14 @@
                                     <label class="form-label text-dark fw-bold">اسم العائلة</label>
                                     <input type="text" name="last_name" class="form-control" x-model="editTraineeLastName" required>
                                 </div>
-                                <div class="col-md-12">
+                                <div class="col-md-6">
+                                    <label class="form-label text-dark fw-bold">الجنس</label>
+                                    <select name="gender" class="form-select" x-model="editTraineeGender" required>
+                                        <option value="male">ذكر (Male) ♂</option>
+                                        <option value="female">أنثى (Female) ♀</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
                                     <label class="form-label text-dark fw-bold">الشعبة / المجموعة</label>
                                     <select name="group" class="form-select" x-model="editTraineeGroupId">
                                         <option value="">-- بدون شعبة حالياً --</option>

@@ -218,7 +218,7 @@
                     <div class="d-flex align-items-center mb-3 text-muted small">
                         <i class="fas fa-user-tie text-primary me-2 fs-6"></i>
                         <span>
-                            الأستاذ: <strong>{{ lecture.group.instructor.get_full_name|default:lecture.group.instructor.username|default:"المدرب المعين" }}</strong>
+                            الأستاذ: <strong>{% if lecture.group and lecture.group.instructor %}{{ lecture.group.instructor.get_full_name|default:lecture.group.instructor.username }}{% else %}المدرب المعين{% endif %}</strong>
                         </span>
                     </div>
 

@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import FileExtensionValidator
 
 
 class SiteConfiguration(models.Model):
@@ -69,3 +70,34 @@ class InitiativeMedia(models.Model):
         verbose_name = "ميديا وإعلام المبادرة"
         verbose_name_plural = "مركز ميديا وإعلام المبادرة"
         ordering = ['-created_at']
+
+
+class LearningInstruction(models.Model):
+    """دروس وإرشادات قصيرة يمكن للإدارة نشرها للمدربين والمتدربين."""
+
+    class Audience(models.TextChoices):
+        ALL = 'all', 'المدربون والمتدربون'
+        TRAINEES = 'trainees', 'المتدربون فقط'
+        TRAINERS = 'trainers', 'المدربون فقط'
+
+    title = models.CharField(max_length=200, verbose_name="عنوان الدرس")
+    summary = models.CharField(max_length=300, verbose_name="ملخص قصير")
+    content = models.TextField(blank=True, verbose_name="شرح الدرس")
+    audience = models.CharField(max_length=20, choices=Audience.choices, default=Audience.ALL, verbose_name="يظهر إلى")
+    icon = models.CharField(max_length=50, default="fa-lightbulb", verbose_name="أيقونة Font Awesome", help_text="مثال: fa-code أو fa-star")
+    video_file = models.FileField(
+        upload_to='learning/videos/', blank=True, null=True, verbose_name="فيديو تعليمي مرفوع",
+        validators=[FileExtensionValidator(allowed_extensions=['mp4', 'webm', 'ogg', 'mov'])],
+    )
+    video_url = models.URLField(blank=True, verbose_name="رابط فيديو تعليمي", help_text="اختياري: رابط YouTube أو Vimeo أو Drive")
+    is_published = models.BooleanField(default=True, verbose_name="منشور")
+    order = models.PositiveIntegerField(default=0, verbose_name="ترتيب الظهور")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإضافة")
+
+    class Meta:
+        ordering = ['order', '-created_at']
+        verbose_name = "تعليمة / درس"
+        verbose_name_plural = "دليل التعليمات والدروس"
+
+    def __str__(self):
+        return self.title
