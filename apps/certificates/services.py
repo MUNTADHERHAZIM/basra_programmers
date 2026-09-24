@@ -4,13 +4,29 @@ from io import BytesIO
 from django.conf import settings
 from django.core.files.base import ContentFile
 from .models import Certificate
-from reportlab.lib.pagesizes import landscape, letter
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-import arabic_reshaper
-from bidi.algorithm import get_display
+try:
+    from reportlab.lib.pagesizes import landscape, letter
+    from reportlab.pdfgen import canvas
+    from reportlab.lib import colors
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+except ImportError:
+    canvas = None
+    colors = None
+    pdfmetrics = None
+    TTFont = None
+    landscape = None
+    letter = None
+
+try:
+    import arabic_reshaper
+except ImportError:
+    arabic_reshaper = None
+
+try:
+    from bidi.algorithm import get_display
+except ImportError:
+    get_display = None
 
 _FONTS_REGISTERED = False
 
@@ -52,10 +68,12 @@ def ar_text(text):
     if not text:
         return ""
     try:
-        # Reshape Arabic characters (connecting forms)
-        reshaped = arabic_reshaper.reshape(str(text))
-        # Convert to RTL display order
-        return get_display(reshaped)
+        if arabic_reshaper and get_display:
+            # Reshape Arabic characters (connecting forms)
+            reshaped = arabic_reshaper.reshape(str(text))
+            # Convert to RTL display order
+            return get_display(reshaped)
+        return str(text)
     except Exception:
         return str(text)
 
