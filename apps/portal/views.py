@@ -923,13 +923,22 @@ def create_assignment_view(request, group_id):
 @login_required
 def submit_assignment_view(request, assignment_id):
     """Allows students to submit a homework with text, files, images, or video uploads/links."""
-    if request.user.role not in [CustomUser.Role.TRAINEE, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
-        raise Http404()
-        
-    assignment = get_object_or_404(Assignment, id=assignment_id)
+    assignment = Assignment.objects.filter(id=assignment_id).select_related('group').first()
+    if not assignment:
+        messages.error(request, f"الواجب الدراسي رقم #{assignment_id} غير موجود أو تم حذفه.")
+        if request.user.role == CustomUser.Role.TRAINEE:
+            return redirect('portal:trainee_dashboard')
+        elif request.user.role == CustomUser.Role.LECTURER:
+            return redirect('portal:lecturer_dashboard')
+        return redirect('portal:dashboard')
+
     submission = AssignmentSubmission.objects.filter(assignment=assignment, trainee=request.user).first()
 
     if request.method == 'POST':
+        if request.user.role != CustomUser.Role.TRAINEE and not request.user.is_superuser:
+            messages.warning(request, "تسليم الواجب متاح لحسابات المتدربين فقط. حسابك الحالي مسجل كـ كادر إداري/تدريبي.")
+            return redirect('portal:dashboard')
+
         submission_text = request.POST.get('submission_text', '').strip()
         video_url = request.POST.get('video_url', '').strip()
         solution_file = request.FILES.get('solution_file')
@@ -973,12 +982,24 @@ def submit_assignment_view(request, assignment_id):
 @login_required
 def grade_submission_view(request, submission_id):
     """Allows instructors to correct a student's solution."""
-    if request.user.role not in [CustomUser.Role.LECTURER, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
-        raise Http404()
+    allowed_roles = [
+        CustomUser.Role.LECTURER,
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.SUPERVISOR,
+    ]
+    if request.user.role not in allowed_roles:
+        messages.error(request, "غير مصرح لك بتصحيح الواجبات.")
+        return redirect('portal:dashboard')
         
-    submission = AssignmentSubmission.objects.filter(id=submission_id, assignment__group__instructor=request.user).first()
+    submission = AssignmentSubmission.objects.filter(id=submission_id).select_related('assignment', 'trainee', 'assignment__group').first()
     if not submission:
-        submission = get_object_or_404(AssignmentSubmission, id=submission_id)
+        messages.error(request, f"تسليم الواجب رقم #{submission_id} غير موجود أو تم حذفه.")
+        if request.user.role == CustomUser.Role.LECTURER:
+            return redirect('portal:lecturer_dashboard')
+        return redirect('portal:dashboard')
     
     if request.method == 'POST':
         grade = int(request.POST.get('grade', 0))
@@ -996,7 +1017,9 @@ def grade_submission_view(request, submission_id):
             award_points(submission.trainee, 10, f"اجتياز واجب '{submission.assignment.title}' (الدرجة {grade}/10)")
             
         messages.success(request, "تم تسجيل درجة الواجب وإرسال التغذية الراجعة.")
-        return redirect('portal:lecturer_dashboard')
+        if request.user.role == CustomUser.Role.LECTURER:
+            return redirect('portal:lecturer_dashboard')
+        return redirect('portal:dashboard')
         
     return render(request, 'portal/grade_submission.html', {'submission': submission})
 
@@ -1004,12 +1027,24 @@ def grade_submission_view(request, submission_id):
 @login_required
 def evaluate_students_view(request, lecture_id):
     """Enables instructors to evaluate student performance for a past lecture."""
-    if request.user.role not in [CustomUser.Role.LECTURER, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
-        raise Http404()
+    allowed_roles = [
+        CustomUser.Role.LECTURER,
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.SUPERVISOR,
+    ]
+    if request.user.role not in allowed_roles:
+        messages.error(request, "غير مصرح لك بالوصول لتقييم الطلاب.")
+        return redirect('portal:dashboard')
         
-    lecture = Lecture.objects.filter(id=lecture_id, group__instructor=request.user).first()
+    lecture = Lecture.objects.filter(id=lecture_id).select_related('group').first()
     if not lecture:
-        lecture = get_object_or_404(Lecture, id=lecture_id)
+        messages.error(request, f"المحاضرة رقم #{lecture_id} غير موجودة.")
+        if request.user.role == CustomUser.Role.LECTURER:
+            return redirect('portal:lecturer_dashboard')
+        return redirect('portal:dashboard')
     trainees = TraineeProfile.objects.filter(group=lecture.group).select_related('user')
     
     if request.method == 'POST':
