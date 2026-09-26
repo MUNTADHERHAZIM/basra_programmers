@@ -1195,15 +1195,37 @@ def activity_log_view(request):
 
 @login_required
 def mark_attendance_manual_view(request, lecture_id):
-    """Allows instructors to manually mark trainee attendance for a lecture."""
-    if request.user.role not in [CustomUser.Role.LECTURER, CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
-        raise Http404("غير مصرح بالدخول.")
+    """Allows instructors, supervisors, and admins to manually review and mark trainee attendance for a lecture."""
+    allowed_roles = [
+        CustomUser.Role.LECTURER,
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.SUPERVISOR,
+        CustomUser.Role.TRAINING_OFFICER,
+    ]
+    if request.user.role not in allowed_roles and not request.user.is_superuser and not request.user.is_staff:
+        messages.error(request, "عذراً، غير مصرح لك بالوصول إلى صفحة مراجعة سجل الحضور.")
+        return redirect('portal:dashboard')
         
-    if request.user.role == CustomUser.Role.LECTURER:
-        lecture = get_object_or_404(Lecture, id=lecture_id, group__instructor=request.user)
-    else:
-        lecture = get_object_or_404(Lecture, id=lecture_id)
+    lecture = get_object_or_404(Lecture.objects.select_related('group', 'group__course', 'group__governorate', 'group__instructor'), id=lecture_id)
 
+    # Scoped permissions check
+    is_authorized = False
+    if request.user.is_superuser or request.user.is_staff or request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
+        is_authorized = True
+    elif request.user.role == CustomUser.Role.GOVERNORATE_ADMIN:
+        is_authorized = (not request.user.governorate) or (lecture.group.governorate == request.user.governorate)
+    elif request.user.role == CustomUser.Role.SUPERVISOR:
+        is_authorized = (lecture.group.supervisor == request.user) or (not request.user.governorate) or (lecture.group.governorate == request.user.governorate)
+    elif request.user.role == CustomUser.Role.TRAINING_OFFICER:
+        is_authorized = (not request.user.governorate) or (lecture.group.governorate == request.user.governorate)
+    elif request.user.role == CustomUser.Role.LECTURER:
+        is_authorized = (lecture.group.instructor == request.user) or (lecture.uploaded_by == request.user) or (not request.user.governorate) or (lecture.group.governorate == request.user.governorate)
+
+    if not is_authorized:
+        messages.error(request, "عذراً، ليس لديك صلاحية لمراجعة سجل حضور هذه المحاضرة.")
+        return redirect('portal:dashboard')
         
     trainees = TraineeProfile.objects.filter(group=lecture.group).select_related('user')
     if not trainees.exists():
@@ -1236,6 +1258,11 @@ def mark_attendance_manual_view(request, lecture_id):
                 award_points(trainee.user, 5, f"حضور متأخر لمحاضرة: '{lecture.title}' (تسجيل يدوي)")
                 
         messages.success(request, "تم تسجيل وتحديث حضور الطلاب يدوياً بنجاح.")
+        next_url = request.POST.get('next') or request.GET.get('next')
+        if next_url:
+            return redirect(next_url)
+        if request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.GOVERNORATE_ADMIN]:
+            return redirect('portal:dashboard')
         return redirect('portal:lecturer_dashboard')
         
     # Pre-populate existing attendances
@@ -1458,6 +1485,55 @@ def add_trainee_post(request):
     return redirect('portal:admin_management_hub')
 
 
+def generate_clean_group_code(course, governorate=None):
+    """Generates a professional, readable group code instead of broken prefixes like الذ- or الـ-."""
+    import random
+    title_lower = course.title.lower() if (course and hasattr(course, 'title')) else ""
+    
+    # Map common track keywords to clean standard prefixes
+    prefix = "GRP"
+    if any(k in title_lower for k in ['ذكاء', 'ai', 'اصطناعي', 'تعلم']):
+        prefix = "AI"
+    elif any(k in title_lower for k in ['بايثون', 'python', 'py']):
+        prefix = "PY"
+    elif any(k in title_lower for k in ['ويب', 'web', 'فرونت', 'باك', 'fullstack', 'html', 'react', 'موقع']):
+        prefix = "WEB"
+    elif any(k in title_lower for k in ['أمن', 'امني', 'cyber', 'سكيورتي', 'سيبران']):
+        prefix = "SEC"
+    elif any(k in title_lower for k in ['شبك', 'network', 'net', 'سيسكو']):
+        prefix = "NET"
+    elif any(k in title_lower for k in ['بيانات', 'data', 'sql', 'قواعد']):
+        prefix = "DATA"
+    elif any(k in title_lower for k in ['موبايل', 'تطبيقات', 'flutter', 'android', 'ios']):
+        prefix = "APP"
+    elif any(k in title_lower for k in ['برمج', 'كود', 'dev']):
+        prefix = "DEV"
+    elif any(k in title_lower for k in ['تصميم', 'ui', 'ux', 'ديزاين']):
+        prefix = "DES"
+    else:
+        eng_chars = "".join([c for c in (course.title if course else "") if c.isascii() and c.isalnum()]).upper()
+        if len(eng_chars) >= 2:
+            prefix = eng_chars[:3]
+        else:
+            clean_ar = (course.title if course else "").strip()
+            if clean_ar.startswith("ال") and len(clean_ar) > 3:
+                clean_ar = clean_ar[2:].strip()
+            ar_letters = "".join([c for c in clean_ar if c.isalpha()])
+            if len(ar_letters) >= 2:
+                prefix = ar_letters[:3]
+            else:
+                prefix = "GRP"
+
+    # Ensure uniqueness within governorate
+    for _ in range(50):
+        rand_num = random.randint(101, 999)
+        candidate = f"{prefix}-{rand_num}"
+        if not Group.objects.filter(governorate=governorate, code=candidate).exists():
+            return candidate
+
+    return f"{prefix}-{random.randint(1000, 9999)}"
+
+
 @login_required
 @require_POST
 def add_group_post(request):
@@ -1504,7 +1580,7 @@ def add_group_post(request):
             group.instructor = CustomUser.objects.get(id=instructor_id) if instructor_id else None
             group.supervisor = CustomUser.objects.get(id=supervisor_id) if supervisor_id else None
             if classroom: group.classroom = classroom.strip()
-            if code: group.code = code.strip()
+            if code and code.strip(): group.code = code.strip()
             if days: group.days = days.strip()
             if start_time: group.start_time = start_time
             if end_time: group.end_time = end_time
@@ -1520,9 +1596,7 @@ def add_group_post(request):
             supervisor = CustomUser.objects.get(id=supervisor_id) if supervisor_id else None
             
             if not code or not code.strip():
-                import random
-                clean_title = "".join([c for c in course.title if c.isalnum()])[:3].upper()
-                code = f"{clean_title}-{random.randint(100, 999)}"
+                code = generate_clean_group_code(course, gov)
                 
             group = Group.objects.create(
                 governorate=gov,
@@ -2389,9 +2463,15 @@ def save_trainee_notes_post(request, trainee_id):
 @login_required
 @require_POST
 def edit_group_post(request, group_id):
-    """Updates an existing group's details."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]:
-        return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
+    """Updates an existing group's details and code."""
+    allowed_roles = [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.TRAINING_OFFICER]
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', '')
+    
+    if request.user.role not in allowed_roles and not request.user.is_superuser:
+        if is_ajax:
+            return JsonResponse({'success': False, 'message': 'غير مصرح.'}, status=403)
+        messages.error(request, "غير مصرح.")
+        return redirect('portal:dashboard')
         
     group = get_object_or_404(Group, id=group_id)
     name = request.POST.get('name')
@@ -2407,7 +2487,8 @@ def edit_group_post(request, group_id):
     end_time = request.POST.get('end_time')
     
     try:
-        # Resolve course/subject dynamically
+        from django.db import transaction
+        # Resolve course/subject dynamically if provided
         course = None
         if course_title:
             course, _ = Course.objects.get_or_create(
@@ -2417,23 +2498,44 @@ def edit_group_post(request, group_id):
         elif course_id:
             course = Course.objects.get(id=course_id)
 
-        from django.db import transaction
         with transaction.atomic():
             if name: group.name = name.strip()
             if course: group.course = course
-            group.instructor = CustomUser.objects.get(id=instructor_id) if instructor_id else None
-            group.supervisor = CustomUser.objects.get(id=supervisor_id) if supervisor_id else None
-            if classroom: group.classroom = classroom.strip()
-            if code: group.code = code.strip()
+            if instructor_id is not None:
+                group.instructor = CustomUser.objects.get(id=instructor_id) if instructor_id else None
+            if supervisor_id is not None:
+                group.supervisor = CustomUser.objects.get(id=supervisor_id) if supervisor_id else None
+            if classroom is not None: group.classroom = classroom.strip()
+            
+            if code and code.strip():
+                new_code = code.strip()
+                # Check uniqueness within the same governorate
+                if Group.objects.filter(governorate=group.governorate, code=new_code).exclude(id=group.id).exists():
+                    msg = f"رمز المجموعة '{new_code}' مستخدم بالفعل في هذه المحافظة. يرجى اختيار رمز آخر."
+                    if is_ajax:
+                        return JsonResponse({'success': False, 'message': msg}, status=400)
+                    messages.error(request, msg)
+                    next_url = request.POST.get('next') or request.GET.get('next')
+                    return redirect(next_url or 'portal:admin_management_hub')
+                group.code = new_code
+                
             if days: group.days = days.strip()
             if start_time: group.start_time = start_time
             if end_time: group.end_time = end_time
             group.save()
             
-            messages.success(request, f"تم تحديث بيانات الشعبة/المجموعة '{group.name}' بنجاح.")
+            msg = f"تم تحديث بيانات ورمز الشعبة '{group.name}' بنجاح."
+            if is_ajax:
+                return JsonResponse({'success': True, 'message': msg, 'code': group.code, 'name': group.name})
+            messages.success(request, msg)
     except Exception as e:
-        messages.error(request, f"فشل التعديل: {str(e)}")
-    return redirect('portal:admin_management_hub')
+        msg = f"فشل التعديل: {str(e)}"
+        if is_ajax:
+            return JsonResponse({'success': False, 'message': msg}, status=400)
+        messages.error(request, msg)
+        
+    next_url = request.POST.get('next') or request.GET.get('next')
+    return redirect(next_url or 'portal:admin_management_hub')
 
 
 @login_required

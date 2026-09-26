@@ -26,10 +26,10 @@
                     <div class="col-md-6">
                         <label class="form-label text-dark fw-bold">الجهة المستهدفة بالتبليغ</label>
                         <select name="target_audience" id="targetAudience" class="form-select py-2" onchange="toggleGroupSelect(); updatePreview();" required>
-                            <option value="all">الجميع ({% if current_governorate %}{{ current_governorate.name }}{% elif request.governorate %}{{ request.governorate.name }}{% else %}الكل{% endif %})</option>
-                            <option value="trainees">المتدربين فقط ({% if current_governorate %}طلاب {{ current_governorate.name }}{% elif request.governorate %}طلاب {{ request.governorate.name }}{% else %}جميع الطلاب{% endif %})</option>
-                            <option value="lecturers">المدربين فقط ({% if current_governorate %}مدربي {{ current_governorate.name }}{% elif request.governorate %}مدربي {{ request.governorate.name }}{% else %}جميع المحاضرين{% endif %})</option>
-                            <option value="group">شعبة/مجموعة معينة</option>
+                            <option value="all">👥 الجميع (الكل)</option>
+                            <option value="trainees">🎓 المتدربين فقط (جميع الطلاب)</option>
+                            <option value="lecturers">👨‍🏫 المدربين فقط (جميع المحاضرين)</option>
+                            <option value="group">📚 شعبة / مجموعة معينة</option>
                         </select>
                     </div>
 

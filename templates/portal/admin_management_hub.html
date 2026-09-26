@@ -242,9 +242,9 @@
                         <!-- If Existing Group -->
                         <div class="col-md-6" x-show="scheduleType === 'existing'">
                             <label class="form-label text-dark fw-bold">اختر الشعبة الحالية</label>
-                            <select name="group_id" class="form-select" :required="scheduleType === 'existing'" @change="
+                            <select name="group_id" class="form-select searchable-select" :required="scheduleType === 'existing'" @change="
                                 const opt = $event.target.options[$event.target.selectedIndex];
-                                if (opt.value) {
+                                if (opt && opt.value) {
                                     const classroom = opt.getAttribute('data-classroom');
                                     const courseTitle = opt.getAttribute('data-course-title');
                                     const instructorId = opt.getAttribute('data-instructor-id');
@@ -256,12 +256,24 @@
                                     
                                     const $form = $event.target.form;
                                     if ($form) {
-                                        $form.elements['classroom'].value = classroom;
-                                        $form.elements['course_title'].value = courseTitle;
-                                        $form.elements['instructor'].value = instructorId || '';
-                                        $form.elements['supervisor'].value = supervisorId || '';
-                                        $form.elements['start_time'].value = startTime;
-                                        $form.elements['end_time'].value = endTime;
+                                        $form.elements['classroom'].value = classroom || '';
+                                        if ($form.elements['course_title'] && $form.elements['course_title'].tomselect) {
+                                            $form.elements['course_title'].tomselect.setValue(courseTitle);
+                                        } else if ($form.elements['course_title']) {
+                                            $form.elements['course_title'].value = courseTitle;
+                                        }
+                                        if ($form.elements['instructor'] && $form.elements['instructor'].tomselect) {
+                                            $form.elements['instructor'].tomselect.setValue(instructorId || '');
+                                        } else if ($form.elements['instructor']) {
+                                            $form.elements['instructor'].value = instructorId || '';
+                                        }
+                                        if ($form.elements['supervisor'] && $form.elements['supervisor'].tomselect) {
+                                            $form.elements['supervisor'].tomselect.setValue(supervisorId || '');
+                                        } else if ($form.elements['supervisor']) {
+                                            $form.elements['supervisor'].value = supervisorId || '';
+                                        }
+                                        $form.elements['start_time'].value = startTime || '16:00';
+                                        $form.elements['end_time'].value = endTime || '18:00';
                                     }
                                     addGroupDays = days;
                                 }
@@ -289,17 +301,25 @@
                         </div>
                         
                         <div class="col-md-6">
-                            <label class="form-label text-dark fw-bold">المادة الدراسية (اسم المادة)</label>
-                            <input type="text" name="course_title" list="courses_list" class="form-control" placeholder="اكتب اسم المادة (مثال: بايثون)" required>
-                            <datalist id="courses_list">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label text-dark fw-bold mb-0">المادة الدراسية (الدورة)</label>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0 small" style="font-size: 0.72rem;">
+                                    <i class="fas fa-magic me-1"></i>موحدة لجميع المحافظات + إضافة مادة جديدة
+                                </span>
+                            </div>
+                            <select name="course_title" id="course_title_select" class="form-select searchable-select-course" required>
+                                <option value="" disabled selected>-- اختر المادة أو اكتب مادة جديدة --</option>
                                 {% for course in courses %}
-                                <option value="{{ course.title }}"></option>
+                                <option value="{{ course.title }}">{{ course.title }} ({{ course.hours }} ساعة)</option>
                                 {% endfor %}
-                            </datalist>
+                            </select>
+                            <div class="form-text text-muted small mt-1">
+                                <i class="fas fa-info-circle me-1"></i>المواد موحدة لجميع المحافظات، ويمكنك أيضاً كتابة مادة جديدة مباشرة في شريط البحث والضغط على Enter لإضافتها لمحافظتك.
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark fw-bold">المدرب / المحاضر</label>
-                            <select name="instructor" class="form-select">
+                            <select name="instructor" class="form-select searchable-select">
                                 <option value="">اختر المدرب (اختياري)</option>
                                 {% for lec in lecturers %}
                                 <option value="{{ lec.id }}">{{ lec.get_full_name|default:lec.username }}</option>
@@ -539,7 +559,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark fw-bold">الشعبة / المجموعة</label>
-                            <select name="group" class="form-select" required>
+                            <select name="group" class="form-select searchable-select" required>
                                 <option value="" disabled selected>اختر الشعبة</option>
                                 {% for g in groups %}
                                 <option value="{{ g.id }}">{{ g.name }} ({{ g.course.title }})</option>
@@ -1281,8 +1301,8 @@
                     </div>
                     <div class="col-md-5">
                         <label class="form-label text-dark fw-bold">الدورة التدريبية</label>
-                        <select name="course" class="form-select" required>
-                            <option value="" disabled selected>اختر الدورة</option>
+                        <select name="course" class="form-select searchable-select" required>
+                            <option value="" disabled selected>اختر الدورة...</option>
                             {% for c in courses %}
                             <option value="{{ c.id }}">{{ c.title }}</option>
                             {% endfor %}
@@ -1357,10 +1377,10 @@
                         <div class="col-md-6">
                             <label class="form-label text-dark fw-bold">الجهة المستهدفة بالتبليغ</label>
                             <select name="target_audience" id="targetAudience" class="form-select" onchange="toggleGroupSelect()" required>
-                                <option value="all">الجميع (المدربين والمتدربين)</option>
-                                <option value="trainees">المتدربين فقط (جميع الطلاب)</option>
-                                <option value="lecturers">المدربين فقط (جميع المحاضرين)</option>
-                                <option value="group">شعبة/مجموعة معينة</option>
+                                <option value="all">👥 الجميع (المدربين والمتدربين)</option>
+                                <option value="trainees">🎓 المتدربين فقط (جميع الطلاب)</option>
+                                <option value="lecturers">👨‍🏫 المدربين فقط (جميع المحاضرين)</option>
+                                <option value="group">📚 شعبة / مجموعة معينة</option>
                             </select>
                         </div>
                         <div class="col-12" id="groupSelectContainer" style="display: none;">
@@ -1602,21 +1622,21 @@
                                 <div class="col-md-6">
                                     <label class="form-label text-dark fw-bold">الدور الوظيفي</label>
                                     <select name="role" class="form-select" required x-ref="roleSelect" @change="$forceUpdate()">
-                                        <option value="trainee">متدرب</option>
-                                        <option value="lecturer">مدرب / محاضر</option>
-                                        <option value="supervisor">مشرف متابع</option>
+                                        <option value="trainee">🎓 متدرب</option>
+                                        <option value="lecturer">👨‍🏫 مدرب / محاضر</option>
+                                        <option value="supervisor">🕵️ مشرف متابع</option>
                                         {% if request.user.role == 'super_admin' %}
-                                        <option value="governorate_admin">مسؤول المحافظة (Governorate Admin)</option>
+                                        <option value="governorate_admin">🏛️ مسؤول المحافظة (Governorate Admin)</option>
                                         {% endif %}
                                     </select>
                                 </div>
                                 {% if is_national or request.user.role == 'super_admin' %}
                                 <div class="col-md-12">
                                     <label class="form-label text-dark fw-bold">المحافظة التابع لها الحساب</label>
-                                    <select name="governorate_id" class="form-select" required>
+                                    <select name="governorate_id" class="form-select searchable-select" required>
                                         {% for gov in all_governorates %}
                                         <option value="{{ gov.id }}" {% if gov.id == current_governorate.id or gov.status == 'active' %}selected{% endif %}>
-                                            {{ gov.name }} ({{ gov.code }}) - {% if gov.status == 'active' %}نشطة ✅{% else %}غير مفعلة (قريباً){% endif %}
+                                            📍 {{ gov.name }} ({{ gov.code }}) - {% if gov.status == 'active' %}نشطة ✅{% else %}غير مفعلة (قريباً){% endif %}
                                         </option>
                                         {% endfor %}
                                     </select>
@@ -1632,10 +1652,10 @@
                                 </div>
                                 <div class="col-12" x-show="$refs.roleSelect && $refs.roleSelect.value === 'trainee'">
                                     <label class="form-label text-dark fw-bold">الشعبة / المجموعة</label>
-                                    <select name="group" class="form-select">
+                                    <select name="group" class="form-select searchable-select">
                                         <option value="">اختر المجموعة (اختياري)</option>
                                         {% for g in groups %}
-                                        <option value="{{ g.id }}">{{ g.name }}</option>
+                                        <option value="{{ g.id }}">📚 {{ g.name }}</option>
                                         {% endfor %}
                                     </select>
                                 </div>
@@ -1669,9 +1689,9 @@
                                 <div class="col-md-6">
                                     <label class="form-label text-dark fw-bold">الدور الوظيفي للحسابات</label>
                                     <select name="role" class="form-select" required x-ref="batchRoleSelect" @change="$forceUpdate()">
-                                        <option value="trainee">متدربين</option>
-                                        <option value="lecturer">مدربين</option>
-                                        <option value="supervisor">مشرفين</option>
+                                        <option value="trainee">🎓 متدربين</option>
+                                        <option value="lecturer">👨‍🏫 مدربين</option>
+                                        <option value="supervisor">🕵️ مشرفين</option>
                                     </select>
                                 </div>
                                 <div class="col-md-6" x-show="$refs.batchRoleSelect && $refs.batchRoleSelect.value === 'trainee'">
@@ -1788,11 +1808,16 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label text-dark fw-bold">المادة الدراسية (اسم المادة)</label>
-                                    <input type="text" name="course_title" list="courses_list" class="form-control" x-model="editGroupCourseTitle" placeholder="اكتب اسم المادة (مثال: بايثون)" required>
+                                    <input type="text" name="course_title" list="edit_courses_list" class="form-control" x-model="editGroupCourseTitle" placeholder="اكتب أو اختر اسم المادة" required>
+                                    <datalist id="edit_courses_list">
+                                        {% for course in courses %}
+                                        <option value="{{ course.title }}">{{ course.title }} ({{ course.hours }} ساعة)</option>
+                                        {% endfor %}
+                                    </datalist>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label text-dark fw-bold">المحاضر / المدرب</label>
-                                    <select name="instructor" class="form-select" x-model="editGroupInstructorId">
+                                    <select name="instructor" class="form-select searchable-select" x-model="editGroupInstructorId">
                                         <option value="">-- غير محدد --</option>
                                         {% for lec in lecturers %}
                                         <option value="{{ lec.id }}">{{ lec.get_full_name|default:lec.username }}</option>
@@ -1801,7 +1826,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label text-dark fw-bold">المشرف المتابع</label>
-                                    <select name="supervisor" class="form-select" x-model="editGroupSupervisorId">
+                                    <select name="supervisor" class="form-select searchable-select" x-model="editGroupSupervisorId">
                                         <option value="">-- غير محدد --</option>
                                         {% for sup in supervisors %}
                                         <option value="{{ sup.id }}">{{ sup.get_full_name|default:sup.username }}</option>

@@ -15,7 +15,13 @@
                     </h5>
                     <p class="text-muted small m-0 mt-1">الدورة والمجموعة: {{ lecture.group.course.title }} - {{ lecture.group.name }} | التاريخ: {{ lecture.date }}</p>
                 </div>
+                {% if request.user.role == 'lecturer' %}
                 <a href="{% url 'portal:lecturer_dashboard' %}" class="btn btn-secondary-custom px-4 btn-sm">
+                {% elif request.user.role == 'supervisor' %}
+                <a href="{% url 'portal:supervisor_dashboard' %}" class="btn btn-secondary-custom px-4 btn-sm">
+                {% else %}
+                <a href="{% url 'portal:dashboard' %}" class="btn btn-secondary-custom px-4 btn-sm">
+                {% endif %}
                     <i class="fas fa-arrow-right me-1"></i>العودة للوحة التحكم
                 </a>
             </div>

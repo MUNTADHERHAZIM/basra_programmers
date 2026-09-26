@@ -123,27 +123,27 @@
 
             <!-- Role Filter -->
             <div class="col-md-2">
-                <label class="form-label small fw-bold text-slate-700">الدور الوظيفي:</label>
-                <select name="role" class="form-select">
-                    <option value="all" {% if role_filter == 'all' %}selected{% endif %}>جميع الأدوار</option>
-                    <option value="super_admin" {% if role_filter == 'super_admin' %}selected{% endif %}>مسؤول النظام (Super Admin)</option>
-                    <option value="governorate_admin" {% if role_filter == 'governorate_admin' %}selected{% endif %}>مسؤول المحافظة</option>
-                    <option value="director" {% if role_filter == 'director' %}selected{% endif %}>مدير المبادرة</option>
-                    <option value="training_officer" {% if role_filter == 'training_officer' %}selected{% endif %}>مسؤول التدريب</option>
-                    <option value="lecturer" {% if role_filter == 'lecturer' %}selected{% endif %}>مدرب تقني</option>
-                    <option value="supervisor" {% if role_filter == 'supervisor' %}selected{% endif %}>مشرف إداري</option>
-                    <option value="trainee" {% if role_filter == 'trainee' %}selected{% endif %}>متدرب / طالب</option>
+                <label class="form-label small fw-bold text-slate-700"><i class="fas fa-user-tag me-1 text-primary"></i>الدور الوظيفي:</label>
+                <select name="role" class="form-select shadow-sm" onchange="this.form.submit()">
+                    <option value="all" {% if role_filter == 'all' %}selected{% endif %}>👥 جميع الأدوار</option>
+                    <option value="super_admin" {% if role_filter == 'super_admin' %}selected{% endif %}>👑 مسؤول النظام (Super Admin)</option>
+                    <option value="governorate_admin" {% if role_filter == 'governorate_admin' %}selected{% endif %}>🏛️ مسؤول المحافظة</option>
+                    <option value="director" {% if role_filter == 'director' %}selected{% endif %}>👔 مدير المبادرة</option>
+                    <option value="training_officer" {% if role_filter == 'training_officer' %}selected{% endif %}>📋 مسؤول التدريب</option>
+                    <option value="lecturer" {% if role_filter == 'lecturer' %}selected{% endif %}>👨‍🏫 مدرب تقني</option>
+                    <option value="supervisor" {% if role_filter == 'supervisor' %}selected{% endif %}>🕵️ مشرف إداري</option>
+                    <option value="trainee" {% if role_filter == 'trainee' %}selected{% endif %}>🎓 متدرب / طالب</option>
                 </select>
             </div>
 
             {% if is_national %}
             <!-- Governorate Filter -->
             <div class="col-md-2">
-                <label class="form-label small fw-bold text-slate-700">المحافظة:</label>
-                <select name="governorate" class="form-select">
-                    <option value="">جميع المحافظات</option>
+                <label class="form-label small fw-bold text-slate-700"><i class="fas fa-map-marker-alt me-1 text-success"></i>المحافظة:</label>
+                <select name="governorate" class="form-select shadow-sm" onchange="this.form.submit()">
+                    <option value="">🌍 جميع المحافظات</option>
                     {% for g in all_governorates %}
-                    <option value="{{ g.id }}" {% if selected_gov and selected_gov.id == g.id %}selected{% endif %}>{{ g.name }}</option>
+                    <option value="{{ g.id }}" {% if selected_gov and selected_gov.id == g.id %}selected{% endif %}>📍 {{ g.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -151,22 +151,22 @@
 
             <!-- Group Filter -->
             <div class="col-md-2">
-                <label class="form-label small fw-bold text-slate-700">الشعبة / المجموعة:</label>
-                <select name="group" class="form-select">
-                    <option value="all" {% if group_filter == 'all' %}selected{% endif %}>جميع الشعَب</option>
+                <label class="form-label small fw-bold text-slate-700"><i class="fas fa-layer-group me-1 text-info"></i>الشعبة / المجموعة:</label>
+                <select name="group" class="form-select shadow-sm" onchange="this.form.submit()">
+                    <option value="all" {% if group_filter == 'all' %}selected{% endif %}>📚 جميع الشعَب</option>
                     {% for g in groups %}
-                    <option value="{{ g.id }}" {% if group_filter == g.id|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>
+                    <option value="{{ g.id }}" {% if group_filter == g.id|stringformat:"s" %}selected{% endif %}>🔹 {{ g.name }}</option>
                     {% endfor %}
                 </select>
             </div>
 
             <!-- Telegram Status Filter -->
             <div class="col-md-2">
-                <label class="form-label small fw-bold text-slate-700">ربط التليغرام:</label>
-                <select name="telegram" class="form-select">
-                    <option value="all" {% if telegram_filter == 'all' %}selected{% endif %}>الكل</option>
-                    <option value="linked" {% if telegram_filter == 'linked' %}selected{% endif %}>مربوط ✅</option>
-                    <option value="unlinked" {% if telegram_filter == 'unlinked' %}selected{% endif %}>غير مربوط ❌</option>
+                <label class="form-label small fw-bold text-slate-700"><i class="fab fa-telegram-plane me-1 text-primary"></i>ربط التليغرام:</label>
+                <select name="telegram" class="form-select shadow-sm" onchange="this.form.submit()">
+                    <option value="all" {% if telegram_filter == 'all' %}selected{% endif %}>⚡ الكل</option>
+                    <option value="linked" {% if telegram_filter == 'linked' %}selected{% endif %}>✅ مربوط</option>
+                    <option value="unlinked" {% if telegram_filter == 'unlinked' %}selected{% endif %}>❌ غير مربوط</option>
                 </select>
             </div>
 

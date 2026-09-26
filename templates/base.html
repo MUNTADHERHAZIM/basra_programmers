@@ -45,16 +45,144 @@
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <style>
-        .ts-dropdown {
-            z-index: 99999 !important;
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25) !important;
-            border-radius: 10px !important;
-            border: 1px solid #cbd5e1 !important;
-            background-color: #ffffff !important;
+        /* Tom-Select Premium RTL Styling */
+        .ts-wrapper {
+            direction: rtl !important;
+            text-align: right !important;
+            font-family: inherit;
+            width: 100% !important;
         }
 
-        .ts-wrapper.focus {
-            z-index: 10000 !important;
+        .ts-control {
+            border-radius: 8px !important;
+            border: 1.5px solid #cbd5e1 !important;
+            padding: 0.55rem 0.85rem !important;
+            font-size: 0.92rem !important;
+            background-color: #ffffff !important;
+            transition: all 0.2s ease-in-out !important;
+            min-height: 42px !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        .ts-wrapper.focus .ts-control {
+            border-color: #1e3a8a !important;
+            box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.15) !important;
+        }
+
+        .ts-control input {
+            direction: rtl !important;
+            text-align: right !important;
+            font-family: inherit !important;
+            font-size: 0.92rem !important;
+        }
+
+        .ts-control input::placeholder {
+            color: #94a3b8 !important;
+            opacity: 1 !important;
+        }
+
+        .ts-wrapper.single .ts-control .item {
+            color: #1e293b !important;
+            font-weight: 500 !important;
+        }
+
+        /* Size variants */
+        .ts-wrapper.ts-sm .ts-control,
+        .form-select-sm + .ts-wrapper .ts-control {
+            min-height: 35px !important;
+            padding: 0.3rem 0.65rem !important;
+            font-size: 0.85rem !important;
+        }
+
+        .ts-wrapper.ts-lg .ts-control,
+        .form-select-lg + .ts-wrapper .ts-control {
+            min-height: 50px !important;
+            padding: 0.75rem 1rem !important;
+            font-size: 1.05rem !important;
+        }
+
+        .ts-dropdown {
+            direction: rtl !important;
+            text-align: right !important;
+            z-index: 99999 !important;
+            box-shadow: 0 14px 35px rgba(15, 23, 42, 0.18) !important;
+            border-radius: 12px !important;
+            border: 1px solid #e2e8f0 !important;
+            background-color: #ffffff !important;
+            padding: 6px !important;
+            margin-top: 4px !important;
+        }
+
+        .ts-dropdown .ts-dropdown-content {
+            max-height: 280px !important;
+            overflow-y: auto !important;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+
+        .ts-dropdown .ts-dropdown-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .ts-dropdown .ts-dropdown-content::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .ts-dropdown .option {
+            padding: 8px 12px !important;
+            border-radius: 8px !important;
+            font-size: 0.9rem !important;
+            color: #334155 !important;
+            cursor: pointer !important;
+            transition: background 0.15s ease !important;
+        }
+
+        .ts-dropdown .option:hover,
+        .ts-dropdown .option.active {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            font-weight: 600 !important;
+        }
+
+        .ts-dropdown .option.selected {
+            background-color: #ecfdf5 !important;
+            color: #065f46 !important;
+            font-weight: bold !important;
+        }
+
+        .ts-dropdown .create {
+            padding: 8px 12px !important;
+            border-radius: 8px !important;
+            background: #f0fdf4 !important;
+            color: #15803d !important;
+            border: 1px dashed #86efac !important;
+            margin-top: 4px !important;
+        }
+
+        .ts-dropdown .create:hover {
+            background: #dcfce7 !important;
+        }
+
+        .ts-wrapper.single .ts-control::after {
+            left: 14px !important;
+            right: auto !important;
+            border-color: #64748b transparent transparent transparent !important;
+            transition: transform 0.2s ease !important;
+        }
+
+        .ts-wrapper.single.dropdown-active .ts-control::after {
+            transform: rotate(180deg) !important;
+        }
+
+        .ts-wrapper .clear-button {
+            left: 28px !important;
+            right: auto !important;
+            color: #94a3b8 !important;
+        }
+        .ts-wrapper .clear-button:hover {
+            color: #ef4444 !important;
         }
     </style>
 
@@ -511,21 +639,117 @@
         });
         {% endif %}
 
-        function initSearchableSelects() {
-            document.querySelectorAll('select.searchable-select').forEach(function (el) {
-                if (!el.tomselect) {
-                    new TomSelect(el, {
-                        create: false,
-                        placeholder: "ابحث بالاسم هنا...",
+        function initSearchableSelects(rootElement) {
+            if (typeof TomSelect === 'undefined') return;
+            var container = rootElement || document;
+            var selects = container.querySelectorAll('select.searchable-select, select.searchable-select-course, select.form-select:not(.no-search), select.form-control:not(.no-search)');
+            
+            selects.forEach(function (el) {
+                if (el.tomselect || el.dataset.tsInit) return;
+                if (el.closest('template') || el.classList.contains('no-search')) return;
+                
+                el.dataset.tsInit = "true";
+                var isCourse = el.classList.contains('searchable-select-course') || el.name === 'course_title';
+                var placeholder = el.getAttribute('placeholder') || 
+                                  el.getAttribute('data-placeholder') ||
+                                  (el.querySelector('option[disabled]') ? el.querySelector('option[disabled]').innerText : 
+                                   (el.querySelector('option[value=""]') ? el.querySelector('option[value=""]').innerText : 'ابحث أو اختر من القائمة...'));
+
+                try {
+                    var ts = new TomSelect(el, {
+                        create: isCourse, // Allows typing new custom courses on the fly!
+                        createOnBlur: isCourse,
+                        placeholder: placeholder,
                         allowEmptyOption: true,
-                        dropdownParent: 'body'
+                        maxOptions: 500,
+                        searchField: ['text', 'value'],
+                        sortField: null, // Preserve original DOM order
+                        dropdownParent: 'body',
+                        plugins: el.multiple ? ['remove_button'] : [],
+                        render: {
+                            no_results: function(data, escape) {
+                                if (isCourse) {
+                                    return '<div class="no-results p-2 text-success small"><i class="fas fa-plus-circle me-1"></i>اضغط Enter لإضافة مادة جديدة لمحافظتك: <strong>' + escape(data.input) + '</strong></div>';
+                                }
+                                return '<div class="no-results p-2 text-muted small"><i class="fas fa-search me-1"></i>لا توجد نتائج تطابق: "' + escape(data.input) + '"</div>';
+                            },
+                            option_create: function(data, escape) {
+                                return '<div class="create p-2 text-success fw-bold"><i class="fas fa-plus me-1"></i>إضافة مادة دراسية جديدة: <strong>' + escape(data.input) + '</strong></div>';
+                            }
+                        }
                     });
+
+                    if (el.classList.contains('form-select-sm') || el.classList.contains('form-control-sm')) {
+                        ts.wrapper.classList.add('ts-sm');
+                    }
+                    if (el.classList.contains('form-select-lg') || el.classList.contains('form-control-lg')) {
+                        ts.wrapper.classList.add('ts-lg');
+                    }
+                    if (el.style.minWidth) {
+                        ts.wrapper.style.minWidth = el.style.minWidth;
+                    }
+                    if (el.style.width) {
+                        ts.wrapper.style.width = el.style.width;
+                    }
+
+                    ts.on('change', function(val) {
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (typeof el.onchange === 'function') {
+                            try {
+                                el.onchange();
+                            } catch(err) {
+                                console.error('Error in onchange on', el, err);
+                            }
+                        }
+                    });
+
+                    // Sync programmatic changes to el.value into TomSelect (Alpine x-model, JS resets, etc.)
+                    try {
+                        var proto = HTMLSelectElement.prototype;
+                        var descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+                        if (descriptor && descriptor.set) {
+                            var originalSet = descriptor.set;
+                            Object.defineProperty(el, 'value', {
+                                configurable: true,
+                                get: function() {
+                                    return descriptor.get.call(this);
+                                },
+                                set: function(val) {
+                                    originalSet.call(this, val);
+                                    if (this.tomselect && this.tomselect.getValue() !== String(val)) {
+                                        this.tomselect.setValue(val, true);
+                                    }
+                                }
+                            });
+                        }
+                    } catch(err) { }
+
+                } catch(e) {
+                    console.warn('TomSelect init error on', el, e);
                 }
             });
         }
 
         document.addEventListener('DOMContentLoaded', function () {
             initSearchableSelects();
+        });
+
+        // Re-init on bootstrap modals shown
+        document.addEventListener('shown.bs.modal', function (event) {
+            initSearchableSelects(event.target);
+        });
+
+        // Debounced observer for Alpine or dynamic tab changes
+        var _tsDebounceTimer = null;
+        var _tsObserver = new MutationObserver(function() {
+            clearTimeout(_tsDebounceTimer);
+            _tsDebounceTimer = setTimeout(function() {
+                initSearchableSelects();
+            }, 120);
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+            _tsObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
         });
 
         // PWA Service Worker & Install Prompt Registration

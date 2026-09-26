@@ -277,7 +277,9 @@
                     <tbody>
                         {% for group in groups %}
                         <tr>
-                            <td><span class="badge bg-secondary">{{ group.code }}</span></td>
+                            <td>
+                                <span class="badge bg-secondary font-monospace px-2 py-1" id="group-code-badge-{{ group.id }}">{{ group.code }}</span>
+                            </td>
                             <td>
                                 <span class="badge bg-primary-subtle text-primary border rounded-pill px-2 py-1">
                                     <i class="fas fa-map-marker-alt me-1"></i>{{ group.governorate.name|default:"عام" }}
@@ -310,7 +312,12 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{% url 'portal:export_trainees_view' %}?group_id={{ group.id }}" class="btn btn-sm btn-outline-success"><i class="fas fa-download"></i> تقرير</a>
+                                <div class="d-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-2" onclick="openEditCodeModal('{{ group.id }}', '{{ group.code|escapejs }}', '{{ group.name|escapejs }}', '{{ group.governorate.name|default:'عام'|escapejs }}')">
+                                        <i class="fas fa-pen me-1"></i>تعديل الرمز
+                                    </button>
+                                    <a href="{% url 'portal:export_trainees_view' %}?group_id={{ group.id }}" class="btn btn-sm btn-outline-success rounded-pill px-2"><i class="fas fa-download me-1"></i>تقرير</a>
+                                </div>
                             </td>
                         </tr>
                         {% empty %}
@@ -323,6 +330,59 @@
             </div>
         </div>
     </div>
+</div>
+
+<!-- Modal: تعديل رمز المجموعة التدريبية -->
+<div class="modal fade" id="editCodeModal" tabindex="-1" aria-labelledby="editCodeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+      <div class="modal-header text-white border-0" style="background: linear-gradient(135deg, #1e3a8a 0%, #0d9488 100%); border-top-left-radius: 16px; border-top-right-radius: 16px;">
+        <h5 class="modal-title fw-bold" id="editCodeModalLabel"><i class="fas fa-barcode me-2"></i>تعديل رمز المجموعة التدريبية</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editCodeForm" method="POST" onsubmit="submitEditCode(event)">
+        {% csrf_token %}
+        <input type="hidden" name="group_id" id="modalGroupId">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-bold">اسم الشعبة / المجموعة</label>
+            <input type="text" id="modalGroupName" class="form-control bg-light fw-bold text-dark" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-bold">المحافظة</label>
+            <input type="text" id="modalGroupGov" class="form-control bg-light text-muted" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-dark fw-bold">رمز المجموعة الجديد <span class="text-danger">*</span></label>
+            <input type="text" name="code" id="modalGroupCode" class="form-control form-control-lg font-monospace text-center fw-bold" placeholder="مثال: AI-101 أو GRP-BGD-1" required>
+            <div class="form-text text-muted small mt-1">يُفضل استخدام رموز احترافية (مثل AI-101 أو PY-101 أو WEB-101).</div>
+          </div>
+          
+          <div class="bg-light p-2 rounded-3 border">
+            <small class="text-muted d-block mb-1 fw-bold">اقتراحات سريعة لرمز الشعبة:</small>
+            <div class="d-flex flex-wrap gap-1">
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="applyCodeSuggestion('AI')">AI-</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="applyCodeSuggestion('PY')">PY-</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="applyCodeSuggestion('WEB')">WEB-</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="applyCodeSuggestion('SEC')">SEC-</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="applyCodeSuggestion('NET')">NET-</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="applyCodeSuggestion('DATA')">DATA-</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" onclick="applyCodeSuggestion('GRP')">GRP-</button>
+            </div>
+          </div>
+          
+          <div id="modalCodeError" class="alert alert-danger mt-3 d-none py-2 small mb-0"></div>
+        </div>
+        <div class="modal-footer border-0 bg-light" style="border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+          <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">إلغاء</button>
+          <button type="submit" class="btn btn-primary px-4 fw-bold" id="btnSaveCode">
+            <i class="fas fa-check me-1"></i>حفظ التعديل
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -427,5 +487,68 @@
             }
         }
     });
+
+    // 3. Edit Group Code Modal Handlers
+    window.openEditCodeModal = function(id, code, name, gov) {
+        document.getElementById('modalGroupId').value = id;
+        document.getElementById('modalGroupCode').value = code;
+        document.getElementById('modalGroupName').value = name;
+        document.getElementById('modalGroupGov').value = gov || 'عام';
+        document.getElementById('modalCodeError').classList.add('d-none');
+        var modalEl = document.getElementById('editCodeModal');
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    };
+
+    window.applyCodeSuggestion = function(prefix) {
+        var rand = Math.floor(101 + Math.random() * 898);
+        document.getElementById('modalGroupCode').value = prefix + '-' + rand;
+    };
+
+    window.submitEditCode = function(e) {
+        e.preventDefault();
+        var form = document.getElementById('editCodeForm');
+        var id = document.getElementById('modalGroupId').value;
+        var newCode = document.getElementById('modalGroupCode').value.trim();
+        var btn = document.getElementById('btnSaveCode');
+        var errorDiv = document.getElementById('modalCodeError');
+        
+        if (!newCode) return;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>جار الحفظ...';
+        errorDiv.classList.add('d-none');
+        
+        var formData = new FormData(form);
+        fetch('/manage/group/' + id + '/edit/', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: formData
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check me-1"></i>حفظ التعديل';
+            if (data.success) {
+                var badge = document.getElementById('group-code-badge-' + id);
+                if (badge) badge.innerText = data.code || newCode;
+                var modalEl = document.getElementById('editCodeModal');
+                var modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                window.location.reload();
+            } else {
+                errorDiv.innerText = data.message || 'حدث خطأ أثناء تعديل الرمز.';
+                errorDiv.classList.remove('d-none');
+            }
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check me-1"></i>حفظ التعديل';
+            // Fallback to regular form post
+            form.action = '/manage/group/' + id + '/edit/';
+            form.submit();
+        });
+    };
 </script>
 {% endblock %}

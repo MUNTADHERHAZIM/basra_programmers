@@ -29,17 +29,16 @@ except ImportError:
     get_display = None
 
 _FONTS_REGISTERED = False
+_REGULAR_FONT = 'Helvetica'
+_BOLD_FONT = 'Helvetica-Bold'
 
 def register_arabic_fonts():
-    global _FONTS_REGISTERED
+    global _FONTS_REGISTERED, _REGULAR_FONT, _BOLD_FONT
     if _FONTS_REGISTERED:
-        return 'Amiri-Bold', 'Amiri'
-    
-    regular_font_name = 'Helvetica'
-    bold_font_name = 'Helvetica-Bold'
+        return _BOLD_FONT, _REGULAR_FONT
     
     # 1. Check project static/fonts directory
-    base_dir = getattr(settings, 'BASE_DIR', os.getcwd())
+    base_dir = str(getattr(settings, 'BASE_DIR', os.getcwd()))
     font_paths = [
         (os.path.join(base_dir, 'static', 'fonts', 'Amiri-Regular.ttf'), os.path.join(base_dir, 'static', 'fonts', 'Amiri-Bold.ttf')),
         (os.path.join(base_dir, 'staticfiles', 'fonts', 'Amiri-Regular.ttf'), os.path.join(base_dir, 'staticfiles', 'fonts', 'Amiri-Bold.ttf')),
@@ -53,29 +52,149 @@ def register_arabic_fonts():
             try:
                 pdfmetrics.registerFont(TTFont('ArabicRegular', reg_path))
                 pdfmetrics.registerFont(TTFont('ArabicBold', bold_path))
-                regular_font_name = 'ArabicRegular'
-                bold_font_name = 'ArabicBold'
+                _REGULAR_FONT = 'ArabicRegular'
+                _BOLD_FONT = 'ArabicBold'
                 _FONTS_REGISTERED = True
                 break
             except Exception:
                 continue
 
-    return bold_font_name, regular_font_name
+    return _BOLD_FONT, _REGULAR_FONT
+
+
+# Complete pure-Python Arabic reshaping & BiDi engine (works without external C/packages)
+ARABIC_FORMS_TABLE = {
+    0x0621: (0xFE80, 0xFE80, 0xFE80, 0xFE80), # ء
+    0x0622: (0xFE81, 0xFE82, 0xFE81, 0xFE82), # آ
+    0x0623: (0xFE83, 0xFE84, 0xFE83, 0xFE84), # أ
+    0x0624: (0xFE85, 0xFE86, 0xFE85, 0xFE86), # ؤ
+    0x0625: (0xFE87, 0xFE88, 0xFE87, 0xFE88), # إ
+    0x0626: (0xFE89, 0xFE8A, 0xFE8B, 0xFE8C), # ئ
+    0x0627: (0xFE8D, 0xFE8E, 0xFE8D, 0xFE8E), # ا
+    0x0628: (0xFE8F, 0xFE90, 0xFE91, 0xFE92), # ب
+    0x0629: (0xFE93, 0xFE94, 0xFE93, 0xFE94), # ة
+    0x062A: (0xFE95, 0xFE96, 0xFE97, 0xFE98), # ت
+    0x062B: (0xFE99, 0xFE9A, 0xFE9B, 0xFE9C), # ث
+    0x062C: (0xFE9D, 0xFE9E, 0xFE9F, 0xFEA0), # ج
+    0x062D: (0xFEA1, 0xFEA2, 0xFEA3, 0xFEA4), # ح
+    0x062E: (0xFEA5, 0xFEA6, 0xFEA7, 0xFEA8), # خ
+    0x062F: (0xFEA9, 0xFEAA, 0xFEA9, 0xFEAA), # د
+    0x0630: (0xFEAB, 0xFEAC, 0xFEAB, 0xFEAC), # ذ
+    0x0631: (0xFEAD, 0xFEAE, 0xFEAD, 0xFEAE), # ر
+    0x0632: (0xFEAF, 0xFEB0, 0xFEAF, 0xFEB0), # ز
+    0x0633: (0xFEB1, 0xFEB2, 0xFEB3, 0xFEB4), # س
+    0x0634: (0xFEB5, 0xFEB6, 0xFEB7, 0xFEB8), # ش
+    0x0635: (0xFEB9, 0xFEBA, 0xFEBB, 0xFEBC), # ص
+    0x0636: (0xFEBD, 0xFEBE, 0xFEBF, 0xFEC0), # ض
+    0x0637: (0xFEC1, 0xFEC2, 0xFEC3, 0xFEC4), # ط
+    0x0638: (0xFEC5, 0xFEC6, 0xFEC7, 0xFEC8), # ظ
+    0x0639: (0xFEC9, 0xFECA, 0xFECB, 0xFECC), # ع
+    0x063A: (0xFECD, 0xFECE, 0xFECF, 0xFED0), # غ
+    0x0641: (0xFED1, 0xFED2, 0xFED3, 0xFED4), # ف
+    0x0642: (0xFED5, 0xFED6, 0xFED7, 0xFED8), # ق
+    0x0643: (0xFED9, 0xFEDA, 0xFEDB, 0xFEDC), # ك
+    0x0644: (0xFEDD, 0xFEDE, 0xFEDF, 0xFEE0), # ل
+    0x0645: (0xFEE1, 0xFEE2, 0xFEE3, 0xFEE4), # م
+    0x0646: (0xFEE5, 0xFEE6, 0xFEE7, 0xFEE8), # ن
+    0x0647: (0xFEE9, 0xFEEA, 0xFEEB, 0xFEEC), # ه
+    0x0648: (0xFEED, 0xFEEE, 0xFEED, 0xFEEE), # و
+    0x0649: (0xFEEF, 0xFEF0, 0xFBE8, 0xFBE9), # ى
+    0x064A: (0xFEF1, 0xFEF2, 0xFEF3, 0xFEF4), # ي
+}
+
+NON_CONNECTING_NEXT = {
+    0x0621, 0x0622, 0x0623, 0x0624, 0x0625, 0x0627, 
+    0x0629, 0x062F, 0x0630, 0x0631, 0x0632, 0x0648, 0x0649
+}
+
+def pure_python_reshape_arabic(text):
+    if not text:
+        return ""
+    import re
+    # Handle lam-alef ligatures first
+    text = str(text)
+    text = text.replace('\u0644\u0622', '\uFEF5')
+    text = text.replace('\u0644\u0623', '\uFEF7')
+    text = text.replace('\u0644\u0625', '\uFEF9')
+    text = text.replace('\u0644\u0627', '\uFEFB')
+    
+    chars = list(text)
+    n = len(chars)
+    result = []
+    
+    for i, ch in enumerate(chars):
+        code = ord(ch)
+        if code not in ARABIC_FORMS_TABLE:
+            result.append(ch)
+            continue
+            
+        forms = ARABIC_FORMS_TABLE[code]
+        prev_connects = False
+        if i > 0:
+            prev_code = ord(chars[i-1])
+            if prev_code in ARABIC_FORMS_TABLE and prev_code not in NON_CONNECTING_NEXT:
+                prev_connects = True
+                
+        next_connects = False
+        if i < n - 1:
+            next_code = ord(chars[i+1])
+            if next_code in ARABIC_FORMS_TABLE and code not in NON_CONNECTING_NEXT:
+                next_connects = True
+                
+        if prev_connects and next_connects:
+            form = forms[3] # Medial
+        elif prev_connects:
+            form = forms[1] # Final
+        elif next_connects:
+            form = forms[2] # Initial
+        else:
+            form = forms[0] # Isolated
+            
+        result.append(chr(form))
+    return ''.join(result)
+
+def pure_python_bidi(text):
+    if not text:
+        return ""
+    import re
+    # Splits text into runs of Arabic vs LTR (numbers, punctuation, English)
+    tokens = re.findall(r'[0-9]+|[a-zA-Z]+|[^0-9a-zA-Z\s]+|\s+', text)
+    tokens.reverse()
+    reversed_tokens = []
+    for tok in tokens:
+        if re.search(r'[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF]', tok):
+            reversed_tokens.append(tok[::-1])
+        else:
+            reversed_tokens.append(tok)
+    return ''.join(reversed_tokens)
 
 
 def ar_text(text):
     """Helper to reshape Arabic text and reverse direction for proper RTL rendering."""
     if not text:
         return ""
+    raw_str = str(text)
     try:
         if arabic_reshaper and get_display:
-            # Reshape Arabic characters (connecting forms)
-            reshaped = arabic_reshaper.reshape(str(text))
-            # Convert to RTL display order
+            try:
+                # Use standard configuration with ligature support
+                reshaper = arabic_reshaper.ArabicReshaper(configuration={
+                    'delete_harakat': False,
+                    'support_ligatures': True,
+                })
+                reshaped = reshaper.reshape(raw_str)
+            except Exception:
+                reshaped = arabic_reshaper.reshape(raw_str)
             return get_display(reshaped)
-        return str(text)
     except Exception:
-        return str(text)
+        pass
+    
+    # Fallback to 100% robust pure-Python implementation
+    try:
+        reshaped = pure_python_reshape_arabic(raw_str)
+        return pure_python_bidi(reshaped)
+    except Exception:
+        return raw_str
 
 
 class CertificateService:

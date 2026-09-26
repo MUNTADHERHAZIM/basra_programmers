@@ -13,6 +13,15 @@ DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "https://*.pythonanywhere.com,http://127.0.0.1,http://localhost"
+    ).split(",")
+    if origin.strip()
+]
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
