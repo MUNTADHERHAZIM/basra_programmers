@@ -217,9 +217,9 @@
     <!-- Main Wrapper -->
     <div class="d-flex min-vh-100 flex-column flex-md-row">
 
-        <!-- Sidebar Navigation (Only for logged-in users) -->
+        <!-- Desktop Sidebar Navigation (Only for logged-in users on medium+ screens) -->
         {% if user.is_authenticated %}
-        <aside class="sidebar col-12 col-md-3 col-lg-2 d-flex flex-column justify-content-between">
+        <aside class="sidebar d-none d-md-flex col-md-3 col-lg-2 flex-column justify-content-between">
             <div>
                 <div class="text-center mb-4">
                     {% if site_config.logo %}
@@ -352,6 +352,106 @@
                 <p class="m-0">المطور: منتظر حازم © 2026</p>
             </div>
         </aside>
+
+        <!-- Mobile Offcanvas Navigation Drawer (Smooth slide-in drawer on phones) -->
+        <div class="offcanvas offcanvas-end mobile-offcanvas-drawer" tabindex="-1" id="mobileSidebarOffcanvas" aria-labelledby="mobileSidebarOffcanvasLabel">
+            <div class="offcanvas-header">
+                <div class="d-flex align-items-center gap-2">
+                    {% if site_config.logo %}
+                    <img src="{{ site_config.logo.url }}" style="max-height: 38px; border-radius: 6px;" alt="Logo">
+                    {% else %}
+                    <i class="fas fa-cubes text-warning fs-3"></i>
+                    {% endif %}
+                    <div>
+                        <h6 class="fw-bold m-0 text-white" id="mobileSidebarOffcanvasLabel">{{ site_config.site_name|default:"1000 مبرمج" }}</h6>
+                        <span class="badge bg-success-subtle text-success py-0 px-2" style="font-size: 0.7rem;">{{ user.get_role_display }}</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body d-flex flex-column justify-content-between">
+                <nav class="nav flex-column">
+                    {% if user.role in 'super_admin,governorate_admin,director,training_officer' %}
+                    <a href="{% url 'portal:admin_dashboard' %}" class="{% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">
+                        <i class="fas fa-chart-line me-2 text-primary"></i>لوحة تحكم الإدارة
+                    </a>
+                    <a href="{% url 'portal:admin_management_hub' %}" class="{% if request.resolver_match.url_name == 'admin_management_hub' %}active{% endif %}">
+                        <i class="fas fa-tasks me-2 text-success"></i>إدارة المبادرة (الشعب/الطلاب)
+                    </a>
+                    <a href="{% url 'portal:accounts_management' %}" class="{% if request.resolver_match.url_name == 'accounts_management' %}active{% endif %}">
+                        <i class="fas fa-users-cog me-2 text-warning"></i>إدارة وتوليد الحسابات
+                    </a>
+                    <a href="{% url 'portal:daily_reports_list' %}" class="{% if request.resolver_match.url_name == 'daily_reports_list' %}active{% endif %}">
+                        <i class="fas fa-clipboard-list me-2 text-info"></i>تقارير المدربين اليومية
+                    </a>
+                    <a href="{% url 'portal:create_announcements_view' %}" class="{% if request.resolver_match.url_name == 'create_announcements_view' %}active{% endif %}">
+                        <i class="fas fa-bullhorn me-2 text-warning"></i>مركز الإعلانات والتبليغات
+                    </a>
+                    <a href="{% url 'portal:send_notifications_view' %}" class="{% if request.resolver_match.url_name == 'send_notifications_view' %}active{% endif %}">
+                        <i class="fas fa-bell me-2 text-primary"></i>مركز إرسال الإشعارات
+                    </a>
+                    <a href="{% url 'portal:activity_log' %}" class="{% if request.resolver_match.url_name == 'activity_log' %}active{% endif %}">
+                        <i class="fas fa-list-ul me-2"></i>سجل نشاطات الطلاب
+                    </a>
+                    {% if user.role == 'super_admin' %}
+                    <a href="{% url 'portal:governorates_management' %}" class="{% if request.resolver_match.url_name == 'governorates_management' %}active{% endif %}">
+                        <i class="fas fa-map-marked-alt me-2 text-info"></i>شبكة المحافظات والفروع
+                    </a>
+                    {% endif %}
+
+                    {% elif user.role == 'lecturer' %}
+                    <a href="{% url 'portal:lecturer_dashboard' %}" class="{% if request.resolver_match.url_name == 'lecturer_dashboard' %}active{% endif %}">
+                        <i class="fas fa-chalkboard-teacher me-2 text-success"></i>لوحة تحكم المحاضر
+                    </a>
+                    <a href="{% url 'portal:daily_reports_list' %}" class="{% if request.resolver_match.url_name == 'daily_reports_list' %}active{% endif %}">
+                        <i class="fas fa-clipboard-list me-2 text-info"></i>تقارير المحاضرات اليومية
+                    </a>
+
+                    {% elif user.role == 'supervisor' %}
+                    <a href="{% url 'portal:supervisor_dashboard' %}" class="{% if request.resolver_match.url_name == 'supervisor_dashboard' %}active{% endif %}">
+                        <i class="fas fa-user-shield me-2 text-primary"></i>لوحة تحكم المشرف
+                    </a>
+                    <a href="{% url 'portal:daily_reports_list' %}" class="{% if request.resolver_match.url_name == 'daily_reports_list' %}active{% endif %}">
+                        <i class="fas fa-clipboard-list me-2 text-info"></i>متابعة تقارير المدربين
+                    </a>
+
+                    {% elif user.role == 'trainee' %}
+                    <a href="{% url 'portal:trainee_dashboard' %}" class="{% if request.resolver_match.url_name == 'trainee_dashboard' %}active{% endif %}">
+                        <i class="fas fa-user-graduate me-2 text-success"></i>لوحة تحكم الطالب
+                    </a>
+                    <a href="{% url 'portal:scan_qr_page' %}" class="{% if request.resolver_match.url_name == 'scan_qr_page' %}active{% endif %}">
+                        <i class="fas fa-qrcode me-2 text-warning"></i>تسجيل الحضور (QR)
+                    </a>
+                    {% endif %}
+
+                    <a href="{% url 'portal:lectures_hub' %}" class="{% if request.resolver_match.url_name == 'lectures_hub' %}active{% endif %}">
+                        <i class="fas fa-book-open me-2 text-info"></i>المحاضرات والمواد (PDF)
+                    </a>
+                    <a href="{% url 'portal:learning_instructions' %}" class="{% if request.resolver_match.url_name == 'learning_instructions' %}active{% endif %}">
+                        <i class="fas fa-hands-helping me-2 text-warning"></i>دليل التعلّم
+                    </a>
+                    <a href="{% url 'portal:chat_view' %}" class="{% if request.resolver_match.url_name == 'chat_view' %}active{% endif %}">
+                        <i class="fas fa-comments me-2 text-warning"></i>منصة التواصل والدردشة
+                    </a>
+                    <a href="{% url 'portal:initiative_media_view' %}" class="{% if request.resolver_match.url_name == 'initiative_media_view' %}active{% endif %}">
+                        <i class="fas fa-photo-video me-2 text-info"></i>مركز إعلام المبادرة
+                    </a>
+                    <a href="{% url 'portal:calendar_view' %}" class="{% if request.resolver_match.url_name == 'calendar_view' %}active{% endif %}">
+                        <i class="fas fa-calendar-alt me-2"></i>جدول المبادرة
+                    </a>
+                    <a href="javascript:void(0)" onclick="triggerPwaInstall();" class="text-primary fw-bold bg-primary-subtle rounded-3 mt-2">
+                        <i class="fas fa-download me-2 text-primary"></i>تثبيت التطبيق على جهازك
+                    </a>
+                    <hr>
+                    <a href="{% url 'portal:logout' %}" class="text-danger">
+                        <i class="fas fa-sign-out-alt me-2"></i>تسجيل الخروج
+                    </a>
+                </nav>
+                <div class="text-center text-muted small mt-3">
+                    <p class="m-0">المطور: منتظر حازم © 2026</p>
+                </div>
+            </div>
+        </div>
         {% endif %}
 
         <!-- Main Content Area -->
@@ -360,7 +460,14 @@
             <!-- Top Navbar -->
             <nav class="navbar top-navbar navbar-expand-lg px-4 py-3 sticky-top">
                 <div class="container-fluid p-0 d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-2 gap-md-3">
+                        {% if user.is_authenticated %}
+                        <!-- Mobile Hamburger Button -->
+                        <button class="btn btn-light d-md-none border shadow-xs rounded-3 p-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebarOffcanvas" aria-label="فتح القائمة الرئيسية">
+                            <i class="fas fa-bars text-slate-800 fs-5"></i>
+                        </button>
+                        {% endif %}
+
                         {% if not user.is_authenticated %}
                         <a class="navbar-brand fw-bold text-dark d-flex align-items-center"
                             href="{% url 'portal:landing' %}">
@@ -370,23 +477,26 @@
                             {% else %}
                             <i class="fas fa-cubes text-success me-2 fs-3"></i>
                             {% endif %}
-                            <span class="ms-2">{{ site_config.site_name|default:"مبادرة 1000 مبرمج" }}</span>
+                            <span class="ms-2 fs-6 fs-md-5">{{ site_config.site_name|default:"مبادرة 1000 مبرمج" }}</span>
                         </a>
                         {% else %}
-                        <h4 class="m-0 fw-bold d-none d-md-block text-slate-800">
+                        <h5 class="m-0 fw-bold d-none d-md-block text-slate-800">
                             {% block header_title %}مرحباً بك في البوابة{% endblock %}
-                        </h4>
+                        </h5>
+                        <div class="d-md-none fw-bold text-slate-800 text-truncate" style="max-width: 140px; font-size: 0.95rem;">
+                            {{ site_config.site_name|default:"1000 مبرمج" }}
+                        </div>
                         {% if user.role == 'super_admin' %}
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1 rounded-pill fw-bold shadow-sm" style="font-size: 0.8rem;">
-                                <i class="fas fa-globe-asia me-1 text-primary"></i> إدارة وطنية عامة
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 px-md-3 py-1 rounded-pill fw-bold shadow-sm d-none d-sm-inline-block" style="font-size: 0.78rem;">
+                                <i class="fas fa-globe-asia me-1 text-primary"></i> إدارة وطنية
                             </span>
                         {% elif current_governorate %}
-                            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1 rounded-pill fw-bold shadow-sm" style="font-size: 0.8rem;">
-                                <i class="fas fa-map-marker-alt me-1 text-success"></i> محافظة {{ current_governorate.name }}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 px-md-3 py-1 rounded-pill fw-bold shadow-sm d-none d-sm-inline-block" style="font-size: 0.78rem;">
+                                <i class="fas fa-map-marker-alt me-1 text-success"></i> {{ current_governorate.name }}
                             </span>
                         {% elif user.governorate %}
-                            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1 rounded-pill fw-bold shadow-sm" style="font-size: 0.8rem;">
-                                <i class="fas fa-map-marker-alt me-1 text-success"></i> محافظة {{ user.governorate.name }}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 px-md-3 py-1 rounded-pill fw-bold shadow-sm d-none d-sm-inline-block" style="font-size: 0.78rem;">
+                                <i class="fas fa-map-marker-alt me-1 text-success"></i> {{ user.governorate.name }}
                             </span>
                         {% endif %}
                         {% endif %}
@@ -511,7 +621,7 @@
             </nav>
 
             <!-- Page Body Content -->
-            <main class="flex-grow-1 p-4">
+            <main class="flex-grow-1 p-3 p-md-4 mb-4 pb-4 mb-md-0 pb-md-0">
                 <div class="container-fluid p-0">
                     {% block content %}{% endblock %}
                 </div>
@@ -815,81 +925,170 @@
         }
     </script>
 
-    <!-- PWA Install Prompt Banner -->
-    <div id="pwa-install-banner" class="position-fixed bottom-0 start-50 translate-middle-x p-3 mb-3 shadow-lg rounded-4 text-white d-none" style="z-index: 1080; max-width: 480px; width: 92%; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.15);">
-        <div class="d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center">
-                <div class="bg-primary text-white rounded-3 p-2 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-                    <i class="fas fa-mobile-alt fs-5"></i>
+    <!-- PWA Install Prompt Banner (Mobile & Desktop Pro Design) -->
+    <style>
+        .pwa-banner-card {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.97) 0%, rgba(30, 41, 59, 0.98) 100%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), 0 0 25px rgba(16, 185, 129, 0.15);
+            z-index: 1090;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            animation: pwaSlideUp 0.4s ease-out forwards;
+        }
+        @keyframes pwaSlideUp {
+            from {
+                opacity: 0;
+                transform: translate(-50%, 30px);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+        }
+        .pwa-app-icon {
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-radius: 14px;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+        }
+        .pwa-btn-install {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #ffffff !important;
+            border: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .pwa-btn-install:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.4);
+            color: #ffffff !important;
+        }
+        @media (max-width: 576px) {
+            .pwa-banner-card {
+                width: calc(100% - 24px) !important;
+                bottom: 12px !important;
+                padding: 16px !important;
+                border-radius: 20px !important;
+            }
+        }
+    </style>
+
+    <div id="pwa-install-banner" class="position-fixed bottom-0 start-50 translate-middle-x p-3 mb-3 rounded-4 text-white d-none pwa-banner-card" style="max-width: 520px; width: 94%;">
+        <div class="position-relative">
+            <!-- Close Button -->
+            <button id="pwa-close-btn" onclick="dismissPwaBanner()" class="btn-close btn-close-white position-absolute top-0 end-0 p-2" style="font-size: 0.75rem; opacity: 0.7;" aria-label="إغلاق"></button>
+            
+            <div class="d-flex align-items-start gap-3 pe-4">
+                <!-- App Icon -->
+                <div class="pwa-app-icon d-flex align-items-center justify-content-center text-white">
+                    <i class="fas fa-laptop-code fs-4"></i>
                 </div>
-                <div>
-                    <h6 class="fw-bold mb-0 text-white">تثبيت تطبيق 1000 برمجة</h6>
-                    <small class="text-slate-300" style="font-size: 0.78rem;">وصول سريع للمحاضرات والحضور بدون إنترنت</small>
+                
+                <!-- Info -->
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                        <h6 class="fw-bold mb-0 text-white fs-6">تطبيق مبادرة 1000 مبرمج</h6>
+                        <span class="badge bg-success-subtle text-success px-2 py-0 border border-success-subtle" style="font-size: 0.68rem;">
+                            <i class="fas fa-check-circle me-1"></i>النسخة المعتمدة
+                        </span>
+                    </div>
+                    <p class="text-slate-300 small mb-2" style="font-size: 0.8rem; line-height: 1.45;">
+                        وصول سريع للمحاضرات والحضور وإشعارات المبادرة على هاتفك بدون إنترنت.
+                    </p>
+                    
+                    <!-- Feature badges -->
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-3" style="font-size: 0.72rem;">
+                        <span class="text-emerald-400"><i class="fas fa-bolt me-1"></i>بدون إنترنت</span>
+                        <span class="text-slate-400">•</span>
+                        <span class="text-cyan-400"><i class="fas fa-bell me-1"></i>تنبيهات فورية</span>
+                        <span class="text-slate-400">•</span>
+                        <span class="text-warning"><i class="fas fa-qrcode me-1"></i>مسح سريع للـ QR</span>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <button id="pwa-install-btn" onclick="installPwaApp()" class="btn btn-sm pwa-btn-install fw-bold px-4 py-2 rounded-pill d-inline-flex align-items-center gap-1 shadow">
+                            <i class="fas fa-download"></i>
+                            <span>تثبيت التطبيق الآن</span>
+                        </button>
+                        <button onclick="dismissPwaBanner()" class="btn btn-sm btn-link text-slate-400 text-decoration-none px-2 py-1 small">
+                            ليس الآن
+                        </button>
+                    </div>
                 </div>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <button id="pwa-install-btn" onclick="installPwaApp()" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm">تثبيت التطبيق</button>
-                <button id="pwa-close-btn" onclick="dismissPwaBanner()" class="btn btn-sm btn-outline-light rounded-circle ms-1 d-flex align-items-center justify-content-center" style="width:32px; height:32px; padding:0;" aria-label="إغلاق">✕</button>
             </div>
         </div>
     </div>
 
-    <!-- PWA Installation Guide Modal -->
+    <!-- PWA Installation Guide Modal (Enhanced Modern Styling) -->
     <div class="modal fade" id="pwaInstallGuideModal" tabindex="-1" aria-labelledby="pwaInstallGuideModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content rounded-4 border-0 shadow-lg">
-                <div class="modal-header bg-primary text-white p-3">
-                    <h5 class="modal-title fw-bold" id="pwaInstallGuideModalLabel">
-                        <i class="fas fa-mobile-alt me-2"></i>تثبيت التطبيق على هاتفك أو حاسوبك
-                    </h5>
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content rounded-4 border-0 shadow-2xl overflow-hidden" style="background: #ffffff;">
+                <div class="modal-header text-white p-3 p-md-4" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="pwa-app-icon d-flex align-items-center justify-content-center text-white shadow-sm" style="width: 42px; height: 42px; min-width: 42px;">
+                            <i class="fas fa-mobile-alt fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold m-0" id="pwaInstallGuideModalLabel">
+                                تثبيت تطبيق 1000 مبرمج
+                            </h5>
+                            <small class="text-slate-300" style="font-size: 0.78rem;">دليل التثبيت السريع على الهاتف والحاسوب</small>
+                        </div>
+                    </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4 text-slate-800">
                     <div class="text-center mb-4">
-                        <div class="bg-primary-subtle text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-2" style="width: 60px; height: 60px;">
-                            <i class="fas fa-cloud-download-alt fs-2"></i>
-                        </div>
-                        <h5 class="fw-bold text-slate-900">تطبيق الويب التقدمي (PWA)</h5>
-                        <p class="text-muted small">يعمل التطبيق بكفاءة على جميع الأجهزة دون الحاجة لمتجر التطبيقات!</p>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1 rounded-pill fw-bold mb-2">
+                            <i class="fas fa-rocket me-1"></i>تطبيق ويب تقدمي PWA خفيف وسريع
+                        </span>
+                        <p class="text-muted small m-0">يعمل بكفاءة عالية على نظامي أندرويد وآيفون دون الحاجة للتحميل من المتجر!</p>
                     </div>
 
                     <!-- Android / Chrome Instructions -->
-                    <div class="p-3 bg-light rounded-3 mb-3 border">
-                        <h6 class="fw-bold text-primary mb-2">
-                            <i class="fab fa-android text-success me-1"></i> أجهزة أندرويد (Google Chrome):
-                        </h6>
-                        <ol class="small m-0 ps-3 text-secondary" style="line-height: 1.7;">
-                            <li>اضغط على قائمة النقاط الثلاث <i class="fas fa-ellipsis-v"></i> أعلى المتصفح.</li>
-                            <li>اختر <strong>"تثبيت التطبيق"</strong> أو <strong>"الإضافة إلى الشاشة الرئيسية"</strong>.</li>
-                            <li>اضغط <strong>تثبيت</strong> ليظهر التطبيق في شاشتك الرئيسية فوراً.</li>
+                    <div class="p-3 bg-light rounded-4 mb-3 border border-slate-200">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="fab fa-android text-success fs-5"></i>
+                            <h6 class="fw-bold text-dark m-0">هواتف أندرويد (Google Chrome):</h6>
+                        </div>
+                        <ol class="small m-0 ps-3 text-secondary" style="line-height: 1.8;">
+                            <li>اضغط على قائمة النقاط الثلاث <i class="fas fa-ellipsis-v text-dark px-1"></i> في أعلى متصفح Chrome.</li>
+                            <li>اختر <strong>"تثبيت التطبيق"</strong> أو <strong>"إضافة إلى الشاشة الرئيسية"</strong>.</li>
+                            <li>اضغط <strong>تثبيت</strong>، وسيظهر رمز التطبيق فوراً بين تطبيقات هاتفك.</li>
                         </ol>
                     </div>
 
                     <!-- iPhone / Safari Instructions -->
-                    <div class="p-3 bg-light rounded-3 mb-3 border">
-                        <h6 class="fw-bold text-dark mb-2">
-                            <i class="fab fa-apple text-dark me-1"></i> أجهزة آيفون (Safari):
-                        </h6>
-                        <ol class="small m-0 ps-3 text-secondary" style="line-height: 1.7;">
-                            <li>اضغط على زر المشاركة <i class="fas fa-share-square text-primary"></i> أسفل الشاشة.</li>
-                            <li>مرر لأسفل واختر <strong>"إضافة إلى الشاشة الرئيسية" (Add to Home Screen)</strong>.</li>
-                            <li>اضغط على <strong>"إضافة" (Add)</strong> في أعلى الزاوية.</li>
+                    <div class="p-3 bg-light rounded-4 mb-3 border border-slate-200">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="fab fa-apple text-dark fs-5"></i>
+                            <h6 class="fw-bold text-dark m-0">أجهزة آيفون و iPad (متصفح Safari):</h6>
+                        </div>
+                        <ol class="small m-0 ps-3 text-secondary" style="line-height: 1.8;">
+                            <li>اضغط على زر المشاركة <i class="fas fa-share-square text-primary px-1"></i> في شريط Safari السفلي.</li>
+                            <li>مرر لأسفل القائمة واختر <strong>"إضافة إلى الشاشة الرئيسية" (Add to Home Screen)</strong>.</li>
+                            <li>اضغط <strong>"إضافة" (Add)</strong> في الزاوية العلوية.</li>
                         </ol>
                     </div>
 
                     <!-- PC / Chrome Instructions -->
-                    <div class="p-3 bg-light rounded-3 border">
-                        <h6 class="fw-bold text-info mb-2">
-                            <i class="fas fa-desktop text-info me-1"></i> أجهزة الكمبيوتر (Chrome / Edge):
-                        </h6>
-                        <p class="small m-0 text-secondary">
-                            اضغط على أيقونة التثبيت <i class="fas fa-laptop-medical text-primary"></i> في شريط العنوان أعلى المتصفح، ثم اختر <strong>تثبيت</strong>.
+                    <div class="p-3 bg-light rounded-4 border border-slate-200">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="fas fa-desktop text-primary fs-5"></i>
+                            <h6 class="fw-bold text-dark m-0">أجهزة الكمبيوتر (Chrome / Edge):</h6>
+                        </div>
+                        <p class="small m-0 text-secondary" style="line-height: 1.7;">
+                            اضغط على أيقونة التثبيت <i class="fas fa-laptop-medical text-primary px-1"></i> الموجودة في شريط العنوان أعلى المتصفح ثم اختر <strong>تثبيت</strong>.
                         </p>
                     </div>
                 </div>
                 <div class="modal-footer bg-light p-3">
-                    <button type="button" class="btn btn-primary fw-bold px-4 w-100 rounded-pill" data-bs-dismiss="modal">
-                        فهمت ذلك!
+                    <button type="button" class="btn btn-success fw-bold px-4 w-100 rounded-pill py-2 shadow-sm" data-bs-dismiss="modal">
+                        <i class="fas fa-check-circle me-1"></i>فهمت ذلك، تم!
                     </button>
                 </div>
             </div>
@@ -897,8 +1096,124 @@
     </div>
 
 
+    <!-- Mobile App Bottom Navigation Bar (Ultra-responsive Native Experience) -->
+    <div class="mobile-bottom-nav d-flex d-md-none">
+        {% if user.is_authenticated %}
+            {% if user.role == 'trainee' %}
+                <a href="{% url 'portal:trainee_dashboard' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'trainee_dashboard' %}active{% endif %}">
+                    <i class="fas fa-home"></i>
+                    <span>الرئيسية</span>
+                </a>
+                <a href="{% url 'portal:lectures_hub' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'lectures_hub' %}active{% endif %}">
+                    <i class="fas fa-book-open"></i>
+                    <span>المحاضرات</span>
+                </a>
+                <a href="{% url 'portal:scan_qr_page' %}" class="mobile-nav-link nav-action-center {% if request.resolver_match.url_name == 'scan_qr_page' %}active{% endif %}">
+                    <div class="action-circle">
+                        <i class="fas fa-qrcode"></i>
+                    </div>
+                    <span>تسجيل QR</span>
+                </a>
+                <a href="{% url 'portal:chat_view' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'chat_view' %}active{% endif %}">
+                    <i class="fas fa-comments"></i>
+                    <span>المحادثات</span>
+                </a>
+                <a href="javascript:void(0)" class="mobile-nav-link" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebarOffcanvas">
+                    <i class="fas fa-bars"></i>
+                    <span>المزيد</span>
+                </a>
+            {% elif user.role == 'lecturer' %}
+                <a href="{% url 'portal:lecturer_dashboard' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'lecturer_dashboard' %}active{% endif %}">
+                    <i class="fas fa-home"></i>
+                    <span>الرئيسية</span>
+                </a>
+                <a href="{% url 'portal:daily_reports_list' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'daily_reports_list' %}active{% endif %}">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>التقارير</span>
+                </a>
+                <a href="{% url 'portal:lectures_hub' %}" class="mobile-nav-link nav-action-center {% if request.resolver_match.url_name == 'lectures_hub' %}active{% endif %}">
+                    <div class="action-circle">
+                        <i class="fas fa-book-open"></i>
+                    </div>
+                    <span>المحاضرات</span>
+                </a>
+                <a href="{% url 'portal:chat_view' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'chat_view' %}active{% endif %}">
+                    <i class="fas fa-comments"></i>
+                    <span>الدردشة</span>
+                </a>
+                <a href="javascript:void(0)" class="mobile-nav-link" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebarOffcanvas">
+                    <i class="fas fa-bars"></i>
+                    <span>المزيد</span>
+                </a>
+            {% elif user.role in 'super_admin,governorate_admin,director,training_officer' %}
+                <a href="{% url 'portal:admin_dashboard' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">
+                    <i class="fas fa-chart-line"></i>
+                    <span>الإدارة</span>
+                </a>
+                <a href="{% url 'portal:admin_management_hub' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'admin_management_hub' %}active{% endif %}">
+                    <i class="fas fa-users-cog"></i>
+                    <span>الشعب</span>
+                </a>
+                <a href="{% url 'portal:daily_reports_list' %}" class="mobile-nav-link nav-action-center {% if request.resolver_match.url_name == 'daily_reports_list' %}active{% endif %}">
+                    <div class="action-circle">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <span>التقارير</span>
+                </a>
+                <a href="{% url 'portal:chat_view' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'chat_view' %}active{% endif %}">
+                    <i class="fas fa-comments"></i>
+                    <span>الدردشة</span>
+                </a>
+                <a href="javascript:void(0)" class="mobile-nav-link" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebarOffcanvas">
+                    <i class="fas fa-bars"></i>
+                    <span>المزيد</span>
+                </a>
+            {% else %}
+                <a href="{% url 'portal:dashboard' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                    <i class="fas fa-home"></i>
+                    <span>الرئيسية</span>
+                </a>
+                <a href="{% url 'portal:lectures_hub' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'lectures_hub' %}active{% endif %}">
+                    <i class="fas fa-book-open"></i>
+                    <span>المحاضرات</span>
+                </a>
+                <a href="{% url 'portal:initiative_media_view' %}" class="mobile-nav-link nav-action-center {% if request.resolver_match.url_name == 'initiative_media_view' %}active{% endif %}">
+                    <div class="action-circle">
+                        <i class="fas fa-photo-video"></i>
+                    </div>
+                    <span>الميديا</span>
+                </a>
+                <a href="{% url 'portal:chat_view' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'chat_view' %}active{% endif %}">
+                    <i class="fas fa-comments"></i>
+                    <span>الدردشة</span>
+                </a>
+                <a href="javascript:void(0)" class="mobile-nav-link" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebarOffcanvas">
+                    <i class="fas fa-bars"></i>
+                    <span>المزيد</span>
+                </a>
+            {% endif %}
+        {% else %}
+            <a href="{% url 'portal:landing' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'landing' %}active{% endif %}">
+                <i class="fas fa-home"></i>
+                <span>الرئيسية</span>
+            </a>
+            <a href="{% url 'portal:initiative_media_view' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'initiative_media_view' %}active{% endif %}">
+                <i class="fas fa-photo-video"></i>
+                <span>الميديا</span>
+            </a>
+            <a href="{% url 'portal:learning_instructions' %}" class="mobile-nav-link {% if request.resolver_match.url_name == 'learning_instructions' %}active{% endif %}">
+                <i class="fas fa-hands-helping"></i>
+                <span>الإرشادات</span>
+            </a>
+            <a href="{% url 'portal:login' %}" class="mobile-nav-link nav-action-center">
+                <div class="action-circle">
+                    <i class="fas fa-sign-in-alt"></i>
+                </div>
+                <span>دخول</span>
+            </a>
+        {% endif %}
+    </div>
+
     {% block extra_js %}{% endblock %}
 </body>
-
-
 </html>

@@ -288,7 +288,7 @@
                                         data-days="{{ g.days|default:'' }}"
                                         data-start="{{ g.start_time|time:'H:i' }}"
                                         data-end="{{ g.end_time|time:'H:i' }}">
-                                    {{ g.name }} (المادة الحالية: {{ g.course.title }})
+                                    {{ g.name }}
                                 </option>
                                 {% endfor %}
                             </select>
@@ -318,9 +318,9 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-dark fw-bold">المدرب / المحاضر</label>
-                            <select name="instructor" class="form-select searchable-select">
-                                <option value="">اختر المدرب (اختياري)</option>
+                            <label class="form-label text-dark fw-bold">المدرب / المحاضر <span class="text-danger">* (إجباري)</span></label>
+                            <select name="instructor" class="form-select searchable-select" required>
+                                <option value="" disabled selected>-- اختر المدرب / المحاضر المسند للشعبة --</option>
                                 {% for lec in lecturers %}
                                 <option value="{{ lec.id }}">{{ lec.get_full_name|default:lec.username }}</option>
                                 {% endfor %}

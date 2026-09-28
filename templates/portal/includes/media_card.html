@@ -2,25 +2,29 @@
     <div class="card h-100 border-0 shadow-sm glass-card overflow-hidden rounded-4 transition-hover">
         
         <!-- Media Header / Media Preview Area -->
-        {% if item.media_type == 'video' %}
-            <div class="ratio ratio-16x9 bg-dark">
+        {% if item.media_type == 'video' or item.video_file or item.video_url %}
+            <div class="ratio ratio-16x9 bg-dark position-relative">
                 {% if item.video_file %}
-                    <video controls class="w-100 h-100 rounded-top" style="object-fit: cover;">
+                    <video controls class="w-100 h-100 rounded-top" style="object-fit: cover;" preload="metadata">
                         <source src="{{ item.video_file.url }}">
                         متصفحك لا يدعم تشغيل الفيديو المباشر.
                     </video>
+                {% elif item.embed_video_url %}
+                    <iframe class="w-100 h-100 rounded-top" src="{{ item.embed_video_url }}" title="{{ item.title }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
                 {% elif item.video_url %}
-                    <a href="{{ item.video_url }}" target="_blank" class="d-flex align-items-center justify-content-center text-white text-decoration-none bg-dark position-relative">
+                    <a href="{{ item.video_url }}" target="_blank" rel="noopener noreferrer" class="d-flex align-items-center justify-content-center text-white text-decoration-none bg-dark position-relative w-100 h-100">
                         {% if item.image %}
-                            <img src="{{ item.image.url }}" class="w-100 h-100 opacity-75" style="object-fit: cover;" alt="Thumbnail">
+                            <img src="{{ item.image.url }}" class="w-100 h-100 opacity-60" style="object-fit: cover;" alt="Thumbnail">
                         {% endif %}
-                        <div class="position-absolute top-50 start-50 translate-middle text-center">
-                            <i class="fab fa-youtube text-danger display-3 shadow"></i>
-                            <p class="m-0 fw-bold small text-white mt-1">مشاهدة الفيديو على الرابط الخارجي</p>
+                        <div class="position-absolute top-50 start-50 translate-middle text-center w-100 px-3">
+                            <div class="bg-danger text-white rounded-circle d-inline-flex align-items-center justify-content-center shadow-lg mb-2" style="width: 52px; height: 52px;">
+                                <i class="fas fa-play fs-4 ms-1"></i>
+                            </div>
+                            <p class="m-0 fw-bold small text-white">مشاهدة الفيديو على الرابط المرفق</p>
                         </div>
                     </a>
                 {% else %}
-                    <div class="d-flex align-items-center justify-content-center text-muted">
+                    <div class="d-flex align-items-center justify-content-center text-muted h-100">
                         <i class="fas fa-video fs-1"></i>
                     </div>
                 {% endif %}

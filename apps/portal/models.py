@@ -62,6 +62,28 @@ class InitiativeMedia(models.Model):
     created_by  = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, verbose_name="الناشر")
     created_at  = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ النشر")
 
+    @property
+    def embed_video_url(self):
+        if not self.video_url:
+            return None
+        import re
+        url = self.video_url.strip()
+        # YouTube matches (watch?v=, youtu.be/, shorts/, embed/)
+        yt_match = re.search(r'(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([^"&?\/ ]{11})', url)
+        if yt_match:
+            return f"https://www.youtube.com/embed/{yt_match.group(1)}"
+        # Vimeo
+        vimeo_match = re.search(r'vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)', url)
+        if vimeo_match:
+            v_id = vimeo_match.group(3) or vimeo_match.group(2) or vimeo_match.group(1)
+            if v_id:
+                return f"https://player.vimeo.com/video/{v_id}"
+        # Google Drive
+        drive_match = re.search(r'drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)', url)
+        if drive_match:
+            return f"https://drive.google.com/file/d/{drive_match.group(1)}/preview"
+        return None
+
     def __str__(self):
         scope = self.governorate.name if self.governorate else "وطني"
         return f"{self.get_media_type_display()}: {self.title} [{scope}]"

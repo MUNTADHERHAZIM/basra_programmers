@@ -1573,6 +1573,10 @@ def add_group_post(request):
         elif course_id:
             course = Course.objects.get(id=course_id)
             
+        if not instructor_id:
+            messages.error(request, "حقل المدرب / المحاضر إجباري. يرجى تحديد المدرب المسند للشعبة.")
+            return redirect('portal:admin_management_hub')
+
         if schedule_type == 'existing' and group_id:
             group = Group.objects.get(id=group_id)
             if name: group.name = name.strip()
@@ -3804,12 +3808,22 @@ def initiative_media_view(request):
     from apps.portal.models import InitiativeMedia
     user = request.user
     
-    media_items = InitiativeMedia.objects.select_related('created_by').all()
-    if not user.is_authenticated or user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR, CustomUser.Role.LECTURER, CustomUser.Role.SUPERVISOR]:
+    media_items = InitiativeMedia.objects.select_related('created_by', 'governorate').all().order_by('-created_at')
+    
+    # Non-staff and public only see public items
+    staff_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.LECTURER,
+        CustomUser.Role.SUPERVISOR
+    ]
+    if not user.is_authenticated or (user.role not in staff_roles and not user.is_staff and not user.is_superuser):
         media_items = media_items.filter(is_public=True)
 
-    videos = [m for m in media_items if m.media_type == InitiativeMedia.MediaType.VIDEO]
-    images = [m for m in media_items if m.media_type == InitiativeMedia.MediaType.IMAGE]
+    videos = [m for m in media_items if m.media_type == InitiativeMedia.MediaType.VIDEO or m.video_file or m.video_url]
+    images = [m for m in media_items if m.media_type == InitiativeMedia.MediaType.IMAGE and not m.video_file and not m.video_url]
     announcements = [m for m in media_items if m.media_type == InitiativeMedia.MediaType.ANNOUNCEMENT]
     
     context = {
@@ -3824,27 +3838,40 @@ def initiative_media_view(request):
 @login_required
 @require_POST
 def add_initiative_media_post(request):
-    """Allows Admins only to publish initiative photos, videos, and media updates."""
-    if request.user.role not in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR]:
-        messages.error(request, "غير مصرح بنشر محتوى الميديا. هذه الخاصية مقتصرة على إدارة المبادرة فقط.")
+    """Allows Admins, Officers, Lecturers, and Supervisors to publish initiative media updates."""
+    allowed_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.TRAINING_OFFICER,
+        CustomUser.Role.SUPERVISOR,
+        CustomUser.Role.LECTURER
+    ]
+    if request.user.role not in allowed_roles and not request.user.is_staff and not request.user.is_superuser:
+        messages.error(request, "غير مصرح بنشر محتوى الميديا. هذه الخاصية مقتصرة على الإدارة والمدربين فقط.")
         return redirect('portal:initiative_media_view')
         
     title = request.POST.get('title')
     description = request.POST.get('description', '')
-    media_type = request.POST.get('media_type', 'image')
+    media_type = request.POST.get('media_type', 'video')
     video_url = request.POST.get('video_url', '')
-    is_public = request.POST.get('is_public') == 'on' or request.POST.get('is_public') == 'true'
+    is_public = request.POST.get('is_public') == 'on' or request.POST.get('is_public') == 'true' or request.POST.get('is_public') == '1'
     
     image = request.FILES.get('image')
     video_file = request.FILES.get('video_file')
     attachment = request.FILES.get('attachment')
     
-    if not title:
+    if not title or not title.strip():
         messages.error(request, "عنوان المحتوى حقل مطلوب.")
         return redirect('portal:initiative_media_view')
+
+    # Auto-adjust media_type if video file or URL is provided
+    if video_file or (video_url and video_url.strip()):
+        media_type = 'video'
         
     from apps.portal.models import InitiativeMedia
     InitiativeMedia.objects.create(
+        governorate=getattr(request.user, 'governorate', None),
         title=title.strip(),
         description=description.strip() if description else None,
         media_type=media_type,
@@ -3856,7 +3883,7 @@ def add_initiative_media_post(request):
         created_by=request.user
     )
     
-    messages.success(request, "تم نشر المحتوى الإعلامي والفيديو بنجاح وإظهاره للطلاب والجميع!")
+    messages.success(request, "تم نشر المحتوى الإعلامي والفيديو بنجاح وإظهاره للجميع!")
     return redirect('portal:initiative_media_view')
 
 
@@ -3867,7 +3894,13 @@ def delete_initiative_media_post(request, media_id):
     from apps.portal.models import InitiativeMedia
     media = get_object_or_404(InitiativeMedia, id=media_id)
     
-    if request.user.role in [CustomUser.Role.SUPER_ADMIN, CustomUser.Role.DIRECTOR] or media.created_by == request.user:
+    allowed_admin_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.TRAINING_OFFICER
+    ]
+    if request.user.role in allowed_admin_roles or media.created_by == request.user or request.user.is_superuser:
         media.delete()
         messages.success(request, "تم حذف عنصر الميديا بنجاح.")
     else:

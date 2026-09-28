@@ -15,7 +15,7 @@
             <p class="text-slate-300 fs-6 m-0">استعرض أحدث الفيديوهات التعليمية، المعارض والأنشطة البرمجية، والإعلانات التوجيهية الخاصة بمبادرة 1000 مبرمج{% if current_governorate %} بـ{{ current_governorate.name }}{% elif request.governorate %} بـ{{ request.governorate.name }}{% endif %}.</p>
         </div>
         <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
-            {% if user.role == 'super_admin' or user.role == 'director' or user.role == 'governorate_admin' or user.role == 'training_officer' %}
+            {% if user.is_authenticated and user.role != 'trainee' and user.role != 'visitor' %}
             <button class="btn btn-warning px-4 py-2 fw-bold text-dark rounded-3 shadow" data-bs-toggle="modal" data-bs-target="#addMediaModal">
                 <i class="fas fa-plus-circle me-1"></i>نشر فيديو / ميديا جديدة
             </button>
@@ -149,7 +149,7 @@
 </div>
 
 <!-- Modal: Add New Initiative Media -->
-{% if user.role == 'super_admin' or user.role == 'director' or user.role == 'lecturer' or user.role == 'supervisor' %}
+{% if user.is_authenticated and user.role != 'trainee' and user.role != 'visitor' %}
 <div class="modal fade" id="addMediaModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg glass-card">
@@ -161,15 +161,15 @@
                 {% csrf_token %}
                 <div class="modal-body p-4">
                     <div class="row g-3">
-                        <div class="col-md-8">
-                            <label class="form-label fw-bold text-dark">عنوان المحتوى / الفيديو</label>
+                        <div class="col-md-7">
+                            <label class="form-label fw-bold text-dark">عنوان المحتوى / الفيديو <span class="text-danger">*</span></label>
                             <input type="text" name="title" class="form-control" placeholder="مثال: التقرير الفيديوي للحسابات والأنشطة البرمجية" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-5">
                             <label class="form-label fw-bold text-dark">نوع المحتوى</label>
-                            <select name="media_type" class="form-select" required>
-                                <option value="video">🎥 فيديو تعليمي / نشاط</option>
-                                <option value="image" selected>📷 صورة ومعرض</option>
+                            <select name="media_type" id="mediaTypeSelect" class="form-select" required>
+                                <option value="video" selected>🎥 فيديو تعليمي / نشاط</option>
+                                <option value="image">📷 صورة ومعرض</option>
                                 <option value="announcement">📢 إعلان / خبر رسمي</option>
                             </select>
                         </div>
@@ -179,22 +179,23 @@
                         </div>
                         
                         <div class="col-md-6 border-top pt-3">
-                            <label class="form-label fw-bold text-dark"><i class="fas fa-image me-1 text-success"></i>إرفاق صورة</label>
-                            <input type="file" name="image" class="form-control" accept="image/*">
+                            <label class="form-label fw-bold text-dark"><i class="fab fa-youtube me-1 text-danger"></i>رابط فيديو (YouTube / Drive / Vimeo)</label>
+                            <input type="url" name="video_url" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
+                            <div class="form-text text-muted small">يدعم روابط يوتيوب العادية، الشورتس، درايف، وفيميو</div>
                         </div>
 
                         <div class="col-md-6 border-top pt-3">
-                            <label class="form-label fw-bold text-dark"><i class="fas fa-file-video me-1 text-danger"></i>رفع ملف فيديو</label>
-                            <input type="file" name="video_file" class="form-control" accept="video/*">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-file-video me-1 text-danger"></i>أو رفع ملف فيديو مباشر</label>
+                            <input type="file" name="video_file" class="form-control" accept="video/mp4,video/webm,video/ogg,video/*">
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-dark"><i class="fab fa-youtube me-1 text-danger"></i>أو رابط فيديو (YouTube / Drive / Vimeo)</label>
-                            <input type="url" name="video_url" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-image me-1 text-success"></i>إرفاق صورة / غلاف (Thumbnail)</label>
+                            <input type="file" name="image" class="form-control" accept="image/*">
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-dark"><i class="fas fa-paperclip me-1 text-primary"></i>ملف مستند إضافي (مرفق)</label>
+                            <label class="form-label fw-bold text-dark"><i class="fas fa-paperclip me-1 text-primary"></i>ملف مستند إضافي (مرفق اختياري)</label>
                             <input type="file" name="attachment" class="form-control">
                         </div>
 
