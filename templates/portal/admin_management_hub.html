@@ -288,7 +288,7 @@
                                         data-days="{{ g.days|default:'' }}"
                                         data-start="{{ g.start_time|time:'H:i' }}"
                                         data-end="{{ g.end_time|time:'H:i' }}">
-                                    {{ g.name }}
+                                    {{ g.name }}{% if g.governorate %} - محافظة {{ g.governorate.name }}{% endif %}{% if g.code %} ({{ g.code }}){% endif %}
                                 </option>
                                 {% endfor %}
                             </select>
@@ -881,7 +881,7 @@
                             <select name="group" class="form-select">
                                 <option value="">اختر المجموعة</option>
                                 {% for g in groups %}
-                                <option value="{{ g.id }}">{{ g.name }}</option>
+                                <option value="{{ g.id }}">{{ g.name }}{% if g.governorate %} ({{ g.governorate.name }}){% endif %}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -971,7 +971,7 @@
                         <select id="traineeGroupFilter" class="form-select form-select-sm" onchange="filterTraineeTable()">
                             <option value="">-- الكل --</option>
                             {% for g in groups %}
-                            <option value="{{ g.name }}">{{ g.name }}</option>
+                            <option value="{{ g.name }}">{{ g.name }}{% if g.governorate %} ({{ g.governorate.name }}){% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -1388,7 +1388,7 @@
                             <select name="group_id" class="form-select">
                                 <option value="">-- اختر مجموعة دراسية --</option>
                                 {% for g in groups %}
-                                <option value="{{ g.id }}">{{ g.name }}</option>
+                                <option value="{{ g.id }}">{{ g.name }}{% if g.governorate %} ({{ g.governorate.name }}){% endif %}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -1655,7 +1655,7 @@
                                     <select name="group" class="form-select searchable-select">
                                         <option value="">اختر المجموعة (اختياري)</option>
                                         {% for g in groups %}
-                                        <option value="{{ g.id }}">📚 {{ g.name }}</option>
+                                        <option value="{{ g.id }}">📚 {{ g.name }}{% if g.governorate %} ({{ g.governorate.name }}){% endif %}</option>
                                         {% endfor %}
                                     </select>
                                 </div>
@@ -1706,7 +1706,7 @@
                                     <select name="group_id" class="form-select" x-model="batchGroupId" @change="fetchGroupStudents($event.target.value)">
                                         <option value="">-- بدون شعبة حالياً --</option>
                                         {% for g in groups %}
-                                        <option value="{{ g.id }}">{{ g.name }}</option>
+                                        <option value="{{ g.id }}">{{ g.name }}{% if g.governorate %} ({{ g.governorate.name }}){% endif %}</option>
                                         {% endfor %}
                                     </select>
                                 </div>

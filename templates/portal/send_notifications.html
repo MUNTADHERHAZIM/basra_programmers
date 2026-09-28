@@ -141,7 +141,7 @@
                         <select name="group_id" id="groupIdSelect" class="form-select py-2" onchange="updatePreview()">
                             <option value="">-- اختر شعبة دراسية --</option>
                             {% for g in groups %}
-                            <option value="{{ g.id }}" data-name="{{ g.name }}">شعبة: {{ g.name }}</option>
+                            <option value="{{ g.id }}" data-name="{{ g.name }}">شعبة: {{ g.name }}{% if g.governorate %} ({{ g.governorate.name }}){% endif %}</option>
                             {% endfor %}
                         </select>
                     </div>

@@ -155,7 +155,7 @@
                 <select name="group" class="form-select shadow-sm" onchange="this.form.submit()">
                     <option value="all" {% if group_filter == 'all' %}selected{% endif %}>📚 جميع الشعَب</option>
                     {% for g in groups %}
-                    <option value="{{ g.id }}" {% if group_filter == g.id|stringformat:"s" %}selected{% endif %}>🔹 {{ g.name }}</option>
+                    <option value="{{ g.id }}" {% if group_filter == g.id|stringformat:"s" %}selected{% endif %}>🔹 {{ g.name }}{% if g.governorate %} ({{ g.governorate.name }}){% endif %}</option>
                     {% endfor %}
                 </select>
             </div>
