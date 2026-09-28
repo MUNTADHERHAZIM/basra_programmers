@@ -3869,21 +3869,24 @@ def add_initiative_media_post(request):
     if video_file or (video_url and video_url.strip()):
         media_type = 'video'
         
-    from apps.portal.models import InitiativeMedia
-    InitiativeMedia.objects.create(
-        governorate=getattr(request.user, 'governorate', None),
-        title=title.strip(),
-        description=description.strip() if description else None,
-        media_type=media_type,
-        image=image,
-        video_file=video_file,
-        video_url=video_url.strip() if video_url else None,
-        attachment=attachment,
-        is_public=is_public,
-        created_by=request.user
-    )
-    
-    messages.success(request, "تم نشر المحتوى الإعلامي والفيديو بنجاح وإظهاره للجميع!")
+    try:
+        from apps.portal.models import InitiativeMedia
+        InitiativeMedia.objects.create(
+            governorate=getattr(request.user, 'governorate', None),
+            title=title.strip(),
+            description=description.strip() if description else None,
+            media_type=media_type,
+            image=image,
+            video_file=video_file,
+            video_url=video_url.strip() if video_url else None,
+            attachment=attachment,
+            is_public=is_public,
+            created_by=request.user
+        )
+        messages.success(request, "تم نشر المحتوى الإعلامي والفيديو بنجاح وإظهاره للجميع!")
+    except Exception as e:
+        messages.error(request, f"حدث خطأ أثناء حفظ ونشر الوسائط: {str(e)}")
+        
     return redirect('portal:initiative_media_view')
 
 
@@ -3892,7 +3895,10 @@ def add_initiative_media_post(request):
 def delete_initiative_media_post(request, media_id):
     """Allows deletion of initiative media items."""
     from apps.portal.models import InitiativeMedia
-    media = get_object_or_404(InitiativeMedia, id=media_id)
+    media = InitiativeMedia.objects.filter(id=media_id).first()
+    if not media:
+        messages.warning(request, "عنصر الميديا المطلوب حذفه غير موجود أو تم حذفه مسبقاً.")
+        return redirect('portal:initiative_media_view')
     
     allowed_admin_roles = [
         CustomUser.Role.SUPER_ADMIN,
@@ -3900,9 +3906,12 @@ def delete_initiative_media_post(request, media_id):
         CustomUser.Role.GOVERNORATE_ADMIN,
         CustomUser.Role.TRAINING_OFFICER
     ]
-    if request.user.role in allowed_admin_roles or media.created_by == request.user or request.user.is_superuser:
-        media.delete()
-        messages.success(request, "تم حذف عنصر الميديا بنجاح.")
+    if request.user.role in allowed_admin_roles or media.created_by == request.user or request.user.is_superuser or request.user.is_staff:
+        try:
+            media.delete()
+            messages.success(request, "تم حذف عنصر الميديا بنجاح.")
+        except Exception as e:
+            messages.error(request, f"حدث خطأ أثناء الحذف: {str(e)}")
     else:
         messages.error(request, "غير مصرح لك بحذف هذا العنصر.")
         

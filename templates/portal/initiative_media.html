@@ -157,7 +157,14 @@
                 <h5 class="modal-title fw-bold"><i class="fas fa-cloud-upload-alt text-warning me-2"></i>نشر فيديو / محتوى ميديا جديد</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST" action="{% url 'portal:add_initiative_media_post' %}" enctype="multipart/form-data">
+            <form id="addMediaPostForm" method="POST" action="{% url 'portal:add_initiative_media_post' %}" enctype="multipart/form-data" onsubmit="
+                const btn = document.getElementById('submitMediaPostBtn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class=\'spinner-border spinner-border-sm me-2\'></span> جاري النشر والرفع... يرجى الانتظار';
+                }
+                return true;
+            ">
                 {% csrf_token %}
                 <div class="modal-body p-4">
                     <div class="row g-3">
@@ -187,6 +194,7 @@
                         <div class="col-md-6 border-top pt-3">
                             <label class="form-label fw-bold text-dark"><i class="fas fa-file-video me-1 text-danger"></i>أو رفع ملف فيديو مباشر</label>
                             <input type="file" name="video_file" class="form-control" accept="video/mp4,video/webm,video/ogg,video/*">
+                            <div class="form-text text-muted small">يفضل ملفات MP4 خفيفة وسريعة التحميل</div>
                         </div>
 
                         <div class="col-md-6">
@@ -211,7 +219,7 @@
                 </div>
                 <div class="modal-footer bg-light px-4 py-3">
                     <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-warning px-5 fw-bold text-dark">
+                    <button type="submit" id="submitMediaPostBtn" class="btn btn-warning px-5 fw-bold text-dark">
                         <i class="fas fa-paper-plane me-1"></i>نشر المحتوى الآن
                     </button>
                 </div>

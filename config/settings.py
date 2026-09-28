@@ -147,8 +147,13 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Allow iframes from same origin (for PDF viewer)
+# Allow iframes from same origin (for PDF viewer and embedded media)
 X_FRAME_OPTIONS = "SAMEORIGIN"
+
+# Upload Limits (Allow up to 100MB for Videos, Media and Materials)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000
 
 # Telegram Bot Configuration
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7891234567:AAExampleTokenPlaceholderFor1000Programmers")
