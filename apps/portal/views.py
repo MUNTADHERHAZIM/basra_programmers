@@ -2806,13 +2806,17 @@ def accounts_management_view(request):
 
     if search_query:
         from django.db.models import Q
-        users_qs = users_qs.filter(
+        search_filter = (
             Q(username__icontains=search_query) |
             Q(first_name__icontains=search_query) |
             Q(last_name__icontains=search_query) |
             Q(email__icontains=search_query) |
-            Q(trainee_profile__training_number__icontains=search_query)
+            Q(phone_number__icontains=search_query) |
+            Q(trainee_profile__custom_training_number__icontains=search_query)
         )
+        if search_query.isdigit():
+            search_filter |= Q(trainee_profile__id=int(search_query))
+        users_qs = users_qs.filter(search_filter)
 
     if role_filter != 'all':
         users_qs = users_qs.filter(role=role_filter)
