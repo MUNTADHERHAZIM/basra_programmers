@@ -4414,7 +4414,7 @@ def contact_us(request):
     صفحة التواصل والدعم والاستفسارات العامة وعن المشاكل والاشتراكات.
     متاحة لجميع الزوار والمتدربين والمدربين.
     """
-    governorates = Governorate.objects.filter(is_active=True).order_by('name')
+    governorates = Governorate.objects.filter(status=Governorate.Status.ACTIVE).order_by('order', 'name')
     categories = ContactMessage.Category.choices
 
     if request.method == 'POST':
@@ -4543,7 +4543,7 @@ def admin_support_messages(request):
             Q(message__icontains=search_query)
         )
 
-    governorates = Governorate.objects.filter(is_active=True).order_by('name')
+    governorates = Governorate.objects.filter(status=Governorate.Status.ACTIVE).order_by('order', 'name')
 
     context = {
         'support_messages': messages_qs[:100],

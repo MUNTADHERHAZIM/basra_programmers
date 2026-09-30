@@ -271,30 +271,6 @@
                                 <i class="fas fa-trash-alt"></i>
                             </button>
                         </div>
-
-                        <!-- Delete Modal -->
-                        <div class="modal fade" id="deleteTicketModal{{ ticket.id }}" tabindex="-1" aria-hidden="true">
-                            <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content rounded-4 border-0 shadow">
-                                    <div class="modal-header bg-danger text-white">
-                                        <h5 class="modal-title fw-bold"><i class="fas fa-trash-alt me-2"></i>تأكيد حذف التذكرة</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body p-4 text-center">
-                                        <i class="fas fa-exclamation-triangle text-danger fs-1 mb-3"></i>
-                                        <h5 class="fw-bold">هل أنت متأكد من حذف التذكرة رقم #{{ ticket.id }}؟</h5>
-                                        <p class="text-muted small">الموضوع: {{ ticket.subject }} (المرسل: {{ ticket.name }})</p>
-                                    </div>
-                                    <div class="modal-footer bg-light justify-content-between">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                                        <form method="POST" action="{% url 'portal:admin_delete_support_message' ticket.id %}">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-danger fw-bold px-4">نعم، احذف</button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </td>
                 </tr>
                 {% empty %}
@@ -310,4 +286,33 @@
         </table>
     </div>
 </div>
+
+<!-- Modals for Delete (Rendered outside table container to prevent clipping) -->
+{% for ticket in support_messages %}
+<div class="modal fade" id="deleteTicketModal{{ ticket.id }}" tabindex="-1" aria-labelledby="deleteTicketModalLabel{{ ticket.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold" id="deleteTicketModalLabel{{ ticket.id }}">
+                    <i class="fas fa-trash-alt me-2"></i>تأكيد حذف التذكرة
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <i class="fas fa-exclamation-triangle text-danger fs-1 mb-3"></i>
+                <h5 class="fw-bold mb-2">هل أنت متأكد من حذف التذكرة رقم #{{ ticket.id }}؟</h5>
+                <p class="text-muted small mb-1"><strong>الموضوع:</strong> {{ ticket.subject }}</p>
+                <p class="text-muted small m-0"><strong>المرسل:</strong> {{ ticket.name }} ({{ ticket.email }})</p>
+            </div>
+            <div class="modal-footer bg-light justify-content-between">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <form method="POST" action="{% url 'portal:admin_delete_support_message' ticket.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger fw-bold px-4">نعم، احذف التذكرة</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 {% endblock %}
