@@ -1,4 +1,4 @@
-from .models import SiteConfiguration
+from .models import SiteConfiguration, ContactMessage
 
 
 def site_settings(request):
@@ -29,6 +29,7 @@ def site_settings(request):
         'is_national': getattr(request, 'is_national', False),
         'unread_notifications_count': 0,
         'all_notifications': [],
+        'unread_support_count': 0,
     }
 
     if request.user.is_authenticated:
@@ -36,4 +37,12 @@ def site_settings(request):
         context['unread_notifications_count'] = unread.count()
         context['all_notifications'] = request.user.notifications.all()[:10]
 
+        # Calculate unread support inquiries for admins
+        if request.user.role in ['super_admin', 'governorate_admin', 'director', 'training_officer']:
+            support_qs = ContactMessage.objects.filter(status='new')
+            if request.user.role != 'super_admin' and getattr(request.user, 'governorate', None):
+                support_qs = support_qs.filter(governorate=request.user.governorate)
+            context['unread_support_count'] = support_qs.count()
+
     return context
+

@@ -123,3 +123,79 @@ class LearningInstruction(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ContactMessage(models.Model):
+    """
+    رسائل وتذاكر الدعم والاستفسارات والمشاكل والاشتراكات في المبادرة
+    """
+    class Category(models.TextChoices):
+        GENERAL = 'general', 'استفسار عام عن المبادرة'
+        REGISTRATION = 'registration', 'الاشتراك والتسجيل والقبول'
+        TECHNICAL = 'technical', 'مشكلة تقنية أو خلل في المنصة'
+        COURSES = 'courses', 'استفسار عن الدورات والمناهج'
+        CERTIFICATES = 'certificates', 'الشهادات والنتائج'
+        SUGGESTION = 'suggestion', 'اقتراح أو فكرة تطويرية'
+        OTHER = 'other', 'أخرى'
+
+    class Status(models.TextChoices):
+        NEW = 'new', 'جديدة / قيد الانتظار'
+        IN_PROGRESS = 'in_progress', 'قيد المراجعة والمتابعة'
+        RESOLVED = 'resolved', 'تم الحل والرد'
+        CLOSED = 'closed', 'مغلقة'
+
+    class Priority(models.TextChoices):
+        LOW = 'low', 'منخفضة'
+        NORMAL = 'normal', 'عادية'
+        URGENT = 'urgent', 'عاجلة'
+
+    user = models.ForeignKey(
+        'users.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_messages',
+        verbose_name="المستخدم المسجل (إن وجد)"
+    )
+    name = models.CharField(max_length=150, verbose_name="الاسم الكامل")
+    email = models.EmailField(verbose_name="البريد الإلكتروني")
+    phone = models.CharField(max_length=30, blank=True, null=True, verbose_name="رقم الهاتف / واتساب")
+    governorate = models.ForeignKey(
+        'locations.Governorate',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_messages',
+        verbose_name="المحافظة"
+    )
+
+    category = models.CharField(max_length=30, choices=Category.choices, default=Category.GENERAL, verbose_name="نوع الاستفسار")
+    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.NORMAL, verbose_name="الأولوية")
+    subject = models.CharField(max_length=250, verbose_name="عنوان الرسالة / الموضوع")
+    message = models.TextField(verbose_name="نص الرسالة / تفاصيل الاستفسار")
+    attachment = models.FileField(upload_to='support_attachments/', blank=True, null=True, verbose_name="مرفق اختياري (صورة/مستند)")
+
+    # Admin handling
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW, verbose_name="حالة الرسالة")
+    admin_notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات الإدارة الداخلية")
+    admin_reply = models.TextField(blank=True, null=True, verbose_name="رد الإدارة المرسل")
+    handled_by = models.ForeignKey(
+        'users.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='handled_support_tickets',
+        verbose_name="المسؤول المتابع"
+    )
+    is_read = models.BooleanField(default=False, verbose_name="تمت قراءتها من الإدارة")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإرسال")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="آخر تحديث")
+
+    def __str__(self):
+        return f"[{self.get_category_display()}] {self.subject} - {self.name}"
+
+    class Meta:
+        verbose_name = "رسالة تواصل واستفسار"
+        verbose_name_plural = "رسائل التواصل والاستفسارات"
+        ordering = ['-created_at']
+

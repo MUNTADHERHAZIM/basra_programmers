@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+
+{% block title %}تواصل معنا والدعم الفني - مبادرة 1000 مبرمج{% endblock %}
+{% block header_title %}مركز التواصل والدعم الفني{% endblock %}
+
+{% block content %}
+<style>
+    .contact-hero {
+        background: linear-gradient(135deg, #064e3b 0%, #047857 50%, #1d4ed8 100%);
+        border-radius: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    .contact-hero::after {
+        content: '';
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 50%;
+        top: -100px;
+        left: -50px;
+    }
+    .contact-channel-card {
+        transition: all 0.3s ease;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+    .contact-channel-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+        border-color: #10b981;
+    }
+    .category-radio-card {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px;
+        text-align: center;
+        background: #fff;
+    }
+    .category-radio-card:hover {
+        border-color: #10b981;
+        background: #f0fdf4;
+    }
+    .category-radio:checked + .category-radio-card {
+        border-color: #10b981;
+        background: #ecfdf5;
+        box-shadow: 0 0 0 1px #10b981;
+        font-weight: bold;
+        color: #065f46;
+    }
+    .faq-accordion .accordion-button:not(.collapsed) {
+        background-color: #f0fdf4;
+        color: #065f46;
+        font-weight: bold;
+    }
+</style>
+
+<!-- Hero Section -->
+<div class="contact-hero text-white p-4 p-md-5 mb-5 shadow-lg position-relative">
+    <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+            <span class="badge bg-warning text-dark rounded-pill px-3 py-2 mb-3 fw-bold">
+                <i class="fas fa-headset me-1"></i>خدمة المستفيدين والمشاركين
+            </span>
+            <h1 class="display-6 fw-bold mb-3">تواصل مع إدارة مبادرة 1000 مبرمج 👋</h1>
+            <p class="fs-5 mb-0 text-white-50" style="line-height: 1.7;">
+                يسعدنا تلقي كافة أسئلتكم، استفسارات التسجيل والاشتراكات، البلاغات عن المشاكل التقنية في المنصة، أو المقترحات التطويرية. فريق الإدارة والمشرفين متواجد لخدمتكم ومتابعة طلباتكم بكل اهتمام.
+            </p>
+        </div>
+        <div class="col-lg-4 text-center d-none d-lg-block">
+            <div class="p-3 bg-white bg-opacity-10 rounded-circle d-inline-block">
+                <i class="fas fa-comments-dollar text-warning" style="font-size: 6rem; opacity: 0.9;"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Info Cards Grid -->
+<div class="row g-3 mb-5">
+    <div class="col-md-6 col-lg-3">
+        <div class="glass-card contact-channel-card p-4 h-100 rounded-4">
+            <div class="icon-box icon-box-primary mb-3 bg-success bg-opacity-10 text-success">
+                <i class="fas fa-user-plus fa-lg"></i>
+            </div>
+            <h5 class="fw-bold text-dark mb-2">التسجيل والاشتراكات</h5>
+            <p class="text-muted small mb-0">استفسارات عن شروط القبول، مواعيد الدورات الجديدة، وتأكيد الحسابات.</p>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="glass-card contact-channel-card p-4 h-100 rounded-4">
+            <div class="icon-box icon-box-primary mb-3 bg-danger bg-opacity-10 text-danger">
+                <i class="fas fa-tools fa-lg"></i>
+            </div>
+            <h5 class="fw-bold text-dark mb-2">الدعم الفني للمنصة</h5>
+            <p class="text-muted small mb-0">حل مشكلات تسجيل الدخول، مسح QR الحضور، ورفع الواجبات والمشاريع.</p>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="glass-card contact-channel-card p-4 h-100 rounded-4">
+            <div class="icon-box icon-box-primary mb-3 bg-primary bg-opacity-10 text-primary">
+                <i class="fas fa-certificate fa-lg"></i>
+            </div>
+            <h5 class="fw-bold text-dark mb-2">الشهادات والنتائج</h5>
+            <p class="text-muted small mb-0">مراجعة التقييمات، استخراج الشهادات الرسمية المعتمدة، والتحقق من الرموز.</p>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="glass-card contact-channel-card p-4 h-100 rounded-4">
+            <div class="icon-box icon-box-primary mb-3 bg-warning bg-opacity-10 text-warning">
+                <i class="fas fa-lightbulb fa-lg"></i>
+            </div>
+            <h5 class="fw-bold text-dark mb-2">أفكار ومقترحات</h5>
+            <p class="text-muted small mb-0">نرحب بمقترحاتكم لتطوير بيئة التدريب وإضافة مزايا جديدة لمنصة المبادرة.</p>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <!-- Contact Form Column -->
+    <div class="col-lg-7">
+        <div class="glass-card p-4 p-md-5 rounded-4 shadow-sm border-0 bg-white">
+            <div class="d-flex align-items-center mb-4 pb-2 border-bottom">
+                <div class="icon-box icon-box-primary me-3 bg-success text-white">
+                    <i class="fas fa-paper-plane"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold m-0 text-slate-900">إرسال استفسار أو طلب دعم</h4>
+                    <small class="text-muted">سيتم تحويل طلبك مباشرة للقسم المعني بالإدارة للرد عليك</small>
+                </div>
+            </div>
+
+            <form method="POST" action="{% url 'portal:contact_us' %}" enctype="multipart/form-data" id="contactForm">
+                {% csrf_token %}
+
+                <!-- Category Selector -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-dark">نوع الاستفسار أو المشكلة <span class="text-danger">*</span></label>
+                    <div class="row g-2">
+                        {% for cat_val, cat_label in categories %}
+                        <div class="col-6 col-sm-4">
+                            <input type="radio" class="d-none category-radio" name="category" id="cat_{{ cat_val }}" value="{{ cat_val }}" {% if forloop.first %}checked{% endif %}>
+                            <label class="category-radio-card w-100 h-100 d-flex flex-column justify-content-center" for="cat_{{ cat_val }}">
+                                <span class="small">{{ cat_label }}</span>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <!-- Name -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-dark">الاسم الكامل <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="fas fa-user text-muted"></i></span>
+                            <input type="text" name="name" class="form-control" placeholder="أدخل اسمك الثلاثي" 
+                                   value="{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}{{ form_data.name|default:'' }}{% endif %}" required>
+                        </div>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-dark">البريد الإلكتروني <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="fas fa-envelope text-muted"></i></span>
+                            <input type="email" name="email" class="form-control dir-ltr text-end" placeholder="name@example.com" 
+                                   value="{% if user.is_authenticated %}{{ user.email }}{% else %}{{ form_data.email|default:'' }}{% endif %}" required>
+                        </div>
+                    </div>
+
+                    <!-- Phone -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-dark">رقم الهاتف / واتساب <small class="text-muted">(اختياري)</small></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="fab fa-whatsapp text-success"></i></span>
+                            <input type="text" name="phone" class="form-control dir-ltr text-end" placeholder="07XXXXXXXXX" 
+                                   value="{% if user.is_authenticated and user.phone_number %}{{ user.phone_number }}{% else %}{{ form_data.phone|default:'' }}{% endif %}">
+                        </div>
+                    </div>
+
+                    <!-- Governorate -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-dark">المحافظة</label>
+                        <select name="governorate" class="form-select">
+                            <option value="">-- عام / غير محدد --</option>
+                            {% for gov in governorates %}
+                            <option value="{{ gov.id }}" {% if user.is_authenticated and user.governorate == gov %}selected{% endif %}>
+                                {{ gov.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Priority -->
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-dark">درجة الأولوية</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="priority" id="p_normal" value="normal" checked>
+                                <label class="form-check-label text-dark" for="p_normal">
+                                    <i class="fas fa-circle text-primary me-1" style="font-size:0.6rem;"></i>عادية
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="priority" id="p_low" value="low">
+                                <label class="form-check-label text-dark" for="p_low">
+                                    <i class="fas fa-circle text-muted me-1" style="font-size:0.6rem;"></i>منخفضة
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="priority" id="p_urgent" value="urgent">
+                                <label class="form-check-label text-danger fw-bold" for="p_urgent">
+                                    <i class="fas fa-exclamation-circle text-danger me-1"></i>عاجلة / طارئة
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subject -->
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-dark">عنوان الرسالة / الموضوع <span class="text-danger">*</span></label>
+                        <input type="text" name="subject" class="form-control form-control-lg" placeholder="مثال: استفسار حول موعد بدء الدورة القادمة أو مشكلة في الحساب" 
+                               value="{{ form_data.subject|default:'' }}" required>
+                    </div>
+
+                    <!-- Message -->
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-dark">تفاصيل الاستفسار أو المشكلة <span class="text-danger">*</span></label>
+                        <textarea name="message" class="form-control" rows="5" placeholder="اكتب استفسارك بالتفصيل مع ذكر أي معلومات تساعدنا على خدمتك بشكل أسرع..." required>{{ form_data.message|default:'' }}</textarea>
+                    </div>
+
+                    <!-- Attachment -->
+                    <div class="col-12">
+                        <label class="form-label fw-bold text-dark">مرفق اختياري <small class="text-muted">(صورة لشاشة الخطأ / مستند PDF / ملف مضغوط)</small></label>
+                        <input type="file" name="attachment" class="form-control" accept="image/*,.pdf,.doc,.docx,.zip,.rar">
+                        <small class="text-muted">الحد الأقصى للملف: 15 ميجابايت.</small>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="col-12 mt-4">
+                        <button type="submit" class="btn btn-success btn-lg w-100 py-3 fw-bold shadow rounded-3">
+                            <i class="fas fa-paper-plane me-2"></i>إرسال الرسالة إلى إدارة المبادرة
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- FAQ & Help Sidebar -->
+    <div class="col-lg-5">
+        <!-- Quick Help Card -->
+        <div class="glass-card p-4 rounded-4 border-0 mb-4 bg-primary text-white shadow-sm">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fas fa-shield-alt fs-2 text-warning me-3"></i>
+                <div>
+                    <h5 class="fw-bold m-0">رعاية العتبة الحسينية المقدسة</h5>
+                    <small class="text-white-50">مبادرة وطنية مجانية لتأهيل الشباب العراقي</small>
+                </div>
+            </div>
+            <p class="small mb-0 text-white-50">
+                فريق الإشراف والمتابعة يحرص على تقديم الدعم الفوري ومراجعة جميع تذاكر الدعم والرد عليها في أقرب وقت.
+            </p>
+        </div>
+
+        <!-- FAQ Section -->
+        <div class="glass-card p-4 rounded-4 border-0 bg-white shadow-sm">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fas fa-question-circle text-success fs-4 me-2"></i>
+                <h5 class="fw-bold m-0 text-slate-800">الأسئلة الشائعة (FAQ)</h5>
+            </div>
+
+            <div class="accordion accordion-flush faq-accordion" id="faqAccordion">
+                <div class="accordion-item border-bottom">
+                    <h2 class="accordion-header" id="faq1">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse1">
+                            كيف يمكنني التسجيل والاشتراك في المبادرة؟
+                        </button>
+                    </h2>
+                    <div id="faqCollapse1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-muted small">
+                            يتم فتح التسجيل لكل محافظة عبر استمارات رسمية يُعلن عنها في قنوات العتبة الحسينية المقدسة وموقع المبادرة. بعد القبول، يتم تزويد كل متدرب باسم مستخدم وكلمة مرور للدخول إلى المنصة.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item border-bottom">
+                    <h2 class="accordion-header" id="faq2">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse2">
+                            نسيت كلمة المرور الخاصة بحسابي، ماذا أفعل؟
+                        </button>
+                    </h2>
+                    <div id="faqCollapse2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-muted small">
+                            يمكنك إرسال طلب عبر هذه الصفحة باختيار (مشكلة تقنية) وتزويدنا برقمك التدريبي أو بريدك المسجل، وسيقوم مسؤول الحسابات بإعادة تعيين كلمة مرورك فوراً، أو يمكنك مراجعة مدرب الشعبة.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item border-bottom">
+                    <h2 class="accordion-header" id="faq3">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse3">
+                            كيف يتم تسجيل الحضور في المحاضرات؟
+                        </button>
+                    </h2>
+                    <div id="faqCollapse3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-muted small">
+                            يقوم المحاضر بعرض رمز QR في بداية المحاضرة داخل القاعة، ويقوم الطالب بفتح صفحة (تسجيل الحضور QR) من هاتفه ومسح الرمز، أو يقوم المحاضر بالتحضير اليدوي المباشر.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item border-bottom">
+                    <h2 class="accordion-header" id="faq4">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse4">
+                            متى وكيف أحصل على شهادة التخرج المعتمدة؟
+                        </button>
+                    </h2>
+                    <div id="faqCollapse4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-muted small">
+                            بعد إكمال الساعات التدريبية المطلوبة، واجتياز التقييمات والواجبات وتسليم المشروع النهائي بنجاح، تقوم الإدارة بإصدار شهادة رسمية إلكترونية قابلة للتحقق الفوري برمز QR وتحميلها بصيغة PDF.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq5">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse5">
+                            هل تتوفر فيديوهات وشروحات لكيفية استخدام المنصة؟
+                        </button>
+                    </h2>
+                    <div id="faqCollapse5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-muted small">
+                            نعم! يمكنك زيارة صفحة <a href="{% url 'portal:learning_instructions' %}" class="fw-bold text-success">دليل الاستخدام والتعلّم</a> لمشاهدة كافة الفيديوهات التوضيحية والتعليمات خطوة بخطوة.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

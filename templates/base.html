@@ -263,6 +263,13 @@
                         class="{% if request.resolver_match.url_name == 'activity_log' %}active{% endif %}">
                         <i class="fas fa-list-ul me-2"></i>سجل نشاطات الطلاب
                     </a>
+                    <a href="{% url 'portal:admin_support_messages' %}"
+                        class="{% if request.resolver_match.url_name in 'admin_support_messages,admin_support_detail' %}active{% endif %}">
+                        <i class="fas fa-envelope-open-text me-2 text-info"></i>استفسارات ورسائل الدعم
+                        {% if unread_support_count %}
+                        <span class="badge bg-danger rounded-pill float-end">{{ unread_support_count }}</span>
+                        {% endif %}
+                    </a>
                     {% if user.role == 'super_admin' %}
                     <a href="{% url 'portal:governorates_management' %}"
                         class="{% if request.resolver_match.url_name == 'governorates_management' %}active{% endif %}">
@@ -338,6 +345,11 @@
                         <i class="fas fa-calendar-alt me-2"></i>جدول المبادرة
                     </a>
 
+                    <a href="{% url 'portal:contact_us' %}"
+                        class="{% if request.resolver_match.url_name == 'contact_us' %}active{% endif %}">
+                        <i class="fas fa-headset me-2 text-success"></i>تواصل معنا / الدعم والاستفسار
+                    </a>
+
                     <a href="javascript:void(0)" onclick="triggerPwaInstall()" class="text-primary fw-bold bg-primary-subtle rounded-3 mt-2">
                         <i class="fas fa-download me-2 text-primary"></i>تثبيت التطبيق على جهازك
                     </a>
@@ -393,6 +405,12 @@
                     <a href="{% url 'portal:activity_log' %}" class="{% if request.resolver_match.url_name == 'activity_log' %}active{% endif %}">
                         <i class="fas fa-list-ul me-2"></i>سجل نشاطات الطلاب
                     </a>
+                    <a href="{% url 'portal:admin_support_messages' %}" class="{% if request.resolver_match.url_name in 'admin_support_messages,admin_support_detail' %}active{% endif %}">
+                        <i class="fas fa-envelope-open-text me-2 text-info"></i>استفسارات ورسائل الدعم
+                        {% if unread_support_count %}
+                        <span class="badge bg-danger rounded-pill float-end">{{ unread_support_count }}</span>
+                        {% endif %}
+                    </a>
                     {% if user.role == 'super_admin' %}
                     <a href="{% url 'portal:governorates_management' %}" class="{% if request.resolver_match.url_name == 'governorates_management' %}active{% endif %}">
                         <i class="fas fa-map-marked-alt me-2 text-info"></i>شبكة المحافظات والفروع
@@ -438,6 +456,9 @@
                     </a>
                     <a href="{% url 'portal:calendar_view' %}" class="{% if request.resolver_match.url_name == 'calendar_view' %}active{% endif %}">
                         <i class="fas fa-calendar-alt me-2"></i>جدول المبادرة
+                    </a>
+                    <a href="{% url 'portal:contact_us' %}" class="{% if request.resolver_match.url_name == 'contact_us' %}active{% endif %}">
+                        <i class="fas fa-headset me-2 text-success"></i>تواصل معنا والدعم
                     </a>
                     <a href="javascript:void(0)" onclick="triggerPwaInstall();" class="text-primary fw-bold bg-primary-subtle rounded-3 mt-2">
                         <i class="fas fa-download me-2 text-primary"></i>تثبيت التطبيق على جهازك
@@ -669,6 +690,11 @@
                                     <i class="fas fa-envelope text-success me-1"></i>
                                     <a href="mailto:muntadherhazim95@gmail.com"
                                         class="text-decoration-none text-muted font-monospace">muntadherhazim95@gmail.com</a>
+                                </div>
+                                <div class="mt-2">
+                                    <a href="{% url 'portal:contact_us' %}" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2 text-decoration-none">
+                                        <i class="fas fa-headset me-1"></i>مركز الدعم والاستفسارات
+                                    </a>
                                 </div>
                             </div>
                         </div>

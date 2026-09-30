@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+
+{% block title %}استفسارات ورسائل الدعم - إدارة المبادرة{% endblock %}
+{% block header_title %}مركز استفسارات ورسائل الدعم الفني{% endblock %}
+
+{% block content %}
+<style>
+    .support-stat-card {
+        border-radius: 16px;
+        transition: all 0.25s ease;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    .support-stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    }
+    .ticket-row-unread {
+        background-color: rgba(16, 185, 129, 0.04) !important;
+        font-weight: 600;
+    }
+    .ticket-badge-new {
+        background-color: #fee2e2;
+        color: #b91c1c;
+    }
+    .ticket-badge-progress {
+        background-color: #fef3c7;
+        color: #b45309;
+    }
+    .ticket-badge-resolved {
+        background-color: #d1fae5;
+        color: #047857;
+    }
+    .ticket-badge-closed {
+        background-color: #f1f5f9;
+        color: #475569;
+    }
+</style>
+
+<!-- Top Header & Actions -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h3 class="fw-bold text-slate-800 m-0"><i class="fas fa-envelope-open-text text-success me-2"></i>صندوق استفسارات ورسائل الدعم</h3>
+        <p class="text-muted small m-0 mt-1">متابعة وإدارة رسائل المستفيدين، مشاكل المنصة، طلبات الاشتراك، والمقترحات</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'portal:contact_us' %}" target="_blank" class="btn btn-outline-success rounded-pill px-3">
+            <i class="fas fa-external-link-alt me-1"></i>معاينة صفحة التواصل العامة
+        </a>
+        <a href="{% url 'portal:admin_dashboard' %}" class="btn btn-outline-secondary rounded-pill px-3">
+            <i class="fas fa-arrow-right me-1"></i>رجوع للوحة التحكم
+        </a>
+    </div>
+</div>
+
+<!-- KPI Stats Row -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="glass-card support-stat-card p-3 bg-white h-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted small d-block mb-1">إجمالي الرسائل</span>
+                    <h3 class="fw-bold text-slate-900 m-0">{{ total_count }}</h3>
+                </div>
+                <div class="icon-box icon-box-primary bg-primary bg-opacity-10 text-primary">
+                    <i class="fas fa-inbox"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="glass-card support-stat-card p-3 bg-white h-100 border-start border-4 border-danger">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted small d-block mb-1">جديدة وبانتظار المتابعة</span>
+                    <h3 class="fw-bold text-danger m-0">{{ new_count }}</h3>
+                </div>
+                <div class="icon-box icon-box-primary bg-danger bg-opacity-10 text-danger">
+                    <i class="fas fa-bell"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="glass-card support-stat-card p-3 bg-white h-100 border-start border-4 border-warning">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted small d-block mb-1">قيد المعالجة والمراجعة</span>
+                    <h3 class="fw-bold text-warning m-0">{{ in_progress_count }}</h3>
+                </div>
+                <div class="icon-box icon-box-primary bg-warning bg-opacity-10 text-warning">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="glass-card support-stat-card p-3 bg-white h-100 border-start border-4 border-success">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted small d-block mb-1">تم الرد والحل</span>
+                    <h3 class="fw-bold text-success m-0">{{ resolved_count }}</h3>
+                </div>
+                <div class="icon-box icon-box-primary bg-success bg-opacity-10 text-success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters & Search Bar -->
+<div class="glass-card p-3 mb-4 bg-white border-0 rounded-4 shadow-sm">
+    <form method="GET" action="{% url 'portal:admin_support_messages' %}" class="row g-2 align-items-center">
+        <!-- Status Filter -->
+        <div class="col-md-3">
+            <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">-- جميع الحالات ({{ total_count }}) --</option>
+                {% for s_val, s_label in statuses %}
+                <option value="{{ s_val }}" {% if selected_status == s_val %}selected{% endif %}>
+                    {{ s_label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Category Filter -->
+        <div class="col-md-3">
+            <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">-- جميع الأنواع والتصنيفات --</option>
+                {% for c_val, c_label in categories %}
+                <option value="{{ c_val }}" {% if selected_category == c_val %}selected{% endif %}>
+                    {{ c_label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Governorate Filter (for Super Admin) -->
+        {% if user.role == 'super_admin' %}
+        <div class="col-md-2">
+            <select name="governorate" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">-- كل المحافظات --</option>
+                {% for gov in governorates %}
+                <option value="{{ gov.id }}" {% if selected_gov == gov.id|stringformat:"s" %}selected{% endif %}>
+                    {{ gov.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <!-- Search Input -->
+        <div class="{% if user.role == 'super_admin' %}col-md-3{% else %}col-md-5{% endif %}">
+            <div class="input-group input-group-sm">
+                <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="بحث بالاسم، البريد، العنوان...">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
+            </div>
+        </div>
+
+        <!-- Reset Button -->
+        <div class="col-md-1 text-end">
+            {% if selected_status or selected_category or selected_gov or search_query %}
+            <a href="{% url 'portal:admin_support_messages' %}" class="btn btn-sm btn-outline-danger w-100" title="إلغاء التصفية">
+                <i class="fas fa-times"></i>
+            </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Support Tickets List Table -->
+<div class="glass-card p-0 bg-white border-0 rounded-4 shadow-sm overflow-hidden mb-5">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 50px;" class="text-center">#</th>
+                    <th>المرسل / مقدم الطلب</th>
+                    <th>نوع الاستفسار</th>
+                    <th>الموضوع وتفاصيل الرسالة</th>
+                    <th>المحافظة</th>
+                    <th>الأولوية</th>
+                    <th>الحالة</th>
+                    <th>التاريخ</th>
+                    <th class="text-center">الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in support_messages %}
+                <tr class="{% if not ticket.is_read %}ticket-row-unread{% endif %}">
+                    <td class="text-center fw-bold text-muted">{{ ticket.id }}</td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            {% if not ticket.is_read %}
+                            <span class="badge bg-danger rounded-circle p-1 me-2" title="غير مقروءة"><span class="visually-hidden">New</span></span>
+                            {% endif %}
+                            <div>
+                                <strong class="text-dark d-block">{{ ticket.name }}</strong>
+                                <small class="text-muted d-block dir-ltr text-end">{{ ticket.email }}</small>
+                                {% if ticket.phone %}
+                                <small class="text-success d-block dir-ltr text-end"><i class="fab fa-whatsapp me-1"></i>{{ ticket.phone }}</small>
+                                {% endif %}
+                                {% if ticket.user %}
+                                <span class="badge bg-info-subtle text-info border border-info-subtle mt-1" style="font-size: 0.65rem;">
+                                    <i class="fas fa-user-check me-1"></i>حساب مسجل ({{ ticket.user.get_role_display }})
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-subtle text-secondary border px-2 py-1">
+                            {{ ticket.get_category_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="max-width: 300px;">
+                            <a href="{% url 'portal:admin_support_detail' ticket.id %}" class="fw-bold text-slate-800 text-decoration-none d-block mb-1 line-clamp-1">
+                                {{ ticket.subject }}
+                            </a>
+                            <p class="text-muted small m-0 line-clamp-2" style="font-size: 0.8rem;">
+                                {{ ticket.message }}
+                            </p>
+                            {% if ticket.attachment %}
+                            <span class="badge bg-light text-primary border mt-1" style="font-size: 0.7rem;">
+                                <i class="fas fa-paperclip me-1"></i>يوجد مرفق
+                            </span>
+                            {% endif %}
+                            {% if ticket.admin_reply %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle mt-1 ms-1" style="font-size: 0.7rem;">
+                                <i class="fas fa-reply me-1"></i>تم الرد
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border">
+                            <i class="fas fa-map-marker-alt me-1 text-danger"></i>{{ ticket.governorate.name|default:"عام" }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if ticket.priority == 'urgent' %}
+                        <span class="badge bg-danger text-white"><i class="fas fa-exclamation-triangle me-1"></i>عاجلة</span>
+                        {% elif ticket.priority == 'low' %}
+                        <span class="badge bg-light text-muted border">منخفضة</span>
+                        {% else %}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">عادية</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if ticket.status == 'new' %}
+                        <span class="badge ticket-badge-new px-2 py-1 rounded-pill">جديدة</span>
+                        {% elif ticket.status == 'in_progress' %}
+                        <span class="badge ticket-badge-progress px-2 py-1 rounded-pill">قيد المتابعة</span>
+                        {% elif ticket.status == 'resolved' %}
+                        <span class="badge ticket-badge-resolved px-2 py-1 rounded-pill"><i class="fas fa-check me-1"></i>تم الحل</span>
+                        {% else %}
+                        <span class="badge ticket-badge-closed px-2 py-1 rounded-pill">مغلقة</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <small class="text-muted d-block">{{ ticket.created_at|date:"Y-m-d" }}</small>
+                        <small class="text-muted" style="font-size: 0.7rem;">{{ ticket.created_at|time:"H:i" }}</small>
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'portal:admin_support_detail' ticket.id %}" class="btn btn-outline-primary" title="عرض التفاصيل والرد">
+                                <i class="fas fa-eye me-1"></i>عرض والرد
+                            </a>
+                            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTicketModal{{ ticket.id }}" title="حذف">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+
+                        <!-- Delete Modal -->
+                        <div class="modal fade" id="deleteTicketModal{{ ticket.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content rounded-4 border-0 shadow">
+                                    <div class="modal-header bg-danger text-white">
+                                        <h5 class="modal-title fw-bold"><i class="fas fa-trash-alt me-2"></i>تأكيد حذف التذكرة</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body p-4 text-center">
+                                        <i class="fas fa-exclamation-triangle text-danger fs-1 mb-3"></i>
+                                        <h5 class="fw-bold">هل أنت متأكد من حذف التذكرة رقم #{{ ticket.id }}؟</h5>
+                                        <p class="text-muted small">الموضوع: {{ ticket.subject }} (المرسل: {{ ticket.name }})</p>
+                                    </div>
+                                    <div class="modal-footer bg-light justify-content-between">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                                        <form method="POST" action="{% url 'portal:admin_delete_support_message' ticket.id %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-danger fw-bold px-4">نعم، احذف</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center py-5 text-muted">
+                        <i class="fas fa-inbox display-4 d-block mb-3 opacity-25"></i>
+                        <h5>لا توجد رسائل أو استفسارات مطابقة</h5>
+                        <p class="small text-muted m-0">لم تصل أي رسائل جديدة بعد، أو لم تطابق خيارات التصفية المدخلة.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -26,7 +26,7 @@ from apps.users.services import ImportExportService, LectureGroupImportExportSer
 from apps.notifications.models import Notification, InternalMessage
 from apps.gamification.services import award_points
 from apps.locations.models import Governorate
-from apps.portal.models import LearningInstruction
+from apps.portal.models import LearningInstruction, ContactMessage
 from apps.users.permissions import get_groups_qs_for_user, get_trainees_qs_for_user
 
 # ==========================================
@@ -4403,4 +4403,261 @@ def delete_lecture_material_post(request, lecture_id):
     lecture.delete()
     messages.success(request, f"تم حذف المحاضرة '{title}' بنجاح.")
     return redirect('portal:lectures_hub')
+
+
+# ==========================================
+# Contact Us & Support Inquiries Views
+# ==========================================
+
+def contact_us(request):
+    """
+    صفحة التواصل والدعم والاستفسارات العامة وعن المشاكل والاشتراكات.
+    متاحة لجميع الزوار والمتدربين والمدربين.
+    """
+    governorates = Governorate.objects.filter(is_active=True).order_by('name')
+    categories = ContactMessage.Category.choices
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        email = request.POST.get('email', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        governorate_id = request.POST.get('governorate', '').strip()
+        category = request.POST.get('category', ContactMessage.Category.GENERAL).strip()
+        priority = request.POST.get('priority', ContactMessage.Priority.NORMAL).strip()
+        subject = request.POST.get('subject', '').strip()
+        message_text = request.POST.get('message', '').strip()
+        attachment = request.FILES.get('attachment')
+
+        # Validation
+        if not name or not email or not subject or not message_text:
+            messages.error(request, "يرجى تعبئة جميع الحقول المطلوبة (الاسم، البريد الإلكتروني، عنوان الرسالة، وتفاصيل الاستفسار).")
+            return render(request, 'portal/contact_us.html', {
+                'governorates': governorates,
+                'categories': categories,
+                'form_data': request.POST,
+            })
+
+        gov_obj = None
+        if governorate_id and governorate_id.isdigit():
+            gov_obj = Governorate.objects.filter(id=int(governorate_id)).first()
+        elif request.user.is_authenticated and getattr(request.user, 'governorate', None):
+            gov_obj = request.user.governorate
+
+        try:
+            ticket = ContactMessage.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                name=name,
+                email=email,
+                phone=phone or None,
+                governorate=gov_obj,
+                category=category,
+                priority=priority,
+                subject=subject,
+                message=message_text,
+                attachment=attachment,
+            )
+
+            # Try to notify admins via telegram or notification
+            try:
+                from apps.notifications.telegram import send_telegram_message
+                admin_users = CustomUser.objects.filter(
+                    role__in=[CustomUser.Role.SUPER_ADMIN, CustomUser.Role.GOVERNORATE_ADMIN],
+                    telegram_chat_id__isnull=False
+                ).exclude(telegram_chat_id='')
+                
+                if gov_obj:
+                    admin_users = admin_users.filter(Q(role=CustomUser.Role.SUPER_ADMIN) | Q(governorate=gov_obj))
+
+                tg_msg = (
+                    f"📬 <b>استفسار/رسالة دعم جديدة في المنصة</b>\n\n"
+                    f"👤 <b>المرسل:</b> {name}\n"
+                    f"📂 <b>النوع:</b> {ticket.get_category_display()}\n"
+                    f"🏢 <b>المحافظة:</b> {gov_obj.name if gov_obj else 'عام/وطني'}\n"
+                    f"📌 <b>العنوان:</b> {subject}\n"
+                    f"💬 <b>الرسالة:</b> {message_text[:120]}...\n\n"
+                    f"🔗 يمكنك مراجعة الرد عبر لوحة تحكم الإدارة."
+                )
+                for admin in admin_users[:5]:
+                    send_telegram_message(admin.telegram_chat_id, tg_msg)
+            except Exception:
+                pass
+
+            messages.success(request, "تم استلام رسالتك واستفسارك بنجاح! سيقوم فريق إدارة المبادرة بمراجعتها والرد عليك في أقرب وقت.")
+            return redirect('portal:contact_us')
+        except Exception as e:
+            messages.error(request, f"حدث خطأ أثناء إرسال الرسالة: {str(e)}")
+
+    return render(request, 'portal/contact_us.html', {
+        'governorates': governorates,
+        'categories': categories,
+    })
+
+
+@login_required
+def admin_support_messages(request):
+    """
+    لوحة إدارة استفسارات وتذاكر الدعم والاشتراكات والمشاكل (خاصة بالإدارة فقط).
+    """
+    user = request.user
+    allowed_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+    ]
+    if user.role not in allowed_roles:
+        messages.error(request, "غير مصرح لك بالوصول إلى مركز استفسارات ورسائل الدعم.")
+        return redirect('portal:dashboard')
+
+    messages_qs = ContactMessage.objects.select_related('user', 'governorate', 'handled_by').all()
+
+    # Scope by governorate for branch admins
+    if user.role != CustomUser.Role.SUPER_ADMIN and getattr(user, 'governorate', None):
+        messages_qs = messages_qs.filter(Q(governorate=user.governorate) | Q(governorate__isnull=True))
+
+    # Stats / Counters
+    total_count = messages_qs.count()
+    new_count = messages_qs.filter(status=ContactMessage.Status.NEW).count()
+    in_progress_count = messages_qs.filter(status=ContactMessage.Status.IN_PROGRESS).count()
+    resolved_count = messages_qs.filter(status=ContactMessage.Status.RESOLVED).count()
+    urgent_count = messages_qs.filter(priority=ContactMessage.Priority.URGENT).count()
+
+    # Filters
+    selected_status = request.GET.get('status', '').strip()
+    selected_category = request.GET.get('category', '').strip()
+    selected_gov = request.GET.get('governorate', '').strip()
+    search_query = request.GET.get('q', '').strip()
+
+    if selected_status:
+        messages_qs = messages_qs.filter(status=selected_status)
+    if selected_category:
+        messages_qs = messages_qs.filter(category=selected_category)
+    if selected_gov and selected_gov.isdigit():
+        messages_qs = messages_qs.filter(governorate_id=int(selected_gov))
+    if search_query:
+        messages_qs = messages_qs.filter(
+            Q(name__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(phone__icontains=search_query) |
+            Q(subject__icontains=search_query) |
+            Q(message__icontains=search_query)
+        )
+
+    governorates = Governorate.objects.filter(is_active=True).order_by('name')
+
+    context = {
+        'support_messages': messages_qs[:100],
+        'total_count': total_count,
+        'new_count': new_count,
+        'in_progress_count': in_progress_count,
+        'resolved_count': resolved_count,
+        'urgent_count': urgent_count,
+        'categories': ContactMessage.Category.choices,
+        'statuses': ContactMessage.Status.choices,
+        'priorities': ContactMessage.Priority.choices,
+        'governorates': governorates,
+        'selected_status': selected_status,
+        'selected_category': selected_category,
+        'selected_gov': selected_gov,
+        'search_query': search_query,
+    }
+    return render(request, 'portal/admin_support_messages.html', context)
+
+
+@login_required
+def admin_support_detail(request, ticket_id):
+    """
+    عرض وتحديث تفاصيل تذكرة الاستفسار / الدعم الفني، وإضافة الرد والملاحظات وتغيير الحالة.
+    """
+    user = request.user
+    allowed_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+        CustomUser.Role.TRAINING_OFFICER,
+    ]
+    if user.role not in allowed_roles:
+        messages.error(request, "غير مصرح لك بالوصول.")
+        return redirect('portal:dashboard')
+
+    ticket = get_object_or_404(ContactMessage, id=ticket_id)
+
+    # Permission check for governorate admin
+    if user.role != CustomUser.Role.SUPER_ADMIN and user.governorate and ticket.governorate and ticket.governorate != user.governorate:
+        messages.error(request, "غير مصرح لك بإدارة رسائل خاصة بمحافظة أخرى.")
+        return redirect('portal:admin_support_messages')
+
+    if request.method == 'POST':
+        new_status = request.POST.get('status')
+        new_priority = request.POST.get('priority')
+        admin_notes = request.POST.get('admin_notes', '').strip()
+        admin_reply = request.POST.get('admin_reply', '').strip()
+
+        if new_status in dict(ContactMessage.Status.choices):
+            ticket.status = new_status
+        if new_priority in dict(ContactMessage.Priority.choices):
+            ticket.priority = new_priority
+
+        ticket.admin_notes = admin_notes
+        
+        reply_added = bool(admin_reply and admin_reply != ticket.admin_reply)
+        ticket.admin_reply = admin_reply
+        ticket.handled_by = user
+        ticket.is_read = True
+        ticket.save()
+
+        # If user is registered in the platform and an admin reply was sent, create in-app notification
+        if reply_added and ticket.user:
+            try:
+                Notification.objects.create(
+                    user=ticket.user,
+                    title="رد من إدارة المبادرة على استفسارك",
+                    message=f"تم الرد على استفسارك '{ticket.subject}': {admin_reply[:120]}...",
+                    link="/portal/contact/"
+                )
+            except Exception:
+                pass
+
+        messages.success(request, f"تم تحديث بيانات التذكرة #{ticket.id} والرد بنجاح.")
+        return redirect('portal:admin_support_detail', ticket_id=ticket.id)
+
+    # Mark as read on GET
+    if not ticket.is_read:
+        ticket.is_read = True
+        ticket.save(update_fields=['is_read'])
+
+    context = {
+        'ticket': ticket,
+        'statuses': ContactMessage.Status.choices,
+        'priorities': ContactMessage.Priority.choices,
+    }
+    return render(request, 'portal/admin_support_detail.html', context)
+
+
+@login_required
+@require_POST
+def admin_delete_support_message(request, ticket_id):
+    """
+    حذف رسالة استفسار / تذكرة دعم (خاص بالإدارة).
+    """
+    user = request.user
+    allowed_roles = [
+        CustomUser.Role.SUPER_ADMIN,
+        CustomUser.Role.GOVERNORATE_ADMIN,
+        CustomUser.Role.DIRECTOR,
+    ]
+    if user.role not in allowed_roles:
+        messages.error(request, "غير مصرح لك بحذف الرسائل.")
+        return redirect('portal:admin_support_messages')
+
+    ticket = get_object_or_404(ContactMessage, id=ticket_id)
+    if user.role != CustomUser.Role.SUPER_ADMIN and user.governorate and ticket.governorate and ticket.governorate != user.governorate:
+        messages.error(request, "لا يمكنك حذف رسائل محافظة أخرى.")
+        return redirect('portal:admin_support_messages')
+
+    ticket_id_val = ticket.id
+    ticket.delete()
+    messages.success(request, f"تم حذف التذكرة رقم #{ticket_id_val} بنجاح.")
+    return redirect('portal:admin_support_messages')
+
 

@@ -217,9 +217,27 @@
                                 <td>{{ sub.assignment.title }} <br> <small class="text-muted">({{ sub.assignment.group.name }})</small></td>
                                 <td>{{ sub.submitted_at|date:"Y-m-d H:i" }}</td>
                                 <td>
-                                    <a href="{{ sub.file.url }}" target="_blank" class="text-decoration-none text-success">
-                                        <i class="fas fa-file-download me-1"></i>تحميل الملف
-                                    </a>
+                                    {% if sub.file %}
+                                        <a href="{{ sub.file.url }}" target="_blank" class="text-decoration-none text-success">
+                                            <i class="fas fa-file-download me-1"></i>تحميل الملف
+                                        </a>
+                                    {% elif sub.image %}
+                                        <a href="{{ sub.image.url }}" target="_blank" class="text-decoration-none text-info">
+                                            <i class="fas fa-image me-1"></i>معاينة الصورة
+                                        </a>
+                                    {% elif sub.video_file %}
+                                        <a href="{{ sub.video_file.url }}" target="_blank" class="text-decoration-none text-warning">
+                                            <i class="fas fa-video me-1"></i>مشاهدة الفيديو
+                                        </a>
+                                    {% elif sub.video_url %}
+                                        <a href="{{ sub.video_url }}" target="_blank" class="text-decoration-none text-danger">
+                                            <i class="fab fa-youtube me-1"></i>رابط يوتيوب
+                                        </a>
+                                    {% elif sub.submission_text %}
+                                        <span class="text-muted small"><i class="fas fa-comment-alt me-1"></i>إجابة نصية</span>
+                                    {% else %}
+                                        <span class="text-muted small">لا يوجد ملف</span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if sub.grade is not None %}

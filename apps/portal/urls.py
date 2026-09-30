@@ -142,6 +142,12 @@ urlpatterns = [
     path('sw.js', views.service_worker_view, name='service_worker'),
     path('offline/', views.offline_view, name='offline'),
 
+    # Contact Us & Support Tickets (Inquiries / Issues / Subscriptions)
+    path('contact/', views.contact_us, name='contact_us'),
+    path('manage/support-messages/', views.admin_support_messages, name='admin_support_messages'),
+    path('manage/support-messages/<int:ticket_id>/', views.admin_support_detail, name='admin_support_detail'),
+    path('manage/support-messages/<int:ticket_id>/delete/', views.admin_delete_support_message, name='admin_delete_support_message'),
+
     # Fallback catch-all 404 page route
     path('<path:invalid_path>/', views.custom_404_view, name='catch_all_404'),
 ]

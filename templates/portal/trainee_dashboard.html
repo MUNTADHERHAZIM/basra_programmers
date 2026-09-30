@@ -325,7 +325,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>المحاضرة الأكاديمية</th>
-                                <th>التاريخ والوقت</th>
+                                <th>تاريخ المحاضرة</th>
                                 <th>حالة الحضور</th>
                                 <th>وقت تسجيل الحضور</th>
                                 <th>طريقة التحضير</th>
@@ -335,7 +335,7 @@
                             {% for att in attendances %}
                             <tr>
                                 <td class="fw-bold text-dark">{{ att.lecture.title }}</td>
-                                <td>{{ att.lecture.date }} ({{ att.lecture.start_time|time:"H:i" }} - {{ att.lecture.end_time|time:"H:i" }})</td>
+                                <td>{{ att.lecture.date }}</td>
                                 <td>
                                     {% if att.status == 'present' %}
                                         <span class="badge bg-success-subtle text-success fs-6"><i class="fas fa-check-circle me-1"></i>حاضر</span>

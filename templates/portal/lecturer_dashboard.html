@@ -95,7 +95,6 @@
                                 <th>المحاضرة والمادة</th>
                                 <th>الشعبة / المجموعة</th>
                                 <th>تاريخ المحاضرة</th>
-                                <th>وقت المحاضرة</th>
                                 <th class="text-center">تسجيل الحضور اليومي</th>
                             </tr>
                         </thead>
@@ -105,7 +104,6 @@
                                 <td class="fw-bold text-dark fs-6">{{ lec.title }}</td>
                                 <td><span class="badge bg-primary fs-7 px-3 py-1">{{ lec.group.name }}</span></td>
                                 <td><span class="fw-bold text-success">{{ lec.date }}</span></td>
-                                <td>{{ lec.start_time|time:"H:i" }} - {{ lec.end_time|time:"H:i" }}</td>
                                 <td class="text-center">
                                     <a href="{% url 'portal:mark_attendance_manual' lec.id %}" class="btn btn-sm btn-success px-3 shadow-sm rounded-pill fw-bold">
                                         <i class="fas fa-user-check me-1"></i>تسجيل حضور وغياب الطلاب اليوم
@@ -117,7 +115,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="5" class="text-center py-4 text-muted">
+                                <td colspan="4" class="text-center py-4 text-muted">
                                     <i class="fas fa-calendar-minus me-2 text-secondary"></i>لا توجد محاضرات مجدولة لليوم في مجموعاتك.
                                 </td>
                             </tr>
@@ -137,7 +135,6 @@
                                 <th>المحاضرة</th>
                                 <th>المجموعة</th>
                                 <th>التاريخ المحدد</th>
-                                <th>الوقت</th>
                                 <th class="text-center">حالة تسجيل الحضور</th>
                             </tr>
                         </thead>
@@ -147,7 +144,6 @@
                                 <td class="fw-bold">{{ lec.title }}</td>
                                 <td><span class="badge bg-secondary">{{ lec.group.name }}</span></td>
                                 <td><span class="badge bg-info-subtle text-info fw-bold">{{ lec.date }}</span></td>
-                                <td>{{ lec.start_time|time:"H:i" }} - {{ lec.end_time|time:"H:i" }}</td>
                                 <td class="text-center">
                                     <span class="btn btn-sm btn-light text-muted border rounded-pill disabled" style="cursor: not-allowed;">
                                         <i class="fas fa-lock me-1"></i>يفتح في يوم المحاضرة ({{ lec.date }})
@@ -156,7 +152,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="5" class="text-center py-4 text-muted">لا توجد محاضرات قادمة للأيام المقبولة</td>
+                                <td colspan="4" class="text-center py-4 text-muted">لا توجد محاضرات قادمة للأيام المقبولة</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -302,7 +298,21 @@
                                             <tr>
                                                 <td class="fw-bold">{{ sub.trainee.get_full_name|default:sub.trainee.username }}</td>
                                                 <td>{{ sub.submitted_at|date:"Y-m-d H:i" }}</td>
-                                                <td><a href="{{ sub.file.url }}" target="_blank" class="text-decoration-none text-success"><i class="fas fa-file-download me-1"></i>تحميل الحل</a></td>
+                                                <td>
+                                                    {% if sub.file %}
+                                                        <a href="{{ sub.file.url }}" target="_blank" class="text-decoration-none text-success"><i class="fas fa-file-download me-1"></i>تحميل الحل</a>
+                                                    {% elif sub.image %}
+                                                        <a href="{{ sub.image.url }}" target="_blank" class="text-decoration-none text-info"><i class="fas fa-image me-1"></i>معاينة الصورة</a>
+                                                    {% elif sub.video_file %}
+                                                        <a href="{{ sub.video_file.url }}" target="_blank" class="text-decoration-none text-warning"><i class="fas fa-video me-1"></i>مشاهدة الفيديو</a>
+                                                    {% elif sub.video_url %}
+                                                        <a href="{{ sub.video_url }}" target="_blank" class="text-decoration-none text-danger"><i class="fab fa-youtube me-1"></i>رابط يوتيوب</a>
+                                                    {% elif sub.submission_text %}
+                                                        <span class="text-muted small"><i class="fas fa-comment-alt me-1"></i>إجابة نصية</span>
+                                                    {% else %}
+                                                        <span class="text-muted small">لا يوجد ملف</span>
+                                                    {% endif %}
+                                                </td>
                                                 <td>
                                                     {% if sub.grade is not None %}
                                                         <span class="badge bg-success">{{ sub.grade }}/10</span>
